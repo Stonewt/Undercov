@@ -13,7 +13,10 @@
         <div id="topRoomInfo" class="top-meta hidden"></div>
       </div>
 
-      <h1>Undercover</h1>
+      <div class="brand-title">
+        <img src="/logo_site.png" alt="Logo Undercover" class="brand-logo" />
+        <h1>Undercover</h1>
+      </div>
 
       <div class="topbar-side topbar-right">
         <div id="topHostInfo" class="top-meta hidden"></div>
@@ -43,23 +46,29 @@
     <main class="page-center">
       <div class="start-screen" id="startWrap">
         <div class="start-card" id="roomSetupCard">
-          <h2>Se connecter à une salle</h2>
-          <p class="start-subtitle">Crée une room ou rejoins-en une avec un code.</p>
-
-          <div class="form-block">
-            <label for="nameInput">Pseudo</label>
-            <input id="nameInput" maxlength="20" placeholder="Ton pseudo" />
+          <div class="start-visual">
+            <img src="/image_à_coté.png" alt="Visuel Undercover" class="start-image" />
           </div>
 
-          <div class="form-block">
-            <button id="createBtn" class="big-btn">Créer une room</button>
-          </div>
+          <div class="start-content">
+            <h2>Se connecter à une salle</h2>
+            <p class="start-subtitle">Crée une room ou rejoins-en une avec un code.</p>
 
-          <div class="separator">ou</div>
+            <div class="form-block">
+              <label for="nameInput">Pseudo</label>
+              <input id="nameInput" maxlength="20" placeholder="Ton pseudo" />
+            </div>
 
-          <div class="join-row">
-            <input id="roomInput" maxlength="6" placeholder="Code room" />
-            <button id="joinBtn" class="big-btn">Rejoindre</button>
+            <div class="form-block">
+              <button id="createBtn" class="big-btn">Créer une room</button>
+            </div>
+
+            <div class="separator">ou</div>
+
+            <div class="join-row">
+              <input id="roomInput" maxlength="6" placeholder="Code room" />
+              <button id="joinBtn" class="big-btn">Rejoindre</button>
+            </div>
           </div>
         </div>
       </div>
@@ -117,7 +126,7 @@
                 <h3>Chat de la manche</h3>
                 <div id="messagesList" class="messages"></div>
                 <div class="row">
-                  <input id="chatInput" maxlength="80" placeholder="Entre ton indice" />
+                  <input id="chatInput" maxlength="24" placeholder="Entre un mot" />
                   <button id="sendChatBtn">Envoyer</button>
                 </div>
                 <p id="chatHelp"></p>

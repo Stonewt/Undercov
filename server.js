@@ -13,8 +13,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = Number(process.env.PORT || 3000);
-const TURN_DURATION_MS = 20_000;
-const VOTE_DURATION_MS = 20_000;
+const TURN_DURATION_MS = 30_000;
+const VOTE_DURATION_MS = 30_000;
 
 const app = express();
 const server = http.createServer(app);
@@ -141,7 +141,9 @@ function sanitizeName(name) {
 
 function sanitizeChatMessage(text) {
   if (typeof text !== "string") return "";
-  return text.trim().replace(/\s+/g, " ").slice(0, 80);
+  const cleaned = text.trim().replace(/\s+/g, " ");
+  if (!cleaned) return "";
+  return cleaned.split(" ")[0].slice(0, 24);
 }
 
 function safeJsonParse(value, fallback) {
@@ -268,6 +270,7 @@ function buildPublicRoom(code) {
   const currentSpeakerId = getCurrentSpeakerId(room);
   const messages = safeJsonParse(room.messages, []);
   const votes = safeJsonParse(room.votes, {});
+  const speakingOrder = safeJsonParse(room.speaking_order, []);
 
   return {
     code: room.code,
@@ -276,6 +279,7 @@ function buildPublicRoom(code) {
     phase: room.phase,
     round: room.round,
     currentSpeakerId,
+    speakingOrder,
     turnEndsAt: room.turn_ends_at,
     voteEndsAt: room.vote_ends_at,
     turnDurationMs: TURN_DURATION_MS,
@@ -623,7 +627,12 @@ function handleTurnTimeout(roomCode) {
 
   const currentPlayer = db.prepare("SELECT * FROM players WHERE id = ?").get(currentSpeakerId);
 
-  if (currentPlayer) {
+  const messages = safeJsonParse(room.messages, []);
+  const alreadySentThisTurn = messages.some(
+    (msg) => msg.round === room.round && msg.playerId === currentSpeakerId
+  );
+
+  if (currentPlayer && !alreadySentThisTurn) {
     pushSystemMessage(roomCode, `${currentPlayer.name} n'a rien envoyé.`);
   }
 

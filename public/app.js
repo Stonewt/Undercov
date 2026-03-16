@@ -7,6 +7,8 @@ let timerInterval = null;
 let selectedVoteTargetId = null;
 let selectedVoteTargetName = null;
 let voteAlreadySent = false;
+let currentTurnKey = null;
+let autoSubmittedTurnKey = null;
 
 const nameInput = document.getElementById("nameInput");
 const roomInput = document.getElementById("roomInput");
@@ -81,6 +83,13 @@ function clearSession() {
   localStorage.removeItem("playerToken");
 }
 
+function normalizeSingleWordInput(value) {
+  if (typeof value !== "string") return "";
+  const cleaned = value.trim().replace(/\s+/g, " ");
+  if (!cleaned) return "";
+  return cleaned.split(" ")[0].slice(0, 24);
+}
+
 function stopTimer() {
   if (timerInterval) {
     clearInterval(timerInterval);
@@ -101,6 +110,9 @@ function resetVoteSelection() {
 
 function resetUI() {
   currentRoom = null;
+  currentTurnKey = null;
+  autoSubmittedTurnKey = null;
+
   lobby.classList.add("hidden");
   secretCard.classList.add("hidden");
   chatCard.classList.add("hidden");
@@ -126,6 +138,7 @@ function resetUI() {
   wordText.textContent = "";
   resultText.textContent = "";
   winnerText.textContent = "";
+  chatInput.value = "";
 
   resetVoteSelection();
   stopTimer();
@@ -136,10 +149,25 @@ function hideGameplayButtons() {
   restartBtn.classList.add("hidden");
 }
 
+function sortPlayersForDisplay(room) {
+  if (!room.started || !Array.isArray(room.speakingOrder) || room.speakingOrder.length === 0) {
+    return [...room.players];
+  }
+
+  const indexMap = new Map(room.speakingOrder.map((id, index) => [id, index]));
+  return [...room.players].sort((a, b) => {
+    const ia = indexMap.has(a.id) ? indexMap.get(a.id) : Number.MAX_SAFE_INTEGER;
+    const ib = indexMap.has(b.id) ? indexMap.get(b.id) : Number.MAX_SAFE_INTEGER;
+    return ia - ib;
+  });
+}
+
 function renderPlayers(room) {
   playersList.innerHTML = "";
 
-  room.players.forEach((player) => {
+  const orderedPlayers = sortPlayersForDisplay(room);
+
+  orderedPlayers.forEach((player) => {
     const li = document.createElement("li");
 
     if (player.eliminated) {
@@ -190,7 +218,22 @@ function renderMessages(room) {
   messages.forEach((msg) => {
     const div = document.createElement("div");
     div.className = "message";
-    div.textContent = `${msg.playerName} : ${msg.text}`;
+
+    if (!msg.playerId) {
+      div.classList.add("system");
+    }
+
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "message-name";
+    nameSpan.textContent = `${msg.playerName}`;
+
+    const textSpan = document.createElement("span");
+    textSpan.className = "message-text";
+    textSpan.textContent = msg.text;
+
+    div.appendChild(nameSpan);
+    div.appendChild(textSpan);
+
     messagesList.appendChild(div);
   });
 
@@ -215,12 +258,12 @@ function renderChat(room) {
     !me.eliminated;
 
   chatInput.disabled = !isMyTurn;
-  sendChatBtn.disabled = !isMyTurn;
+  sendChatBtn.disabled = !isMyTurn || !normalizeSingleWordInput(chatInput.value);
 
   if (room.phase === "voting") {
     chatHelp.textContent = "Vote en cours.";
   } else if (isMyTurn) {
-    chatHelp.textContent = "C'est ton tour : envoie ton indice avant la fin du timer.";
+    chatHelp.textContent = "Entre un seul mot. S'il reste écrit à la fin, il sera envoyé automatiquement.";
   } else {
     chatHelp.textContent = "Ce n'est pas ton tour. Tu peux lire.";
   }
@@ -298,7 +341,7 @@ function renderEndGame(room) {
     const li = document.createElement("li");
     li.textContent =
       `${player.name} : ${player.role}` +
-      `${player.word ? ` | mot : ${player.word}` : " | pas de mot"}`;
+      `${player.word ? ` | ${player.word}` : " | pas de mot"}`;
     revealList.appendChild(li);
   });
 }
@@ -311,10 +354,10 @@ function renderTimer(room) {
 
   if (room.phase === "speaking" && room.turnEndsAt) {
     endAt = room.turnEndsAt;
-    total = room.turnDurationMs || 20000;
+    total = room.turnDurationMs || 30000;
   } else if (room.phase === "voting" && room.voteEndsAt) {
     endAt = room.voteEndsAt;
-    total = room.voteDurationMs || 20000;
+    total = room.voteDurationMs || 30000;
   } else {
     return;
   }
@@ -334,6 +377,24 @@ function renderTimer(room) {
 
     if (remaining <= 3000) {
       timerFill.style.background = "#ef4444";
+    }
+
+    const isMyTurn =
+      room.phase === "speaking" &&
+      room.currentSpeakerId === myPlayerId &&
+      !room.gameOver;
+
+    if (
+      isMyTurn &&
+      remaining <= 250 &&
+      currentTurnKey &&
+      autoSubmittedTurnKey !== currentTurnKey
+    ) {
+      const word = normalizeSingleWordInput(chatInput.value);
+      if (word && !sendChatBtn.disabled) {
+        autoSubmittedTurnKey = currentTurnKey;
+        sendChatBtn.click();
+      }
     }
 
     if (remaining <= 0) {
@@ -358,6 +419,16 @@ function renderRoom(room) {
   topHostInfo.textContent = host ? `Hôte : ${host.name}` : "Pas d'hôte";
   topRoomInfo.classList.remove("hidden");
   topHostInfo.classList.remove("hidden");
+
+  const nextTurnKey = `${room.code}-${room.phase}-${room.round}-${room.currentSpeakerId || "none"}`;
+  if (currentTurnKey !== nextTurnKey) {
+    currentTurnKey = nextTurnKey;
+    autoSubmittedTurnKey = null;
+
+    if (!(room.phase === "speaking" && room.currentSpeakerId === myPlayerId)) {
+      chatInput.value = "";
+    }
+  }
 
   if (!room.started) {
     phaseInfo.textContent = "Manche 0";
@@ -487,13 +558,14 @@ leaveBtn.addEventListener("click", () => {
 });
 
 sendChatBtn.addEventListener("click", () => {
-  const text = chatInput.value.trim();
+  const text = normalizeSingleWordInput(chatInput.value);
   if (!text) return;
 
   socket.emit("sendTurnMessage", { text }, (res) => {
     if (!res.ok) return setStatus(res.error, true);
     chatInput.value = "";
-    setStatus("Indice envoyé");
+    sendChatBtn.disabled = true;
+    setStatus("Mot envoyé");
   });
 });
 
@@ -508,6 +580,21 @@ confirmVoteBtn.addEventListener("click", () => {
     selectedVoteText.textContent = `Vote confirmé contre ${selectedVoteTargetName}.`;
     setStatus("Vote envoyé", true);
   });
+});
+
+chatInput.addEventListener("input", () => {
+  const normalized = normalizeSingleWordInput(chatInput.value);
+  if (chatInput.value !== normalized) {
+    chatInput.value = normalized;
+  }
+
+  const isMyTurn =
+    currentRoom &&
+    currentRoom.phase === "speaking" &&
+    currentRoom.currentSpeakerId === myPlayerId &&
+    !currentRoom.gameOver;
+
+  sendChatBtn.disabled = !isMyTurn || !normalized;
 });
 
 chatInput.addEventListener("keydown", (e) => {
@@ -528,7 +615,7 @@ socket.on("gameStarted", ({ word }) => {
   resultCard.classList.add("hidden");
   endCard.classList.add("hidden");
   resetVoteSelection();
-  wordText.textContent = word ? `Mot : ${word}` : "Tu n'as pas de mot.";
+  wordText.textContent = word || "Tu n'as pas de mot.";
   setStatus("La partie commence");
 });
 

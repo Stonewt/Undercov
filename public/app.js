@@ -52,6 +52,34 @@ function saveSession(playerId, playerToken) {
   localStorage.setItem("playerToken", playerToken);
 }
 
+function clearSession() {
+  myPlayerId = null;
+  myPlayerToken = null;
+  localStorage.removeItem("playerId");
+  localStorage.removeItem("playerToken");
+}
+
+function resetUI() {
+  currentRoom = null;
+  lobby.classList.add("hidden");
+  secretCard.classList.add("hidden");
+  chatCard.classList.add("hidden");
+  voteCard.classList.add("hidden");
+  resultCard.classList.add("hidden");
+  endCard.classList.add("hidden");
+  playersList.innerHTML = "";
+  messagesList.innerHTML = "";
+  voteButtons.innerHTML = "";
+  revealList.innerHTML = "";
+  roomCodeEl.textContent = "";
+  hostInfo.textContent = "";
+  phaseInfo.textContent = "";
+  speakerInfo.textContent = "";
+  wordText.textContent = "";
+  resultText.textContent = "";
+  winnerText.textContent = "";
+}
+
 function hideGameplayButtons() {
   startBtn.classList.add("hidden");
   nextSpeakerBtn.classList.add("hidden");
@@ -102,7 +130,6 @@ function renderChat(room) {
   }
 
   chatCard.classList.remove("hidden");
-
   renderMessages(room);
 
   const me = room.players.find((p) => p.id === myPlayerId);
@@ -162,30 +189,24 @@ function renderEndGame(room) {
   }
 
   endCard.classList.remove("hidden");
-
   winnerText.textContent = `Gagnant : ${room.winner}`;
   revealList.innerHTML = "";
 
   room.reveal.forEach((player) => {
     const li = document.createElement("li");
-
     li.textContent =
       `${player.name} : ${player.role}` +
       `${player.word ? ` | mot : ${player.word}` : " | pas de mot"}`;
-
     revealList.appendChild(li);
   });
 }
 
 function renderRoom(room) {
   currentRoom = room;
-
   lobby.classList.remove("hidden");
-
   roomCodeEl.textContent = room.code;
 
   const host = room.players.find((p) => p.id === room.hostPlayerId);
-
   hostInfo.textContent = host ? `Hôte : ${host.name}` : "Pas d'hôte";
 
   if (!room.started) {
@@ -193,7 +214,6 @@ function renderRoom(room) {
     speakerInfo.textContent = "";
   } else {
     phaseInfo.textContent = `Phase : ${room.phase} | Manche : ${room.round}`;
-
     const speaker = room.players.find((p) => p.id === room.currentSpeakerId);
 
     if (room.phase === "speaking" && speaker) {
@@ -207,21 +227,17 @@ function renderRoom(room) {
 
   renderPlayers(room);
   renderChat(room);
-
   hideGameplayButtons();
 
   const isHost = room.hostPlayerId === myPlayerId;
 
   if (!room.started && isHost) startBtn.classList.remove("hidden");
-
   if (room.started && !room.gameOver && room.phase === "speaking" && isHost) {
     nextSpeakerBtn.classList.remove("hidden");
   }
-
   if (room.started && !room.gameOver && room.phase === "voting" && isHost) {
     finishVotingBtn.classList.remove("hidden");
   }
-
   if (room.gameOver && isHost) restartBtn.classList.remove("hidden");
 
   renderVoteButtons(room);
@@ -230,16 +246,17 @@ function renderRoom(room) {
 
 createBtn.addEventListener("click", () => {
   const name = nameInput.value.trim();
-
   if (!name) return setStatus("Entre un pseudo");
+
+  // très important : on oublie l'ancienne room
+  clearSession();
+  resetUI();
 
   socket.emit("createRoom", { name }, (res) => {
     if (!res.ok) return setStatus(res.error);
 
     saveSession(res.playerId, res.playerToken);
-
     renderRoom(res.room);
-
     setStatus("Room créée");
   });
 });
@@ -250,13 +267,15 @@ joinBtn.addEventListener("click", () => {
 
   if (!name || !code) return setStatus("Entre un pseudo et un code");
 
+  // très important : on oublie l'ancienne room
+  clearSession();
+  resetUI();
+
   socket.emit("joinRoom", { name, code }, (res) => {
     if (!res.ok) return setStatus(res.error);
 
     saveSession(res.playerId, res.playerToken);
-
     renderRoom(res.room);
-
     setStatus("Room rejointe");
   });
 });
@@ -289,12 +308,10 @@ restartBtn.addEventListener("click", () => {
 
 sendChatBtn.addEventListener("click", () => {
   const text = chatInput.value.trim();
-
   if (!text) return;
 
   socket.emit("sendTurnMessage", { text }, (res) => {
     if (!res.ok) return setStatus(res.error);
-
     chatInput.value = "";
   });
 });
@@ -305,21 +322,8 @@ chatInput.addEventListener("keydown", (e) => {
   }
 });
 
-socket.on("connect", () => {
-  if (!myPlayerToken) return;
-
-  socket.emit("reconnectPlayer", { playerToken: myPlayerToken }, (res) => {
-    if (!res?.ok) return;
-
-    myPlayerId = res.playerId;
-
-    localStorage.setItem("playerId", myPlayerId);
-
-    renderRoom(res.room);
-
-    setStatus("Reconnecté");
-  });
-});
+// IMPORTANT : plus de reconnexion automatique forcée
+// On laisse l'utilisateur créer ou rejoindre une room manuellement.
 
 socket.on("roomUpdated", (room) => {
   renderRoom(room);
@@ -327,12 +331,9 @@ socket.on("roomUpdated", (room) => {
 
 socket.on("gameStarted", ({ word }) => {
   secretCard.classList.remove("hidden");
-
   resultCard.classList.add("hidden");
   endCard.classList.add("hidden");
-
   wordText.textContent = word ? `Mot : ${word}` : "Tu n'as pas de mot.";
-
   setStatus("La partie commence");
 });
 

@@ -66,23 +66,27 @@ CREATE TABLE IF NOT EXISTS players (
 
 function columnExists(tableName, columnName) {
   const cols = db.prepare(`PRAGMA table_info(${tableName})`).all();
-  return cols.some(c => c.name === columnName);
+  return cols.some((c) => c.name === columnName);
 }
 
 if (!columnExists("rooms", "messages")) {
   db.exec(`ALTER TABLE rooms ADD COLUMN messages TEXT NOT NULL DEFAULT '[]'`);
 }
 
-app.use(helmet({
-  contentSecurityPolicy: false
-}));
+app.use(
+  helmet({
+    contentSecurityPolicy: false
+  })
+);
 
-app.use(rateLimit({
-  windowMs: 60 * 1000,
-  limit: 120,
-  standardHeaders: true,
-  legacyHeaders: false
-}));
+app.use(
+  rateLimit({
+    windowMs: 60 * 1000,
+    limit: 120,
+    standardHeaders: true,
+    legacyHeaders: false
+  })
+);
 
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -156,7 +160,9 @@ function getRoom(code) {
 }
 
 function getPlayersByRoom(code) {
-  return db.prepare("SELECT * FROM players WHERE room_code = ? ORDER BY created_at ASC").all(code);
+  return db
+    .prepare("SELECT * FROM players WHERE room_code = ? ORDER BY created_at ASC")
+    .all(code);
 }
 
 function getPlayerByToken(token) {
@@ -276,7 +282,9 @@ function buildPublicRoom(code) {
 }
 
 function emitRoom(roomCode) {
-  io.to(roomCode).emit("roomUpdated", buildPublicRoom(roomCode));
+  const publicRoom = buildPublicRoom(roomCode);
+  if (!publicRoom) return;
+  io.to(roomCode).emit("roomUpdated", publicRoom);
 }
 
 function getAlivePlayers(roomCode) {
@@ -285,7 +293,8 @@ function getAlivePlayers(roomCode) {
 
 function assignRoles(roomCode) {
   const players = shuffle(getPlayersByRoom(roomCode));
-  const [civilWord, undercoverWord] = wordPairs[Math.floor(Math.random() * wordPairs.length)];
+  const [civilWord, undercoverWord] =
+    wordPairs[Math.floor(Math.random() * wordPairs.length)];
   const withMrWhite = players.length >= 5;
 
   players.forEach((player, index) => {
@@ -308,6 +317,7 @@ function assignRoles(roomCode) {
   });
 
   const alivePlayers = getAlivePlayers(roomCode);
+
   updateRoom(roomCode, {
     started: 1,
     phase: "speaking",
@@ -324,6 +334,7 @@ function assignRoles(roomCode) {
 function startNewRound(roomCode) {
   const alivePlayers = getAlivePlayers(roomCode);
   const room = getRoom(roomCode);
+  if (!room) return;
 
   updateRoom(roomCode, {
     phase: "speaking",
@@ -337,6 +348,7 @@ function startNewRound(roomCode) {
 
 function countAliveByRole(roomCode) {
   const alive = getAlivePlayers(roomCode);
+
   return {
     civil: alive.filter((p) => p.role === "civil").length,
     undercover: alive.filter((p) => p.role === "undercover").length,
@@ -348,17 +360,29 @@ function checkWin(roomCode) {
   const counts = countAliveByRole(roomCode);
 
   if (counts.undercover === 0 && counts.mrwhite === 0) {
-    updateRoom(roomCode, { game_over: 1, phase: "finished", winner: "civils" });
+    updateRoom(roomCode, {
+      game_over: 1,
+      phase: "finished",
+      winner: "civils"
+    });
     return true;
   }
 
   if (counts.undercover > 0 && counts.civil <= counts.undercover) {
-    updateRoom(roomCode, { game_over: 1, phase: "finished", winner: "undercover" });
+    updateRoom(roomCode, {
+      game_over: 1,
+      phase: "finished",
+      winner: "undercover"
+    });
     return true;
   }
 
   if (counts.mrwhite > 0 && counts.civil + counts.undercover === 1) {
-    updateRoom(roomCode, { game_over: 1, phase: "finished", winner: "mrwhite" });
+    updateRoom(roomCode, {
+      game_over: 1,
+      phase: "finished",
+      winner: "mrwhite"
+    });
     return true;
   }
 
@@ -367,6 +391,10 @@ function checkWin(roomCode) {
 
 function eliminateFromVotes(roomCode) {
   const room = getRoom(roomCode);
+  if (!room) {
+    return { tie: true, eliminated: null };
+  }
+
   const votes = safeJsonParse(room.votes, {});
   const tally = {};
 
@@ -393,6 +421,7 @@ function eliminateFromVotes(roomCode) {
   }
 
   const eliminated = db.prepare("SELECT * FROM players WHERE id = ?").get(topPlayers[0]);
+
   if (!eliminated) {
     return { tie: true, eliminated: null };
   }
@@ -423,10 +452,12 @@ function sendSecrets(roomCode) {
 
 function requirePlayer(socket, callback) {
   const player = getPlayerBySocket(socket.id);
+
   if (!player) {
     callback?.({ ok: false, error: "Session invalide" });
     return null;
   }
+
   return player;
 }
 
@@ -437,7 +468,11 @@ function isHost(player, room) {
 io.on("connection", (socket) => {
   socket.on("createRoom", ({ name }, callback) => {
     try {
-      const code = randomCode();
+      let code = randomCode();
+      while (getRoom(code)) {
+        code = randomCode();
+      }
+
       const playerId = randomString(16);
       const playerToken = randomString(32);
       const createdAt = nowIso();
@@ -454,7 +489,15 @@ io.on("connection", (socket) => {
           id, room_code, name, player_token, connected, eliminated,
           role, word, socket_id, created_at, updated_at
         ) VALUES (?, ?, ?, ?, 1, 0, NULL, NULL, ?, ?, ?)
-      `).run(playerId, code, sanitizeName(name), playerToken, socket.id, createdAt, createdAt);
+      `).run(
+        playerId,
+        code,
+        sanitizeName(name),
+        playerToken,
+        socket.id,
+        createdAt,
+        createdAt
+      );
 
       socket.join(code);
 
@@ -475,7 +518,9 @@ io.on("connection", (socket) => {
       const room = getRoom(roomCode);
 
       if (!room) return callback({ ok: false, error: "Room introuvable" });
-      if (room.started) return callback({ ok: false, error: "La partie a déjà commencé" });
+      if (room.started) {
+        return callback({ ok: false, error: "La partie a déjà commencé" });
+      }
 
       const players = getPlayersByRoom(roomCode);
       if (players.length >= 12) {
@@ -491,7 +536,15 @@ io.on("connection", (socket) => {
           id, room_code, name, player_token, connected, eliminated,
           role, word, socket_id, created_at, updated_at
         ) VALUES (?, ?, ?, ?, 1, 0, NULL, NULL, ?, ?, ?)
-      `).run(playerId, roomCode, sanitizeName(name), playerToken, socket.id, createdAt, createdAt);
+      `).run(
+        playerId,
+        roomCode,
+        sanitizeName(name),
+        playerToken,
+        socket.id,
+        createdAt,
+        createdAt
+      );
 
       socket.join(roomCode);
       emitRoom(roomCode);
@@ -536,10 +589,14 @@ io.on("connection", (socket) => {
 
     const room = getRoom(player.room_code);
     if (!room) return callback({ ok: false, error: "Room introuvable" });
-    if (!isHost(player, room)) return callback({ ok: false, error: "Seul l'hôte peut lancer" });
+    if (!isHost(player, room)) {
+      return callback({ ok: false, error: "Seul l'hôte peut lancer" });
+    }
 
     const players = getPlayersByRoom(player.room_code);
-    if (players.length < 3) return callback({ ok: false, error: "Il faut au moins 3 joueurs" });
+    if (players.length < 3) {
+      return callback({ ok: false, error: "Il faut au moins 3 joueurs" });
+    }
 
     assignRoles(player.room_code);
     sendSecrets(player.room_code);
@@ -569,8 +626,12 @@ io.on("connection", (socket) => {
 
     const room = getRoom(player.room_code);
     if (!room) return callback({ ok: false, error: "Room introuvable" });
-    if (room.phase !== "speaking") return callback({ ok: false, error: "Le chat est fermé" });
-    if (player.eliminated) return callback({ ok: false, error: "Tu es éliminé" });
+    if (room.phase !== "speaking") {
+      return callback({ ok: false, error: "Le chat est fermé" });
+    }
+    if (player.eliminated) {
+      return callback({ ok: false, error: "Tu es éliminé" });
+    }
 
     const speakingOrder = safeJsonParse(room.speaking_order, []);
     const currentSpeakerId = speakingOrder[room.current_speaker_index] || null;
@@ -588,7 +649,10 @@ io.on("connection", (socket) => {
     );
 
     if (alreadySentThisTurn) {
-      return callback({ ok: false, error: "Tu as déjà envoyé ton mot pour ce tour" });
+      return callback({
+        ok: false,
+        error: "Tu as déjà envoyé ton indice pour ce tour"
+      });
     }
 
     messages.push({
@@ -614,8 +678,12 @@ io.on("connection", (socket) => {
 
     const room = getRoom(player.room_code);
     if (!room) return callback({ ok: false, error: "Room introuvable" });
-    if (!isHost(player, room)) return callback({ ok: false, error: "Seul l'hôte peut avancer" });
-    if (room.phase !== "speaking") return callback({ ok: false, error: "Mauvaise phase" });
+    if (!isHost(player, room)) {
+      return callback({ ok: false, error: "Seul l'hôte peut avancer" });
+    }
+    if (room.phase !== "speaking") {
+      return callback({ ok: false, error: "Mauvaise phase" });
+    }
 
     const order = safeJsonParse(room.speaking_order, []);
     const currentSpeakerId = order[room.current_speaker_index] || null;
@@ -626,15 +694,23 @@ io.on("connection", (socket) => {
     );
 
     if (!currentSpeakerSent) {
-      return callback({ ok: false, error: "Le joueur actuel doit d'abord envoyer son mot" });
+      return callback({
+        ok: false,
+        error: "Le joueur actuel doit d'abord envoyer son indice"
+      });
     }
 
     const nextIndex = room.current_speaker_index + 1;
 
     if (nextIndex >= order.length) {
-      updateRoom(room.code, { phase: "voting", current_speaker_index: nextIndex });
+      updateRoom(room.code, {
+        phase: "voting",
+        current_speaker_index: nextIndex
+      });
     } else {
-      updateRoom(room.code, { current_speaker_index: nextIndex });
+      updateRoom(room.code, {
+        current_speaker_index: nextIndex
+      });
     }
 
     emitRoom(room.code);
@@ -647,23 +723,36 @@ io.on("connection", (socket) => {
 
     const room = getRoom(player.room_code);
     if (!room) return callback({ ok: false, error: "Room introuvable" });
-    if (room.phase !== "voting") return callback({ ok: false, error: "Vote fermé" });
-    if (player.eliminated) return callback({ ok: false, error: "Tu es éliminé" });
+    if (room.phase !== "voting") {
+      return callback({ ok: false, error: "Vote fermé" });
+    }
+    if (player.eliminated) {
+      return callback({ ok: false, error: "Tu es éliminé" });
+    }
 
-    const target = db.prepare("SELECT * FROM players WHERE id = ? AND room_code = ?").get(targetId, room.code);
+    const target = db
+      .prepare("SELECT * FROM players WHERE id = ? AND room_code = ?")
+      .get(targetId, room.code);
+
     if (!target || target.eliminated) {
       return callback({ ok: false, error: "Cible invalide" });
     }
+
     if (target.id === player.id) {
-      return callback({ ok: false, error: "Tu ne peux pas voter contre toi-même" });
+      return callback({
+        ok: false,
+        error: "Tu ne peux pas voter contre toi-même"
+      });
     }
 
     const votes = safeJsonParse(room.votes, {});
     votes[player.id] = target.id;
 
-    updateRoom(room.code, { votes: JSON.stringify(votes) });
-    emitRoom(room.code);
+    updateRoom(room.code, {
+      votes: JSON.stringify(votes)
+    });
 
+    emitRoom(room.code);
     callback({ ok: true });
   });
 
@@ -673,13 +762,21 @@ io.on("connection", (socket) => {
 
     const room = getRoom(player.room_code);
     if (!room) return callback({ ok: false, error: "Room introuvable" });
-    if (!isHost(player, room)) return callback({ ok: false, error: "Seul l'hôte peut clôturer" });
-    if (room.phase !== "voting") return callback({ ok: false, error: "Mauvaise phase" });
+    if (!isHost(player, room)) {
+      return callback({ ok: false, error: "Seul l'hôte peut clôturer" });
+    }
+    if (room.phase !== "voting") {
+      return callback({ ok: false, error: "Mauvaise phase" });
+    }
 
     const alive = getAlivePlayers(room.code);
     const votes = safeJsonParse(room.votes, {});
+
     if (Object.keys(votes).length < alive.length) {
-      return callback({ ok: false, error: "Tous les joueurs n'ont pas voté" });
+      return callback({
+        ok: false,
+        error: "Tous les joueurs n'ont pas voté"
+      });
     }
 
     const result = eliminateFromVotes(room.code);
@@ -701,7 +798,9 @@ io.on("connection", (socket) => {
 
     const room = getRoom(player.room_code);
     if (!room) return callback({ ok: false, error: "Room introuvable" });
-    if (!isHost(player, room)) return callback({ ok: false, error: "Seul l'hôte peut relancer" });
+    if (!isHost(player, room)) {
+      return callback({ ok: false, error: "Seul l'hôte peut relancer" });
+    }
 
     assignRoles(room.code);
     sendSecrets(room.code);
@@ -726,6 +825,8 @@ io.on("connection", (socket) => {
     const connectedPlayers = players.filter((p) => p.connected);
 
     if (connectedPlayers.length === 0) {
+      db.prepare("DELETE FROM players WHERE room_code = ?").run(room.code);
+      db.prepare("DELETE FROM rooms WHERE code = ?").run(room.code);
       return;
     }
 

@@ -10,12 +10,14 @@ let selectedVoteTargetName = null;
 let voteAlreadySent = false;
 let currentTurnKey = null;
 let autoSubmittedTurnKey = null;
-let triedResume = false;
 
 const nameInput = document.getElementById("nameInput");
 const roomInput = document.getElementById("roomInput");
 const createBtn = document.getElementById("createBtn");
 const joinBtn = document.getElementById("joinBtn");
+const resumeBlock = document.getElementById("resumeBlock");
+const resumeBtn = document.getElementById("resumeBtn");
+const resumeSeparator = document.getElementById("resumeSeparator");
 
 const statusBanner = document.getElementById("statusBanner");
 const topRoomInfo = document.getElementById("topRoomInfo");
@@ -94,6 +96,17 @@ function clearSession() {
   localStorage.removeItem("roomCode");
 }
 
+function updateResumeUI() {
+  const hasResume = Boolean(myPlayerToken && myRoomCode);
+
+  resumeBlock.classList.toggle("hidden", !hasResume);
+  resumeSeparator.classList.toggle("hidden", !hasResume);
+
+  if (resumeBtn && hasResume) {
+    resumeBtn.textContent = `Reprendre ma partie (${myRoomCode})`;
+  }
+}
+
 function normalizeSingleWordInput(value) {
   if (typeof value !== "string") return "";
   const cleaned = value.trim().replace(/\s+/g, " ");
@@ -153,6 +166,7 @@ function resetUI() {
 
   resetVoteSelection();
   stopTimer();
+  updateResumeUI();
 }
 
 function hideGameplayButtons() {
@@ -514,22 +528,6 @@ function initAds() {
   });
 }
 
-function tryResumeSession() {
-  if (triedResume || !myPlayerToken) return;
-  triedResume = true;
-
-  socket.emit("resumeSession", { playerToken: myPlayerToken }, (res) => {
-    if (!res?.ok) {
-      clearSession();
-      return;
-    }
-
-    saveSession(res.playerId, res.playerToken, res.room?.code);
-    renderRoom(res.room);
-    setStatus("Session reprise");
-  });
-}
-
 createBtn.addEventListener("click", () => {
   const name = nameInput.value.trim();
   if (!name) return setStatus("Entre un pseudo", true);
@@ -542,6 +540,7 @@ createBtn.addEventListener("click", () => {
 
     saveSession(res.playerId, res.playerToken, res.room.code);
     renderRoom(res.room);
+    updateResumeUI();
     setStatus("Room créée");
   });
 });
@@ -560,7 +559,28 @@ joinBtn.addEventListener("click", () => {
 
     saveSession(res.playerId, res.playerToken, res.room.code);
     renderRoom(res.room);
+    updateResumeUI();
     setStatus("Room rejointe");
+  });
+});
+
+resumeBtn.addEventListener("click", () => {
+  if (!myPlayerToken) {
+    updateResumeUI();
+    return setStatus("Aucune session à reprendre", true);
+  }
+
+  socket.emit("resumeSession", { playerToken: myPlayerToken }, (res) => {
+    if (!res?.ok) {
+      clearSession();
+      resetUI();
+      return setStatus(res?.error || "Impossible de reprendre la session", true);
+    }
+
+    saveSession(res.playerId, res.playerToken, res.room.code);
+    renderRoom(res.room);
+    updateResumeUI();
+    setStatus("Reconnexion réussie");
   });
 });
 
@@ -632,10 +652,6 @@ chatInput.addEventListener("keydown", (e) => {
   }
 });
 
-socket.on("connect", () => {
-  tryResumeSession();
-});
-
 socket.on("roomUpdated", (room) => {
   if (room.phase !== "voting") {
     resetVoteSelection();
@@ -652,6 +668,11 @@ socket.on("gameStarted", ({ word }) => {
   setStatus("La partie commence");
 });
 
+socket.on("sessionResumed", ({ word }) => {
+  secretCard.classList.remove("hidden");
+  wordText.textContent = word || "Tu n'as pas de mot.";
+});
+
 socket.on("voteResult", (result) => {
   resultCard.classList.remove("hidden");
   resetVoteSelection();
@@ -666,4 +687,4 @@ socket.on("voteResult", (result) => {
 });
 
 initAds();
-tryResumeSession();
+updateResumeUI();

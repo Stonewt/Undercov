@@ -600,7 +600,7 @@ function sendSecrets(roomCode) {
 
 function sendSecretToPlayer(player) {
   if (!player?.socket_id) return;
-  io.to(player.socket_id).emit("gameStarted", {
+  io.to(player.socket_id).emit("sessionResumed", {
     word: player.word
   });
 }
@@ -806,7 +806,7 @@ io.on("connection", (socket) => {
 
       const freshPlayer = getPlayerByToken(playerToken);
 
-      if (room.started) {
+      if (room.started && !room.game_over) {
         sendSecretToPlayer(freshPlayer);
       }
 

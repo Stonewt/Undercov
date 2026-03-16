@@ -23,8 +23,6 @@ const leaveWrap = document.getElementById("leaveWrap");
 const leaveBtn = document.getElementById("leaveBtn");
 
 const lobby = document.getElementById("lobby");
-const roomCodeEl = document.getElementById("roomCode");
-const hostInfo = document.getElementById("hostInfo");
 const phaseInfo = document.getElementById("phaseInfo");
 const speakerInfo = document.getElementById("speakerInfo");
 const playersList = document.getElementById("playersList");
@@ -123,8 +121,6 @@ function resetUI() {
   voteButtons.innerHTML = "";
   revealList.innerHTML = "";
 
-  roomCodeEl.textContent = "";
-  hostInfo.textContent = "";
   phaseInfo.textContent = "";
   speakerInfo.textContent = "";
   wordText.textContent = "";
@@ -160,7 +156,6 @@ function renderPlayers(room) {
     let mainLabel = player.name;
     if (player.id === myPlayerId) mainLabel += " (toi)";
     nameLine.textContent = mainLabel;
-
     li.appendChild(nameLine);
 
     const subParts = [];
@@ -357,11 +352,8 @@ function renderRoom(room) {
   leaveWrap.classList.remove("hidden");
   startWrap.classList.add("hidden");
 
-  roomCodeEl.textContent = room.code;
-
   const host = room.players.find((p) => p.id === room.hostPlayerId);
 
-  hostInfo.textContent = host ? `Hôte : ${host.name}` : "Pas d'hôte";
   topRoomInfo.textContent = `Room ${room.code}`;
   topHostInfo.textContent = host ? `Hôte : ${host.name}` : "Pas d'hôte";
   topRoomInfo.classList.remove("hidden");
@@ -440,7 +432,7 @@ function initAds() {
 
 createBtn.addEventListener("click", () => {
   const name = nameInput.value.trim();
-  if (!name) return setStatus("Entre un pseudo");
+  if (!name) return setStatus("Entre un pseudo", true);
 
   clearSession();
   resetUI();

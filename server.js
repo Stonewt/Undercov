@@ -1,0 +1,669 @@
+import "dotenv/config";
+import express from "express";
+import http from "http";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import { Server } from "socket.io";
+import path from "path";
+import { fileURLToPath } from "url";
+import Database from "better-sqlite3";
+import fs from "fs";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const PORT = Number(process.env.PORT || 3000);
+const app = express();
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: true,
+    credentials: true
+  }
+});
+
+const dataDir = path.join(__dirname, "data");
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+}
+
+const db = new Database(path.join(dataDir, "game.sqlite"));
+db.pragma("journal_mode = WAL");
+
+db.exec(`
+CREATE TABLE IF NOT EXISTS rooms (
+  code TEXT PRIMARY KEY,
+  host_player_id TEXT,
+  started INTEGER NOT NULL DEFAULT 0,
+  phase TEXT NOT NULL DEFAULT 'lobby',
+  round INTEGER NOT NULL DEFAULT 0,
+  current_speaker_index INTEGER NOT NULL DEFAULT 0,
+  speaking_order TEXT NOT NULL DEFAULT '[]',
+  votes TEXT NOT NULL DEFAULT '{}',
+  game_over INTEGER NOT NULL DEFAULT 0,
+  winner TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS players (
+  id TEXT PRIMARY KEY,
+  room_code TEXT NOT NULL,
+  name TEXT NOT NULL,
+  player_token TEXT NOT NULL UNIQUE,
+  connected INTEGER NOT NULL DEFAULT 0,
+  eliminated INTEGER NOT NULL DEFAULT 0,
+  role TEXT,
+  word TEXT,
+  socket_id TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY(room_code) REFERENCES rooms(code)
+);
+`);
+
+app.use(helmet({
+  contentSecurityPolicy: false
+}));
+
+app.use(rateLimit({
+  windowMs: 60 * 1000,
+  limit: 120,
+  standardHeaders: true,
+  legacyHeaders: false
+}));
+
+app.use(express.static(path.join(__dirname, "public")));
+
+const wordPairs = [
+  ["chat", "tigre"],
+  ["pizza", "burger"],
+  ["soleil", "lune"],
+  ["plage", "désert"],
+  ["voiture", "moto"],
+  ["pomme", "poire"],
+  ["livre", "magazine"],
+  ["train", "métro"],
+  ["café", "thé"],
+  ["stylo", "crayon"],
+  ["forêt", "jungle"],
+  ["mer", "océan"]
+];
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function randomString(length = 24) {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  let result = "";
+  for (let i = 0; i < length; i++) {
+    result += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return result;
+}
+
+function randomCode(length = 6) {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let result = "";
+  for (let i = 0; i < length; i++) {
+    result += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return result;
+}
+
+function sanitizeName(name) {
+  if (typeof name !== "string") return "Joueur";
+  const cleaned = name.trim().replace(/\s+/g, " ").slice(0, 20);
+  return cleaned || "Joueur";
+}
+
+function safeJsonParse(value, fallback) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
+function shuffle(array) {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function getRoom(code) {
+  return db.prepare("SELECT * FROM rooms WHERE code = ?").get(code);
+}
+
+function getPlayersByRoom(code) {
+  return db.prepare("SELECT * FROM players WHERE room_code = ? ORDER BY created_at ASC").all(code);
+}
+
+function getPlayerByToken(token) {
+  return db.prepare("SELECT * FROM players WHERE player_token = ?").get(token);
+}
+
+function getPlayerBySocket(socketId) {
+  return db.prepare("SELECT * FROM players WHERE socket_id = ?").get(socketId);
+}
+
+function updateRoom(code, patch) {
+  const room = getRoom(code);
+  if (!room) return;
+
+  const next = {
+    ...room,
+    ...patch,
+    updated_at: nowIso()
+  };
+
+  db.prepare(`
+    UPDATE rooms
+    SET host_player_id = ?,
+        started = ?,
+        phase = ?,
+        round = ?,
+        current_speaker_index = ?,
+        speaking_order = ?,
+        votes = ?,
+        game_over = ?,
+        winner = ?,
+        updated_at = ?
+    WHERE code = ?
+  `).run(
+    next.host_player_id,
+    next.started,
+    next.phase,
+    next.round,
+    next.current_speaker_index,
+    next.speaking_order,
+    next.votes,
+    next.game_over,
+    next.winner,
+    next.updated_at,
+    code
+  );
+}
+
+function updatePlayer(id, patch) {
+  const player = db.prepare("SELECT * FROM players WHERE id = ?").get(id);
+  if (!player) return;
+
+  const next = {
+    ...player,
+    ...patch,
+    updated_at: nowIso()
+  };
+
+  db.prepare(`
+    UPDATE players
+    SET name = ?,
+        connected = ?,
+        eliminated = ?,
+        role = ?,
+        word = ?,
+        socket_id = ?,
+        updated_at = ?
+    WHERE id = ?
+  `).run(
+    next.name,
+    next.connected,
+    next.eliminated,
+    next.role,
+    next.word,
+    next.socket_id,
+    next.updated_at,
+    id
+  );
+}
+
+function buildPublicRoom(code) {
+  const room = getRoom(code);
+  if (!room) return null;
+
+  const players = getPlayersByRoom(code);
+  const speakingOrder = safeJsonParse(room.speaking_order, []);
+  const currentSpeakerId = speakingOrder[room.current_speaker_index] || null;
+
+  return {
+    code: room.code,
+    hostPlayerId: room.host_player_id,
+    started: Boolean(room.started),
+    phase: room.phase,
+    round: room.round,
+    currentSpeakerId,
+    gameOver: Boolean(room.game_over),
+    winner: room.winner,
+    players: players.map((p) => ({
+      id: p.id,
+      name: p.name,
+      connected: Boolean(p.connected),
+      eliminated: Boolean(p.eliminated)
+    })),
+    reveal: room.game_over
+      ? players.map((p) => ({
+          name: p.name,
+          role: p.role,
+          word: p.word,
+          eliminated: Boolean(p.eliminated)
+        }))
+      : null
+  };
+}
+
+function emitRoom(roomCode) {
+  io.to(roomCode).emit("roomUpdated", buildPublicRoom(roomCode));
+}
+
+function getAlivePlayers(roomCode) {
+  return getPlayersByRoom(roomCode).filter((p) => !p.eliminated);
+}
+
+function assignRoles(roomCode) {
+  const players = shuffle(getPlayersByRoom(roomCode));
+  const [civilWord, undercoverWord] = wordPairs[Math.floor(Math.random() * wordPairs.length)];
+  const withMrWhite = players.length >= 5;
+
+  players.forEach((player, index) => {
+    let role = "civil";
+    let word = civilWord;
+
+    if (index === 0) {
+      role = "undercover";
+      word = undercoverWord;
+    } else if (withMrWhite && index === 1) {
+      role = "mrwhite";
+      word = null;
+    }
+
+    updatePlayer(player.id, {
+      eliminated: 0,
+      role,
+      word
+    });
+  });
+
+  const alivePlayers = getAlivePlayers(roomCode);
+  updateRoom(roomCode, {
+    started: 1,
+    phase: "speaking",
+    round: 1,
+    current_speaker_index: 0,
+    speaking_order: JSON.stringify(alivePlayers.map((p) => p.id)),
+    votes: JSON.stringify({}),
+    game_over: 0,
+    winner: null
+  });
+}
+
+function startNewRound(roomCode) {
+  const alivePlayers = getAlivePlayers(roomCode);
+  const room = getRoom(roomCode);
+
+  updateRoom(roomCode, {
+    phase: "speaking",
+    round: room.round + 1,
+    current_speaker_index: 0,
+    speaking_order: JSON.stringify(alivePlayers.map((p) => p.id)),
+    votes: JSON.stringify({})
+  });
+}
+
+function countAliveByRole(roomCode) {
+  const alive = getAlivePlayers(roomCode);
+  return {
+    civil: alive.filter((p) => p.role === "civil").length,
+    undercover: alive.filter((p) => p.role === "undercover").length,
+    mrwhite: alive.filter((p) => p.role === "mrwhite").length
+  };
+}
+
+function checkWin(roomCode) {
+  const counts = countAliveByRole(roomCode);
+
+  if (counts.undercover === 0 && counts.mrwhite === 0) {
+    updateRoom(roomCode, { game_over: 1, phase: "finished", winner: "civils" });
+    return true;
+  }
+
+  if (counts.undercover > 0 && counts.civil <= counts.undercover) {
+    updateRoom(roomCode, { game_over: 1, phase: "finished", winner: "undercover" });
+    return true;
+  }
+
+  if (counts.mrwhite > 0 && counts.civil + counts.undercover === 1) {
+    updateRoom(roomCode, { game_over: 1, phase: "finished", winner: "mrwhite" });
+    return true;
+  }
+
+  return false;
+}
+
+function eliminateFromVotes(roomCode) {
+  const room = getRoom(roomCode);
+  const votes = safeJsonParse(room.votes, {});
+  const tally = {};
+
+  for (const voterId of Object.keys(votes)) {
+    const targetId = votes[voterId];
+    tally[targetId] = (tally[targetId] || 0) + 1;
+  }
+
+  let maxVotes = 0;
+  let topPlayers = [];
+
+  for (const targetId of Object.keys(tally)) {
+    const count = tally[targetId];
+    if (count > maxVotes) {
+      maxVotes = count;
+      topPlayers = [targetId];
+    } else if (count === maxVotes) {
+      topPlayers.push(targetId);
+    }
+  }
+
+  if (topPlayers.length !== 1) {
+    return { tie: true, eliminated: null };
+  }
+
+  const eliminated = db.prepare("SELECT * FROM players WHERE id = ?").get(topPlayers[0]);
+  if (!eliminated) {
+    return { tie: true, eliminated: null };
+  }
+
+  updatePlayer(eliminated.id, { eliminated: 1 });
+
+  return {
+    tie: false,
+    eliminated: {
+      id: eliminated.id,
+      name: eliminated.name,
+      role: eliminated.role
+    }
+  };
+}
+
+function sendSecrets(roomCode) {
+  const players = getPlayersByRoom(roomCode);
+
+  players.forEach((player) => {
+    if (player.socket_id) {
+      io.to(player.socket_id).emit("gameStarted", {
+        role: player.role,
+        word: player.word
+      });
+    }
+  });
+}
+
+function requirePlayer(socket, callback) {
+  const player = getPlayerBySocket(socket.id);
+  if (!player) {
+    callback?.({ ok: false, error: "Session invalide" });
+    return null;
+  }
+  return player;
+}
+
+function isHost(player, room) {
+  return room.host_player_id === player.id;
+}
+
+io.on("connection", (socket) => {
+  socket.on("createRoom", ({ name }, callback) => {
+    try {
+      const code = randomCode();
+      const playerId = randomString(16);
+      const playerToken = randomString(32);
+      const createdAt = nowIso();
+
+      db.prepare(`
+        INSERT INTO rooms (
+          code, host_player_id, started, phase, round, current_speaker_index,
+          speaking_order, votes, game_over, winner, created_at, updated_at
+        ) VALUES (?, ?, 0, 'lobby', 0, 0, '[]', '{}', 0, NULL, ?, ?)
+      `).run(code, playerId, createdAt, createdAt);
+
+      db.prepare(`
+        INSERT INTO players (
+          id, room_code, name, player_token, connected, eliminated,
+          role, word, socket_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, 1, 0, NULL, NULL, ?, ?, ?)
+      `).run(playerId, code, sanitizeName(name), playerToken, socket.id, createdAt, createdAt);
+
+      socket.join(code);
+
+      callback({
+        ok: true,
+        room: buildPublicRoom(code),
+        playerToken,
+        playerId
+      });
+    } catch {
+      callback({ ok: false, error: "Impossible de créer la room" });
+    }
+  });
+
+  socket.on("joinRoom", ({ name, code }, callback) => {
+    try {
+      const roomCode = String(code || "").toUpperCase().trim();
+      const room = getRoom(roomCode);
+
+      if (!room) return callback({ ok: false, error: "Room introuvable" });
+      if (room.started) return callback({ ok: false, error: "La partie a déjà commencé" });
+
+      const players = getPlayersByRoom(roomCode);
+      if (players.length >= 12) {
+        return callback({ ok: false, error: "La room est pleine" });
+      }
+
+      const playerId = randomString(16);
+      const playerToken = randomString(32);
+      const createdAt = nowIso();
+
+      db.prepare(`
+        INSERT INTO players (
+          id, room_code, name, player_token, connected, eliminated,
+          role, word, socket_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, 1, 0, NULL, NULL, ?, ?, ?)
+      `).run(playerId, roomCode, sanitizeName(name), playerToken, socket.id, createdAt, createdAt);
+
+      socket.join(roomCode);
+      emitRoom(roomCode);
+
+      callback({
+        ok: true,
+        room: buildPublicRoom(roomCode),
+        playerToken,
+        playerId
+      });
+    } catch {
+      callback({ ok: false, error: "Impossible de rejoindre la room" });
+    }
+  });
+
+  socket.on("reconnectPlayer", ({ playerToken }, callback) => {
+    try {
+      const player = getPlayerByToken(String(playerToken || ""));
+      if (!player) return callback({ ok: false, error: "Token invalide" });
+
+      updatePlayer(player.id, {
+        connected: 1,
+        socket_id: socket.id
+      });
+
+      socket.join(player.room_code);
+      emitRoom(player.room_code);
+
+      callback({
+        ok: true,
+        room: buildPublicRoom(player.room_code),
+        playerId: player.id
+      });
+    } catch {
+      callback({ ok: false, error: "Reconnexion impossible" });
+    }
+  });
+
+  socket.on("startGame", (_, callback) => {
+    const player = requirePlayer(socket, callback);
+    if (!player) return;
+
+    const room = getRoom(player.room_code);
+    if (!room) return callback({ ok: false, error: "Room introuvable" });
+    if (!isHost(player, room)) return callback({ ok: false, error: "Seul l'hôte peut lancer" });
+
+    const players = getPlayersByRoom(player.room_code);
+    if (players.length < 3) return callback({ ok: false, error: "Il faut au moins 3 joueurs" });
+
+    assignRoles(player.room_code);
+    sendSecrets(player.room_code);
+    emitRoom(player.room_code);
+
+    callback({ ok: true });
+  });
+
+  socket.on("getMySecret", (_, callback) => {
+    const player = requirePlayer(socket, callback);
+    if (!player) return;
+
+    const room = getRoom(player.room_code);
+    if (!room || !room.started) {
+      return callback({ ok: false, error: "Partie non démarrée" });
+    }
+
+    callback({
+      ok: true,
+      role: player.role,
+      word: player.word
+    });
+  });
+
+  socket.on("nextSpeaker", (_, callback) => {
+    const player = requirePlayer(socket, callback);
+    if (!player) return;
+
+    const room = getRoom(player.room_code);
+    if (!room) return callback({ ok: false, error: "Room introuvable" });
+    if (!isHost(player, room)) return callback({ ok: false, error: "Seul l'hôte peut avancer" });
+    if (room.phase !== "speaking") return callback({ ok: false, error: "Mauvaise phase" });
+
+    const order = safeJsonParse(room.speaking_order, []);
+    const nextIndex = room.current_speaker_index + 1;
+
+    if (nextIndex >= order.length) {
+      updateRoom(room.code, { phase: "voting", current_speaker_index: nextIndex });
+    } else {
+      updateRoom(room.code, { current_speaker_index: nextIndex });
+    }
+
+    emitRoom(room.code);
+    callback({ ok: true });
+  });
+
+  socket.on("votePlayer", ({ targetId }, callback) => {
+    const player = requirePlayer(socket, callback);
+    if (!player) return;
+
+    const room = getRoom(player.room_code);
+    if (!room) return callback({ ok: false, error: "Room introuvable" });
+    if (room.phase !== "voting") return callback({ ok: false, error: "Vote fermé" });
+    if (player.eliminated) return callback({ ok: false, error: "Tu es éliminé" });
+
+    const target = db.prepare("SELECT * FROM players WHERE id = ? AND room_code = ?").get(targetId, room.code);
+    if (!target || target.eliminated) {
+      return callback({ ok: false, error: "Cible invalide" });
+    }
+    if (target.id === player.id) {
+      return callback({ ok: false, error: "Tu ne peux pas voter contre toi-même" });
+    }
+
+    const votes = safeJsonParse(room.votes, {});
+    votes[player.id] = target.id;
+
+    updateRoom(room.code, { votes: JSON.stringify(votes) });
+    emitRoom(room.code);
+
+    callback({ ok: true });
+  });
+
+  socket.on("finishVoting", (_, callback) => {
+    const player = requirePlayer(socket, callback);
+    if (!player) return;
+
+    const room = getRoom(player.room_code);
+    if (!room) return callback({ ok: false, error: "Room introuvable" });
+    if (!isHost(player, room)) return callback({ ok: false, error: "Seul l'hôte peut clôturer" });
+    if (room.phase !== "voting") return callback({ ok: false, error: "Mauvaise phase" });
+
+    const alive = getAlivePlayers(room.code);
+    const votes = safeJsonParse(room.votes, {});
+    if (Object.keys(votes).length < alive.length) {
+      return callback({ ok: false, error: "Tous les joueurs n'ont pas voté" });
+    }
+
+    const result = eliminateFromVotes(room.code);
+    io.to(room.code).emit("voteResult", result);
+
+    if (!result.tie && checkWin(room.code)) {
+      emitRoom(room.code);
+      return callback({ ok: true });
+    }
+
+    startNewRound(room.code);
+    emitRoom(room.code);
+    callback({ ok: true });
+  });
+
+  socket.on("restartGame", (_, callback) => {
+    const player = requirePlayer(socket, callback);
+    if (!player) return;
+
+    const room = getRoom(player.room_code);
+    if (!room) return callback({ ok: false, error: "Room introuvable" });
+    if (!isHost(player, room)) return callback({ ok: false, error: "Seul l'hôte peut relancer" });
+
+    assignRoles(room.code);
+    sendSecrets(room.code);
+    emitRoom(room.code);
+
+    callback({ ok: true });
+  });
+
+  socket.on("disconnect", () => {
+    const player = getPlayerBySocket(socket.id);
+    if (!player) return;
+
+    updatePlayer(player.id, {
+      connected: 0,
+      socket_id: null
+    });
+
+    const room = getRoom(player.room_code);
+    if (!room) return;
+
+    const players = getPlayersByRoom(room.code);
+    const connectedPlayers = players.filter((p) => p.connected);
+
+    if (connectedPlayers.length === 0) {
+      return;
+    }
+
+    if (room.host_player_id === player.id) {
+      updateRoom(room.code, {
+        host_player_id: connectedPlayers[0].id
+      });
+    }
+
+    emitRoom(room.code);
+  });
+});
+
+server.listen(PORT, () => {
+  console.log(`Serveur lancé sur http://localhost:${PORT}`);
+});

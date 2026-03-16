@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Undercover Online</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>Undercover Online</h1>
+
+    <div class="card">
+      <input id="nameInput" maxlength="20" placeholder="Ton pseudo" />
+      <div class="row">
+        <button id="createBtn">Créer une room</button>
+      </div>
+      <div class="row">
+        <input id="roomInput" maxlength="6" placeholder="Code room" />
+        <button id="joinBtn">Rejoindre</button>
+      </div>
+      <p id="status"></p>
+    </div>
+
+    <div class="card hidden" id="lobby">
+      <h2>Room <span id="roomCode"></span></h2>
+      <p id="hostInfo"></p>
+      <p id="phaseInfo"></p>
+      <p id="speakerInfo"></p>
+      <ul id="playersList"></ul>
+
+      <div class="actions">
+        <button id="startBtn" class="hidden">Lancer la partie</button>
+        <button id="nextSpeakerBtn" class="hidden">Joueur suivant</button>
+        <button id="finishVotingBtn" class="hidden">Clôturer le vote</button>
+        <button id="restartBtn" class="hidden">Rejouer</button>
+      </div>
+    </div>
+
+    <div class="card hidden" id="secretCard">
+      <h2>Ton rôle</h2>
+      <p id="roleText"></p>
+      <p id="wordText"></p>
+      <button id="revealBtn">Afficher mon secret</button>
+    </div>
+
+    <div class="card hidden" id="voteCard">
+      <h2>Vote</h2>
+      <div id="voteButtons"></div>
+    </div>
+
+    <div class="card hidden" id="resultCard">
+      <h2>Résultat</h2>
+      <p id="resultText"></p>
+    </div>
+
+    <div class="card hidden" id="endCard">
+      <h2>Fin de partie</h2>
+      <p id="winnerText"></p>
+      <ul id="revealList"></ul>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

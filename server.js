@@ -13,6 +13,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = Number(process.env.PORT || 3000);
+const TURN_DURATION_MS = 20_000;
+
 const app = express();
 const server = http.createServer(app);
 
@@ -42,6 +44,7 @@ CREATE TABLE IF NOT EXISTS rooms (
   speaking_order TEXT NOT NULL DEFAULT '[]',
   votes TEXT NOT NULL DEFAULT '{}',
   messages TEXT NOT NULL DEFAULT '[]',
+  turn_ends_at INTEGER,
   game_over INTEGER NOT NULL DEFAULT 0,
   winner TEXT,
   created_at TEXT NOT NULL,
@@ -71,6 +74,10 @@ function columnExists(tableName, columnName) {
 
 if (!columnExists("rooms", "messages")) {
   db.exec(`ALTER TABLE rooms ADD COLUMN messages TEXT NOT NULL DEFAULT '[]'`);
+}
+
+if (!columnExists("rooms", "turn_ends_at")) {
+  db.exec(`ALTER TABLE rooms ADD COLUMN turn_ends_at INTEGER`);
 }
 
 app.use(
@@ -104,6 +111,8 @@ const wordPairs = [
   ["forêt", "jungle"],
   ["mer", "océan"]
 ];
+
+const roomTimers = new Map();
 
 function nowIso() {
   return new Date().toISOString();
@@ -193,6 +202,7 @@ function updateRoom(code, patch) {
         speaking_order = ?,
         votes = ?,
         messages = ?,
+        turn_ends_at = ?,
         game_over = ?,
         winner = ?,
         updated_at = ?
@@ -206,6 +216,7 @@ function updateRoom(code, patch) {
     next.speaking_order,
     next.votes,
     next.messages,
+    next.turn_ends_at,
     next.game_over,
     next.winner,
     next.updated_at,
@@ -245,13 +256,21 @@ function updatePlayer(id, patch) {
   );
 }
 
+function getAlivePlayers(roomCode) {
+  return getPlayersByRoom(roomCode).filter((p) => !p.eliminated);
+}
+
+function getCurrentSpeakerId(room) {
+  const speakingOrder = safeJsonParse(room.speaking_order, []);
+  return speakingOrder[room.current_speaker_index] || null;
+}
+
 function buildPublicRoom(code) {
   const room = getRoom(code);
   if (!room) return null;
 
   const players = getPlayersByRoom(code);
-  const speakingOrder = safeJsonParse(room.speaking_order, []);
-  const currentSpeakerId = speakingOrder[room.current_speaker_index] || null;
+  const currentSpeakerId = getCurrentSpeakerId(room);
   const messages = safeJsonParse(room.messages, []);
 
   return {
@@ -261,6 +280,8 @@ function buildPublicRoom(code) {
     phase: room.phase,
     round: room.round,
     currentSpeakerId,
+    turnEndsAt: room.turn_ends_at,
+    turnDurationMs: TURN_DURATION_MS,
     gameOver: Boolean(room.game_over),
     winner: room.winner,
     messages,
@@ -287,8 +308,52 @@ function emitRoom(roomCode) {
   io.to(roomCode).emit("roomUpdated", publicRoom);
 }
 
-function getAlivePlayers(roomCode) {
-  return getPlayersByRoom(roomCode).filter((p) => !p.eliminated);
+function clearRoomTimer(roomCode) {
+  const timer = roomTimers.get(roomCode);
+  if (timer) {
+    clearTimeout(timer);
+    roomTimers.delete(roomCode);
+  }
+}
+
+function pushSystemMessage(roomCode, text) {
+  const room = getRoom(roomCode);
+  if (!room) return;
+
+  const messages = safeJsonParse(room.messages, []);
+  messages.push({
+    id: randomString(10),
+    playerId: null,
+    playerName: "Système",
+    text,
+    round: room.round,
+    createdAt: nowIso()
+  });
+
+  updateRoom(room.code, {
+    messages: JSON.stringify(messages)
+  });
+}
+
+function scheduleTurnTimer(roomCode) {
+  clearRoomTimer(roomCode);
+
+  const room = getRoom(roomCode);
+  if (!room || room.phase !== "speaking" || room.game_over) return;
+
+  const turnEndsAt = Date.now() + TURN_DURATION_MS;
+
+  updateRoom(roomCode, {
+    turn_ends_at: turnEndsAt
+  });
+
+  emitRoom(roomCode);
+
+  const timeout = setTimeout(() => {
+    handleTurnTimeout(roomCode);
+  }, TURN_DURATION_MS);
+
+  roomTimers.set(roomCode, timeout);
 }
 
 function assignRoles(roomCode) {
@@ -326,9 +391,12 @@ function assignRoles(roomCode) {
     speaking_order: JSON.stringify(alivePlayers.map((p) => p.id)),
     votes: JSON.stringify({}),
     messages: JSON.stringify([]),
+    turn_ends_at: null,
     game_over: 0,
     winner: null
   });
+
+  scheduleTurnTimer(roomCode);
 }
 
 function startNewRound(roomCode) {
@@ -342,8 +410,11 @@ function startNewRound(roomCode) {
     current_speaker_index: 0,
     speaking_order: JSON.stringify(alivePlayers.map((p) => p.id)),
     votes: JSON.stringify({}),
-    messages: JSON.stringify([])
+    messages: JSON.stringify([]),
+    turn_ends_at: null
   });
+
+  scheduleTurnTimer(roomCode);
 }
 
 function countAliveByRole(roomCode) {
@@ -360,27 +431,33 @@ function checkWin(roomCode) {
   const counts = countAliveByRole(roomCode);
 
   if (counts.undercover === 0 && counts.mrwhite === 0) {
+    clearRoomTimer(roomCode);
     updateRoom(roomCode, {
       game_over: 1,
       phase: "finished",
+      turn_ends_at: null,
       winner: "civils"
     });
     return true;
   }
 
   if (counts.undercover > 0 && counts.civil <= counts.undercover) {
+    clearRoomTimer(roomCode);
     updateRoom(roomCode, {
       game_over: 1,
       phase: "finished",
+      turn_ends_at: null,
       winner: "undercover"
     });
     return true;
   }
 
   if (counts.mrwhite > 0 && counts.civil + counts.undercover === 1) {
+    clearRoomTimer(roomCode);
     updateRoom(roomCode, {
       game_over: 1,
       phase: "finished",
+      turn_ends_at: null,
       winner: "mrwhite"
     });
     return true;
@@ -421,7 +498,6 @@ function eliminateFromVotes(roomCode) {
   }
 
   const eliminated = db.prepare("SELECT * FROM players WHERE id = ?").get(topPlayers[0]);
-
   if (!eliminated) {
     return { tie: true, eliminated: null };
   }
@@ -465,6 +541,51 @@ function isHost(player, room) {
   return room.host_player_id === player.id;
 }
 
+function advanceTurn(roomCode) {
+  const room = getRoom(roomCode);
+  if (!room) return;
+
+  const order = safeJsonParse(room.speaking_order, []);
+  const nextIndex = room.current_speaker_index + 1;
+
+  if (nextIndex >= order.length) {
+    clearRoomTimer(roomCode);
+    updateRoom(room.code, {
+      phase: "voting",
+      current_speaker_index: nextIndex,
+      turn_ends_at: null
+    });
+    emitRoom(room.code);
+    return;
+  }
+
+  updateRoom(room.code, {
+    current_speaker_index: nextIndex,
+    turn_ends_at: null
+  });
+
+  scheduleTurnTimer(room.code);
+}
+
+function handleTurnTimeout(roomCode) {
+  const room = getRoom(roomCode);
+  if (!room || room.phase !== "speaking" || room.game_over) return;
+
+  const currentSpeakerId = getCurrentSpeakerId(room);
+  if (!currentSpeakerId) return;
+
+  const currentPlayer = db
+    .prepare("SELECT * FROM players WHERE id = ?")
+    .get(currentSpeakerId);
+
+  if (currentPlayer) {
+    pushSystemMessage(roomCode, `${currentPlayer.name} n'a rien envoyé.`);
+  }
+
+  emitRoom(roomCode);
+  advanceTurn(roomCode);
+}
+
 io.on("connection", (socket) => {
   socket.on("createRoom", ({ name }, callback) => {
     try {
@@ -480,8 +601,8 @@ io.on("connection", (socket) => {
       db.prepare(`
         INSERT INTO rooms (
           code, host_player_id, started, phase, round, current_speaker_index,
-          speaking_order, votes, messages, game_over, winner, created_at, updated_at
-        ) VALUES (?, ?, 0, 'lobby', 0, 0, '[]', '{}', '[]', 0, NULL, ?, ?)
+          speaking_order, votes, messages, turn_ends_at, game_over, winner, created_at, updated_at
+        ) VALUES (?, ?, 0, 'lobby', 0, 0, '[]', '{}', '[]', NULL, 0, NULL, ?, ?)
       `).run(code, playerId, createdAt, createdAt);
 
       db.prepare(`
@@ -633,9 +754,7 @@ io.on("connection", (socket) => {
       return callback({ ok: false, error: "Tu es éliminé" });
     }
 
-    const speakingOrder = safeJsonParse(room.speaking_order, []);
-    const currentSpeakerId = speakingOrder[room.current_speaker_index] || null;
-
+    const currentSpeakerId = getCurrentSpeakerId(room);
     if (player.id !== currentSpeakerId) {
       return callback({ ok: false, error: "Ce n'est pas ton tour" });
     }
@@ -670,51 +789,8 @@ io.on("connection", (socket) => {
 
     emitRoom(room.code);
     callback({ ok: true });
-  });
 
-  socket.on("nextSpeaker", (_, callback) => {
-    const player = requirePlayer(socket, callback);
-    if (!player) return;
-
-    const room = getRoom(player.room_code);
-    if (!room) return callback({ ok: false, error: "Room introuvable" });
-    if (!isHost(player, room)) {
-      return callback({ ok: false, error: "Seul l'hôte peut avancer" });
-    }
-    if (room.phase !== "speaking") {
-      return callback({ ok: false, error: "Mauvaise phase" });
-    }
-
-    const order = safeJsonParse(room.speaking_order, []);
-    const currentSpeakerId = order[room.current_speaker_index] || null;
-
-    const messages = safeJsonParse(room.messages, []);
-    const currentSpeakerSent = messages.some(
-      (msg) => msg.round === room.round && msg.playerId === currentSpeakerId
-    );
-
-    if (!currentSpeakerSent) {
-      return callback({
-        ok: false,
-        error: "Le joueur actuel doit d'abord envoyer son indice"
-      });
-    }
-
-    const nextIndex = room.current_speaker_index + 1;
-
-    if (nextIndex >= order.length) {
-      updateRoom(room.code, {
-        phase: "voting",
-        current_speaker_index: nextIndex
-      });
-    } else {
-      updateRoom(room.code, {
-        current_speaker_index: nextIndex
-      });
-    }
-
-    emitRoom(room.code);
-    callback({ ok: true });
+    advanceTurn(room.code);
   });
 
   socket.on("votePlayer", ({ targetId }, callback) => {
@@ -825,6 +901,7 @@ io.on("connection", (socket) => {
     const connectedPlayers = players.filter((p) => p.connected);
 
     if (connectedPlayers.length === 0) {
+      clearRoomTimer(room.code);
       db.prepare("DELETE FROM players WHERE room_code = ?").run(room.code);
       db.prepare("DELETE FROM rooms WHERE code = ?").run(room.code);
       return;

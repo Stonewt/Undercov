@@ -3,6 +3,7 @@ const socket = io();
 let currentRoom = null;
 let myPlayerId = localStorage.getItem("playerId") || null;
 let myPlayerToken = localStorage.getItem("playerToken") || null;
+let timerInterval = null;
 
 const nameInput = document.getElementById("nameInput");
 const roomInput = document.getElementById("roomInput");
@@ -18,7 +19,6 @@ const speakerInfo = document.getElementById("speakerInfo");
 const playersList = document.getElementById("playersList");
 
 const startBtn = document.getElementById("startBtn");
-const nextSpeakerBtn = document.getElementById("nextSpeakerBtn");
 const finishVotingBtn = document.getElementById("finishVotingBtn");
 const restartBtn = document.getElementById("restartBtn");
 
@@ -40,6 +40,9 @@ const resultText = document.getElementById("resultText");
 const endCard = document.getElementById("endCard");
 const winnerText = document.getElementById("winnerText");
 const revealList = document.getElementById("revealList");
+
+const timerFill = document.getElementById("timerFill");
+const timerText = document.getElementById("timerText");
 
 function setStatus(message) {
   statusEl.textContent = message;
@@ -78,11 +81,11 @@ function resetUI() {
   wordText.textContent = "";
   resultText.textContent = "";
   winnerText.textContent = "";
+  stopTimer();
 }
 
 function hideGameplayButtons() {
   startBtn.classList.add("hidden");
-  nextSpeakerBtn.classList.add("hidden");
   finishVotingBtn.classList.add("hidden");
   restartBtn.classList.add("hidden");
 }
@@ -96,7 +99,7 @@ function renderPlayers(room) {
 
     if (!player.connected) label += " (déconnecté)";
     if (player.eliminated) label += " - éliminé";
-    if (player.id === room.currentSpeakerId) label += " ← parle";
+    if (player.id === room.currentSpeakerId) label += " ← joue";
     if (player.id === myPlayerId) label += " (toi)";
 
     li.textContent = label;
@@ -146,9 +149,9 @@ function renderChat(room) {
   if (room.phase !== "speaking") {
     chatHelp.textContent = "Le chat est fermé pendant le vote.";
   } else if (isMyTurn) {
-    chatHelp.textContent = "C'est ton tour : écris ton indice.";
+    chatHelp.textContent = "C'est ton tour : envoie ton indice avant la fin du timer.";
   } else {
-    chatHelp.textContent = "Ce n'est pas ton tour.";
+    chatHelp.textContent = "Ce n'est pas ton tour. Tu peux lire.";
   }
 }
 
@@ -201,6 +204,55 @@ function renderEndGame(room) {
   });
 }
 
+function stopTimer() {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+  timerFill.style.width = "0%";
+  timerText.textContent = "--";
+}
+
+function renderTimer(room) {
+  stopTimer();
+
+  if (
+    !room.started ||
+    room.gameOver ||
+    room.phase !== "speaking" ||
+    !room.turnEndsAt
+  ) {
+    return;
+  }
+
+  const total = room.turnDurationMs || 20000;
+
+  const tick = () => {
+    const remaining = Math.max(0, room.turnEndsAt - Date.now());
+    const percent = Math.max(0, Math.min(100, (remaining / total) * 100));
+
+    timerFill.style.width = `${percent}%`;
+    timerText.textContent = `${Math.ceil(remaining / 1000)} s`;
+
+    if (remaining <= 7000) {
+      timerFill.style.background = "#f59e0b";
+    } else {
+      timerFill.style.background = "#22c55e";
+    }
+
+    if (remaining <= 3000) {
+      timerFill.style.background = "#ef4444";
+    }
+
+    if (remaining <= 0) {
+      stopTimer();
+    }
+  };
+
+  tick();
+  timerInterval = setInterval(tick, 200);
+}
+
 function renderRoom(room) {
   currentRoom = room;
   lobby.classList.remove("hidden");
@@ -227,14 +279,12 @@ function renderRoom(room) {
 
   renderPlayers(room);
   renderChat(room);
+  renderTimer(room);
   hideGameplayButtons();
 
   const isHost = room.hostPlayerId === myPlayerId;
 
   if (!room.started && isHost) startBtn.classList.remove("hidden");
-  if (room.started && !room.gameOver && room.phase === "speaking" && isHost) {
-    nextSpeakerBtn.classList.remove("hidden");
-  }
   if (room.started && !room.gameOver && room.phase === "voting" && isHost) {
     finishVotingBtn.classList.remove("hidden");
   }
@@ -248,7 +298,6 @@ createBtn.addEventListener("click", () => {
   const name = nameInput.value.trim();
   if (!name) return setStatus("Entre un pseudo");
 
-  // très important : on oublie l'ancienne room
   clearSession();
   resetUI();
 
@@ -267,7 +316,6 @@ joinBtn.addEventListener("click", () => {
 
   if (!name || !code) return setStatus("Entre un pseudo et un code");
 
-  // très important : on oublie l'ancienne room
   clearSession();
   resetUI();
 
@@ -284,12 +332,6 @@ startBtn.addEventListener("click", () => {
   socket.emit("startGame", {}, (res) => {
     if (!res.ok) return setStatus(res.error);
     setStatus("Partie lancée");
-  });
-});
-
-nextSpeakerBtn.addEventListener("click", () => {
-  socket.emit("nextSpeaker", {}, (res) => {
-    if (!res.ok) return setStatus(res.error);
   });
 });
 
@@ -313,6 +355,7 @@ sendChatBtn.addEventListener("click", () => {
   socket.emit("sendTurnMessage", { text }, (res) => {
     if (!res.ok) return setStatus(res.error);
     chatInput.value = "";
+    setStatus("Indice envoyé");
   });
 });
 
@@ -321,9 +364,6 @@ chatInput.addEventListener("keydown", (e) => {
     sendChatBtn.click();
   }
 });
-
-// IMPORTANT : plus de reconnexion automatique forcée
-// On laisse l'utilisateur créer ou rejoindre une room manuellement.
 
 socket.on("roomUpdated", (room) => {
   renderRoom(room);

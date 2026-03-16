@@ -7,65 +7,89 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="container">
-    <h1>Undercover Online</h1>
-
-    <div class="card">
-      <input id="nameInput" maxlength="20" placeholder="Ton pseudo" />
-      <div class="row">
-        <button id="createBtn">Créer une room</button>
-      </div>
-      <div class="row">
-        <input id="roomInput" maxlength="6" placeholder="Code room" />
-        <button id="joinBtn">Rejoindre</button>
-      </div>
+  <div class="app-shell">
+    <div class="topbar">
+      <h1>Undercover Online</h1>
       <p id="status"></p>
     </div>
 
-    <div class="card hidden" id="lobby">
-      <h2>Room <span id="roomCode"></span></h2>
-      <p id="hostInfo"></p>
-      <p id="phaseInfo"></p>
-      <p id="speakerInfo"></p>
-      <ul id="playersList"></ul>
+    <div class="main-grid">
+      <div class="panel panel-left">
+        <div class="card compact-card">
+          <input id="nameInput" maxlength="20" placeholder="Ton pseudo" />
+          <div class="row">
+            <button id="createBtn">Créer une room</button>
+          </div>
+          <div class="row">
+            <input id="roomInput" maxlength="6" placeholder="Code room" />
+            <button id="joinBtn">Rejoindre</button>
+          </div>
+        </div>
 
-      <div class="actions">
-        <button id="startBtn" class="hidden">Lancer la partie</button>
-        <button id="nextSpeakerBtn" class="hidden">Joueur suivant</button>
-        <button id="finishVotingBtn" class="hidden">Clôturer le vote</button>
-        <button id="restartBtn" class="hidden">Rejouer</button>
+        <div class="card hidden compact-card" id="secretCard">
+          <h2>Ton mot</h2>
+          <p id="wordText"></p>
+        </div>
+
+        <div class="card hidden compact-card" id="voteCard">
+          <h2>Vote</h2>
+          <div id="voteButtons"></div>
+        </div>
+
+        <div class="card hidden compact-card" id="resultCard">
+          <h2>Résultat</h2>
+          <p id="resultText"></p>
+        </div>
+
+        <div class="card hidden compact-card" id="endCard">
+          <h2>Fin de partie</h2>
+          <p id="winnerText"></p>
+          <ul id="revealList"></ul>
+        </div>
       </div>
-    </div>
 
-    <div class="card hidden" id="secretCard">
-      <h2>Ton mot secret</h2>
-      <p id="wordText"></p>
-    </div>
+      <div class="panel panel-center">
+        <div class="card room-card hidden" id="lobby">
+          <div class="room-header">
+            <div>
+              <h2>Room <span id="roomCode"></span></h2>
+              <p id="hostInfo"></p>
+              <p id="phaseInfo"></p>
+              <p id="speakerInfo"></p>
+            </div>
+            <div class="room-actions">
+              <button id="startBtn" class="hidden">Lancer</button>
+              <button id="finishVotingBtn" class="hidden">Clôturer le vote</button>
+              <button id="restartBtn" class="hidden">Rejouer</button>
+            </div>
+          </div>
 
-    <div class="card hidden" id="chatCard">
-      <h2>Chat de la manche</h2>
-      <div id="messagesList" class="messages"></div>
-      <div class="row">
-        <input id="chatInput" maxlength="80" placeholder="Entre ton mot ou ton indice" />
-        <button id="sendChatBtn">Envoyer</button>
+          <div class="timer-wrap">
+            <div class="timer-label">Temps restant</div>
+            <div class="timer-bar">
+              <div id="timerFill" class="timer-fill"></div>
+            </div>
+            <div id="timerText" class="timer-text">--</div>
+          </div>
+
+          <div class="room-content">
+            <div class="players-box">
+              <h3>Joueurs</h3>
+              <ul id="playersList"></ul>
+            </div>
+
+            <div class="chat-box hidden" id="chatCard">
+              <h3>Chat de la manche</h3>
+              <div id="messagesList" class="messages"></div>
+              <div class="row">
+                <input id="chatInput" maxlength="80" placeholder="Entre ton indice" />
+                <button id="sendChatBtn">Envoyer</button>
+              </div>
+              <p id="chatHelp"></p>
+            </div>
+          </div>
+        </div>
       </div>
-      <p id="chatHelp"></p>
-    </div>
-
-    <div class="card hidden" id="voteCard">
-      <h2>Vote</h2>
-      <div id="voteButtons"></div>
-    </div>
-
-    <div class="card hidden" id="resultCard">
-      <h2>Résultat</h2>
-      <p id="resultText"></p>
-    </div>
-
-    <div class="card hidden" id="endCard">
-      <h2>Fin de partie</h2>
-      <p id="winnerText"></p>
-      <ul id="revealList"></ul>
     </div>
   </div>
 

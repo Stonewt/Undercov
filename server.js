@@ -417,7 +417,7 @@ function assignRoles(roomCode) {
     });
   });
 
-  const alivePlayers = getAlivePlayers(roomCode);
+  const alivePlayers = shuffle(getAlivePlayers(roomCode));
 
   updateRoom(roomCode, {
     started: 1,
@@ -437,7 +437,7 @@ function assignRoles(roomCode) {
 }
 
 function startNewRound(roomCode) {
-  const alivePlayers = getAlivePlayers(roomCode);
+  const alivePlayers = shuffle(getAlivePlayers(roomCode));
   const room = getRoom(roomCode);
   if (!room) return;
 
@@ -662,9 +662,6 @@ function removePlayerFromRoom(playerId, roomCode) {
   const room = getRoom(roomCode);
   if (!room) return;
 
-  const player = db.prepare("SELECT * FROM players WHERE id = ?").get(playerId);
-  if (!player) return;
-
   db.prepare("DELETE FROM players WHERE id = ?").run(playerId);
 
   const remainingPlayers = getPlayersByRoom(roomCode);
@@ -675,18 +672,72 @@ function removePlayerFromRoom(playerId, roomCode) {
     return;
   }
 
+  const patch = {};
+
   if (room.host_player_id === playerId) {
-    updateRoom(roomCode, {
-      host_player_id: remainingPlayers[0].id
-    });
+    patch.host_player_id = remainingPlayers[0].id;
+  }
+
+  if (room.started && !room.game_over) {
+    const oldOrder = safeJsonParse(room.speaking_order, []);
+    const aliveRemaining = remainingPlayers.filter((p) => !p.eliminated);
+    let newOrder = oldOrder.filter((id) =>
+      aliveRemaining.some((p) => p.id === id)
+    );
+
+    if (newOrder.length === 0 && aliveRemaining.length > 0) {
+      newOrder = shuffle(aliveRemaining).map((p) => p.id);
+    }
+
+    let newIndex = room.current_speaker_index;
+    const removedIndex = oldOrder.indexOf(playerId);
+
+    if (removedIndex !== -1 && removedIndex < newIndex) {
+      newIndex -= 1;
+    }
+
+    if (newIndex >= newOrder.length) {
+      newIndex = Math.max(0, newOrder.length - 1);
+    }
+
+    patch.speaking_order = JSON.stringify(newOrder);
+    patch.current_speaker_index = newIndex;
+
+    const votes = safeJsonParse(room.votes, {});
+    delete votes[playerId];
+
+    for (const voterId of Object.keys(votes)) {
+      if (votes[voterId] === playerId) {
+        delete votes[voterId];
+      }
+    }
+
+    patch.votes = JSON.stringify(votes);
+  }
+
+  updateRoom(roomCode, patch);
+
+  if (checkWin(roomCode)) {
+    emitRoom(roomCode);
+    return;
   }
 
   emitRoom(roomCode);
 }
 
+function removeSocketFromPreviousRoom(socket) {
+  const existingPlayer = getPlayerBySocket(socket.id);
+  if (!existingPlayer) return;
+
+  socket.leave(existingPlayer.room_code);
+  removePlayerFromRoom(existingPlayer.id, existingPlayer.room_code);
+}
+
 io.on("connection", (socket) => {
   socket.on("createRoom", ({ name }, callback) => {
     try {
+      removeSocketFromPreviousRoom(socket);
+
       let code = randomCode();
       while (getRoom(code)) code = randomCode();
 
@@ -731,6 +782,8 @@ io.on("connection", (socket) => {
 
   socket.on("joinRoom", ({ name, code }, callback) => {
     try {
+      removeSocketFromPreviousRoom(socket);
+
       const roomCode = String(code || "").toUpperCase().trim();
       const room = getRoom(roomCode);
 
@@ -918,7 +971,7 @@ io.on("connection", (socket) => {
       return;
     }
 
-    clearAllRoomTimers(player.room_code);
+    socket.leave(player.room_code);
     removePlayerFromRoom(player.id, player.room_code);
 
     callback?.({ ok: true });

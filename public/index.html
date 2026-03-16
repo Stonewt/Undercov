@@ -8,10 +8,6 @@
 </head>
 <body>
   <div class="app-shell">
-    <div class="bg-orb orb-1"></div>
-    <div class="bg-orb orb-2"></div>
-    <div class="bg-grid"></div>
-
     <div class="topbar">
       <div class="topbar-side topbar-left">
         <div id="topRoomInfo" class="top-meta hidden"></div>
@@ -47,8 +43,7 @@
     <main class="page-center">
       <div class="start-screen" id="startWrap">
         <div class="start-card" id="roomSetupCard">
-          <div class="start-badge">Jeu multijoueur</div>
-          <h2>Entre dans la partie</h2>
+          <h2>Se connecter à une salle</h2>
           <p class="start-subtitle">Crée une room ou rejoins-en une avec un code.</p>
 
           <div class="form-block">
@@ -71,7 +66,7 @@
 
       <div class="game-layout">
         <div class="panel panel-left">
-          <div class="card hidden compact-card accent-card" id="secretCard">
+          <div class="card hidden compact-card" id="secretCard">
             <h2>Ton mot</h2>
             <p id="wordText"></p>
           </div>
@@ -88,12 +83,6 @@
           <div class="card hidden compact-card" id="resultCard">
             <h2>Résultat</h2>
             <p id="resultText"></p>
-          </div>
-
-          <div class="card hidden compact-card" id="endCard">
-            <h2 id="endTitle">Fin de partie</h2>
-            <p id="winnerText"></p>
-            <ul id="revealList"></ul>
           </div>
 
           <div class="bottom-left-actions hidden" id="leaveWrap">
@@ -115,9 +104,7 @@
 
             <div class="room-content">
               <div class="players-box">
-                <div class="section-title-row">
-                  <h3>Joueurs</h3>
-                </div>
+                <h3>Joueurs</h3>
                 <ul id="playersList"></ul>
               </div>
 
@@ -127,17 +114,19 @@
                   <p id="speakerInfo" class="speaker-line"></p>
                 </div>
 
-                <div class="section-title-row">
-                  <h3>Chat de la manche</h3>
-                </div>
-
+                <h3>Chat de la manche</h3>
                 <div id="messagesList" class="messages"></div>
-
-                <div class="row message-input-row">
+                <div class="row">
                   <input id="chatInput" maxlength="80" placeholder="Entre ton indice" />
                   <button id="sendChatBtn">Envoyer</button>
                 </div>
                 <p id="chatHelp"></p>
+              </div>
+
+              <div class="end-box hidden" id="endCard">
+                <h2 id="endTitle">Fin de partie</h2>
+                <p id="winnerText"></p>
+                <ul id="revealList"></ul>
               </div>
             </div>
 

@@ -20,6 +20,7 @@ body {
   flex-direction: column;
   padding: 18px;
   gap: 18px;
+  position: relative;
 }
 
 .topbar {
@@ -50,53 +51,24 @@ body {
   font-weight: 700;
 }
 
+/* Le jeu reste toujours centré */
 .layout-grid {
   flex: 1 1 auto;
   min-height: 0;
-  display: grid;
-  grid-template-columns: 170px minmax(0, 1fr) 170px;
-  gap: 18px;
-}
-
-.ad-column {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  min-height: 0;
-}
-
-.ad-slot {
   position: relative;
-  flex: 1 1 0;
-  min-height: 180px;
-  border-radius: 16px;
-  border: 1px dashed rgba(255,255,255,0.18);
-  background: rgba(255,255,255,0.03);
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
-  color: rgba(255,255,255,0.55);
-  font-size: 14px;
-}
-
-.ad-close {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  border-radius: 999px;
-  background: #374151;
-  font-size: 18px;
-  line-height: 1;
 }
 
 .main-grid {
+  width: min(1180px, 100%);
   min-height: 0;
   display: grid;
   grid-template-columns: 320px 1fr;
   gap: 18px;
+  position: relative;
+  z-index: 2;
 }
 
 .panel {
@@ -119,6 +91,26 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  min-height: 100%;
+}
+
+/* Carte d'accueil plus grande et vraiment centrée */
+#roomSetupCard {
+  width: min(520px, 92vw);
+  padding: 26px;
+  border-radius: 22px;
+}
+
+#roomSetupCard h2 {
+  text-align: center;
+  font-size: 30px;
+  margin-bottom: 18px;
+}
+
+#roomSetupCard input,
+#roomSetupCard button {
+  font-size: 16px;
+  padding: 14px 16px;
 }
 
 .card {
@@ -312,21 +304,72 @@ button:disabled {
   margin-top: auto;
 }
 
-@media (max-width: 1320px) {
-  .layout-grid {
-    grid-template-columns: 120px minmax(0, 1fr) 120px;
+/* Pubs en overlay indépendantes du centre du jeu */
+.ad-column {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  z-index: 1;
+}
+
+#ad-column-left,
+#leftAds {
+  left: 0;
+}
+
+#ad-column-right,
+#rightAds {
+  right: 0;
+}
+
+.ad-slot {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 180px;
+  border-radius: 16px;
+  border: 1px dashed rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.03);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,0.55);
+  font-size: 14px;
+}
+
+.ad-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 999px;
+  background: #374151;
+  font-size: 18px;
+  line-height: 1;
+}
+
+@media (max-width: 1500px) {
+  .ad-column {
+    width: 120px;
   }
 }
 
-@media (max-width: 1120px) {
-  .layout-grid {
-    grid-template-columns: 1fr;
-  }
-
+@media (max-width: 1320px) {
   .ad-column {
     display: none !important;
   }
 
+  .main-grid {
+    width: min(1180px, 100%);
+  }
+}
+
+@media (max-width: 1120px) {
   .main-grid {
     grid-template-columns: 1fr;
   }
@@ -342,5 +385,13 @@ button:disabled {
   .app-shell {
     height: auto;
     min-height: 100vh;
+  }
+
+  .start-wrap {
+    min-height: 70vh;
+  }
+
+  #roomSetupCard {
+    width: min(560px, 95vw);
   }
 }

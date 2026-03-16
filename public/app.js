@@ -4,6 +4,9 @@ let currentRoom = null;
 let myPlayerId = localStorage.getItem("playerId") || null;
 let myPlayerToken = localStorage.getItem("playerToken") || null;
 let timerInterval = null;
+let selectedVoteTargetId = null;
+let selectedVoteTargetName = null;
+let voteAlreadySent = false;
 
 const nameInput = document.getElementById("nameInput");
 const roomInput = document.getElementById("roomInput");
@@ -11,8 +14,9 @@ const createBtn = document.getElementById("createBtn");
 const joinBtn = document.getElementById("joinBtn");
 const statusEl = document.getElementById("status");
 
-const roomControlsCard = document.getElementById("roomControlsCard");
-const leaveGameBtn = document.getElementById("leaveGameBtn");
+const roomSetupCard = document.getElementById("roomSetupCard");
+const leaveWrap = document.getElementById("leaveWrap");
+const leaveBtn = document.getElementById("leaveBtn");
 
 const lobby = document.getElementById("lobby");
 const roomCodeEl = document.getElementById("roomCode");
@@ -22,7 +26,6 @@ const speakerInfo = document.getElementById("speakerInfo");
 const playersList = document.getElementById("playersList");
 
 const startBtn = document.getElementById("startBtn");
-const finishVotingBtn = document.getElementById("finishVotingBtn");
 const restartBtn = document.getElementById("restartBtn");
 
 const secretCard = document.getElementById("secretCard");
@@ -36,6 +39,8 @@ const chatHelp = document.getElementById("chatHelp");
 
 const voteCard = document.getElementById("voteCard");
 const voteButtons = document.getElementById("voteButtons");
+const selectedVoteText = document.getElementById("selectedVoteText");
+const confirmVoteBtn = document.getElementById("confirmVoteBtn");
 
 const resultCard = document.getElementById("resultCard");
 const resultText = document.getElementById("resultText");
@@ -75,18 +80,24 @@ function stopTimer() {
   timerFill.style.background = "#22c55e";
 }
 
+function resetVoteSelection() {
+  selectedVoteTargetId = null;
+  selectedVoteTargetName = null;
+  voteAlreadySent = false;
+  selectedVoteText.textContent = "Aucun joueur sélectionné.";
+  confirmVoteBtn.disabled = true;
+}
+
 function resetUI() {
   currentRoom = null;
-
   lobby.classList.add("hidden");
   secretCard.classList.add("hidden");
   chatCard.classList.add("hidden");
   voteCard.classList.add("hidden");
   resultCard.classList.add("hidden");
   endCard.classList.add("hidden");
-
-  roomControlsCard.classList.remove("hidden");
-  leaveGameBtn.classList.add("hidden");
+  leaveWrap.classList.add("hidden");
+  roomSetupCard.classList.remove("hidden");
 
   playersList.innerHTML = "";
   messagesList.innerHTML = "";
@@ -100,29 +111,14 @@ function resetUI() {
   wordText.textContent = "";
   resultText.textContent = "";
   winnerText.textContent = "";
-  chatInput.value = "";
-  roomInput.value = "";
 
-  hideGameplayButtons();
+  resetVoteSelection();
   stopTimer();
 }
 
 function hideGameplayButtons() {
   startBtn.classList.add("hidden");
-  finishVotingBtn.classList.add("hidden");
   restartBtn.classList.add("hidden");
-}
-
-function updateRoomControlsVisibility(room) {
-  const inStartedGame = Boolean(room && room.started && !room.gameOver);
-
-  if (inStartedGame) {
-    roomControlsCard.classList.add("hidden");
-    leaveGameBtn.classList.remove("hidden");
-  } else {
-    roomControlsCard.classList.remove("hidden");
-    leaveGameBtn.classList.add("hidden");
-  }
 }
 
 function renderPlayers(room) {
@@ -181,8 +177,8 @@ function renderChat(room) {
   chatInput.disabled = !isMyTurn;
   sendChatBtn.disabled = !isMyTurn;
 
-  if (room.phase !== "speaking") {
-    chatHelp.textContent = "Le chat est fermé pendant le vote.";
+  if (room.phase === "voting") {
+    chatHelp.textContent = "Vote en cours.";
   } else if (isMyTurn) {
     chatHelp.textContent = "C'est ton tour : envoie ton indice avant la fin du timer.";
   } else {
@@ -197,6 +193,7 @@ function renderVoteButtons(room) {
 
   if (!me || me.eliminated || room.phase !== "voting" || room.gameOver) {
     voteCard.classList.add("hidden");
+    resetVoteSelection();
     return;
   }
 
@@ -207,17 +204,28 @@ function renderVoteButtons(room) {
     .forEach((player) => {
       const btn = document.createElement("button");
       btn.className = "vote-btn";
-      btn.textContent = `Voter contre ${player.name}`;
+      btn.textContent = `Choisir ${player.name}`;
+
+      if (selectedVoteTargetId === player.id) {
+        btn.classList.add("vote-btn-selected");
+      }
 
       btn.onclick = () => {
-        socket.emit("votePlayer", { targetId: player.id }, (res) => {
-          if (!res.ok) return setStatus(res.error);
-          setStatus(`Vote envoyé contre ${player.name}`);
-        });
+        if (voteAlreadySent) return;
+        selectedVoteTargetId = player.id;
+        selectedVoteTargetName = player.name;
+        selectedVoteText.textContent = `Cible sélectionnée : ${player.name}`;
+        confirmVoteBtn.disabled = false;
+        renderVoteButtons(room);
       };
 
       voteButtons.appendChild(btn);
     });
+
+  if (voteAlreadySent) {
+    confirmVoteBtn.disabled = true;
+    selectedVoteText.textContent = `Vote confirmé contre ${selectedVoteTargetName}.`;
+  }
 }
 
 function renderEndGame(room) {
@@ -230,7 +238,7 @@ function renderEndGame(room) {
   winnerText.textContent = `Gagnant : ${room.winner}`;
   revealList.innerHTML = "";
 
-  (room.reveal || []).forEach((player) => {
+  room.reveal.forEach((player) => {
     const li = document.createElement("li");
     li.textContent =
       `${player.name} : ${player.role}` +
@@ -242,30 +250,34 @@ function renderEndGame(room) {
 function renderTimer(room) {
   stopTimer();
 
-  if (
-    !room.started ||
-    room.gameOver ||
-    room.phase !== "speaking" ||
-    !room.turnEndsAt
-  ) {
+  let endAt = null;
+  let total = null;
+
+  if (room.phase === "speaking" && room.turnEndsAt) {
+    endAt = room.turnEndsAt;
+    total = room.turnDurationMs || 20000;
+  } else if (room.phase === "voting" && room.voteEndsAt) {
+    endAt = room.voteEndsAt;
+    total = room.voteDurationMs || 20000;
+  } else {
     return;
   }
 
-  const total = room.turnDurationMs || 20000;
-
   const tick = () => {
-    const remaining = Math.max(0, room.turnEndsAt - Date.now());
+    const remaining = Math.max(0, endAt - Date.now());
     const percent = Math.max(0, Math.min(100, (remaining / total) * 100));
 
     timerFill.style.width = `${percent}%`;
     timerText.textContent = `${Math.ceil(remaining / 1000)} s`;
 
-    if (remaining <= 3000) {
-      timerFill.style.background = "#ef4444";
-    } else if (remaining <= 7000) {
+    if (remaining <= 7000) {
       timerFill.style.background = "#f59e0b";
     } else {
       timerFill.style.background = "#22c55e";
+    }
+
+    if (remaining <= 3000) {
+      timerFill.style.background = "#ef4444";
     }
 
     if (remaining <= 0) {
@@ -279,24 +291,28 @@ function renderTimer(room) {
 
 function renderRoom(room) {
   currentRoom = room;
+
   lobby.classList.remove("hidden");
+  leaveWrap.classList.remove("hidden");
+  roomSetupCard.classList.add("hidden");
+
   roomCodeEl.textContent = room.code;
 
   const host = room.players.find((p) => p.id === room.hostPlayerId);
   hostInfo.textContent = host ? `Hôte : ${host.name}` : "Pas d'hôte";
 
   if (!room.started) {
-    phaseInfo.textContent = "";
+    phaseInfo.textContent = "Manche 0";
     speakerInfo.textContent = "";
   } else {
-    phaseInfo.textContent = `Manche : ${room.round}`;
+    phaseInfo.textContent = `Manche ${room.round}`;
 
     const speaker = room.players.find((p) => p.id === room.currentSpeakerId);
 
     if (room.phase === "speaking" && speaker) {
       speakerInfo.textContent = `Tour de ${speaker.name}`;
     } else if (room.phase === "voting") {
-      speakerInfo.textContent = "Vote en cours";
+      speakerInfo.textContent = `Vote en cours (${room.voteCount}/${room.players.filter(p => !p.eliminated).length})`;
     } else {
       speakerInfo.textContent = "";
     }
@@ -306,44 +322,14 @@ function renderRoom(room) {
   renderChat(room);
   renderTimer(room);
   hideGameplayButtons();
-  updateRoomControlsVisibility(room);
 
   const isHost = room.hostPlayerId === myPlayerId;
 
-  if (!room.started && isHost) {
-    startBtn.classList.remove("hidden");
-  }
-
-  if (room.started && !room.gameOver && room.phase === "voting" && isHost) {
-    finishVotingBtn.classList.remove("hidden");
-  }
-
-  if (room.gameOver && isHost) {
-    restartBtn.classList.remove("hidden");
-  }
+  if (!room.started && isHost) startBtn.classList.remove("hidden");
+  if (room.gameOver && isHost) restartBtn.classList.remove("hidden");
 
   renderVoteButtons(room);
   renderEndGame(room);
-}
-
-function leaveCurrentGame() {
-  if (!currentRoom) {
-    clearSession();
-    resetUI();
-    setStatus("Tu as quitté la partie");
-    return;
-  }
-
-  socket.emit("leaveRoom", {}, (res) => {
-    clearSession();
-    resetUI();
-
-    if (res?.ok) {
-      setStatus("Tu as quitté la partie");
-    } else {
-      setStatus("Tu as quitté la partie");
-    }
-  });
 }
 
 createBtn.addEventListener("click", () => {
@@ -366,9 +352,7 @@ joinBtn.addEventListener("click", () => {
   const name = nameInput.value.trim();
   const code = roomInput.value.trim().toUpperCase();
 
-  if (!name || !code) {
-    return setStatus("Entre un pseudo et un code");
-  }
+  if (!name || !code) return setStatus("Entre un pseudo et un code");
 
   clearSession();
   resetUI();
@@ -389,17 +373,17 @@ startBtn.addEventListener("click", () => {
   });
 });
 
-finishVotingBtn.addEventListener("click", () => {
-  socket.emit("finishVoting", {}, (res) => {
-    if (!res.ok) return setStatus(res.error);
-  });
-});
-
 restartBtn.addEventListener("click", () => {
   socket.emit("restartGame", {}, (res) => {
     if (!res.ok) return setStatus(res.error);
     setStatus("Nouvelle partie lancée");
   });
+});
+
+leaveBtn.addEventListener("click", () => {
+  clearSession();
+  resetUI();
+  setStatus("Tu as quitté la partie.");
 });
 
 sendChatBtn.addEventListener("click", () => {
@@ -413,17 +397,29 @@ sendChatBtn.addEventListener("click", () => {
   });
 });
 
+confirmVoteBtn.addEventListener("click", () => {
+  if (!selectedVoteTargetId || voteAlreadySent) return;
+
+  socket.emit("votePlayer", { targetId: selectedVoteTargetId }, (res) => {
+    if (!res.ok) return setStatus(res.error);
+
+    voteAlreadySent = true;
+    confirmVoteBtn.disabled = true;
+    selectedVoteText.textContent = `Vote confirmé contre ${selectedVoteTargetName}.`;
+    setStatus(`Vote envoyé contre ${selectedVoteTargetName}`);
+  });
+});
+
 chatInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !sendChatBtn.disabled) {
     sendChatBtn.click();
   }
 });
 
-leaveGameBtn.addEventListener("click", () => {
-  leaveCurrentGame();
-});
-
 socket.on("roomUpdated", (room) => {
+  if (room.phase !== "voting") {
+    resetVoteSelection();
+  }
   renderRoom(room);
 });
 
@@ -431,12 +427,14 @@ socket.on("gameStarted", ({ word }) => {
   secretCard.classList.remove("hidden");
   resultCard.classList.add("hidden");
   endCard.classList.add("hidden");
+  resetVoteSelection();
   wordText.textContent = word ? `Mot : ${word}` : "Tu n'as pas de mot.";
   setStatus("La partie commence");
 });
 
 socket.on("voteResult", (result) => {
   resultCard.classList.remove("hidden");
+  resetVoteSelection();
 
   if (result.tie) {
     resultText.textContent = "Égalité : personne n'est éliminé.";
@@ -445,25 +443,4 @@ socket.on("voteResult", (result) => {
       `${result.eliminated.name} est éliminé.` +
       ` Son rôle était ${result.eliminated.role}.`;
   }
-});
-
-socket.on("connect", () => {
-  if (!myPlayerToken) return;
-
-  socket.emit("reconnectPlayer", { playerToken: myPlayerToken }, (res) => {
-    if (!res?.ok) {
-      clearSession();
-      resetUI();
-      return;
-    }
-
-    myPlayerId = res.playerId;
-    localStorage.setItem("playerId", myPlayerId);
-    renderRoom(res.room);
-    setStatus("Reconnecté");
-  });
-});
-
-socket.on("disconnect", () => {
-  stopTimer();
 });

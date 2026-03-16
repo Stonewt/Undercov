@@ -14,6 +14,7 @@ const __dirname = path.dirname(__filename);
 
 const PORT = Number(process.env.PORT || 3000);
 const TURN_DURATION_MS = 20_000;
+const VOTE_DURATION_MS = 20_000;
 
 const app = express();
 const server = http.createServer(app);
@@ -45,6 +46,7 @@ CREATE TABLE IF NOT EXISTS rooms (
   votes TEXT NOT NULL DEFAULT '{}',
   messages TEXT NOT NULL DEFAULT '[]',
   turn_ends_at INTEGER,
+  vote_ends_at INTEGER,
   game_over INTEGER NOT NULL DEFAULT 0,
   winner TEXT,
   created_at TEXT NOT NULL,
@@ -75,9 +77,11 @@ function columnExists(tableName, columnName) {
 if (!columnExists("rooms", "messages")) {
   db.exec(`ALTER TABLE rooms ADD COLUMN messages TEXT NOT NULL DEFAULT '[]'`);
 }
-
 if (!columnExists("rooms", "turn_ends_at")) {
   db.exec(`ALTER TABLE rooms ADD COLUMN turn_ends_at INTEGER`);
+}
+if (!columnExists("rooms", "vote_ends_at")) {
+  db.exec(`ALTER TABLE rooms ADD COLUMN vote_ends_at INTEGER`);
 }
 
 app.use(
@@ -112,7 +116,8 @@ const wordPairs = [
   ["mer", "océan"]
 ];
 
-const roomTimers = new Map();
+const roomTurnTimers = new Map();
+const roomVoteTimers = new Map();
 
 function nowIso() {
   return new Date().toISOString();
@@ -203,6 +208,7 @@ function updateRoom(code, patch) {
         votes = ?,
         messages = ?,
         turn_ends_at = ?,
+        vote_ends_at = ?,
         game_over = ?,
         winner = ?,
         updated_at = ?
@@ -217,6 +223,7 @@ function updateRoom(code, patch) {
     next.votes,
     next.messages,
     next.turn_ends_at,
+    next.vote_ends_at,
     next.game_over,
     next.winner,
     next.updated_at,
@@ -272,6 +279,7 @@ function buildPublicRoom(code) {
   const players = getPlayersByRoom(code);
   const currentSpeakerId = getCurrentSpeakerId(room);
   const messages = safeJsonParse(room.messages, []);
+  const votes = safeJsonParse(room.votes, {});
 
   return {
     code: room.code,
@@ -281,10 +289,13 @@ function buildPublicRoom(code) {
     round: room.round,
     currentSpeakerId,
     turnEndsAt: room.turn_ends_at,
+    voteEndsAt: room.vote_ends_at,
     turnDurationMs: TURN_DURATION_MS,
+    voteDurationMs: VOTE_DURATION_MS,
     gameOver: Boolean(room.game_over),
     winner: room.winner,
     messages,
+    voteCount: Object.keys(votes).length,
     players: players.map((p) => ({
       id: p.id,
       name: p.name,
@@ -308,12 +319,25 @@ function emitRoom(roomCode) {
   io.to(roomCode).emit("roomUpdated", publicRoom);
 }
 
-function clearRoomTimer(roomCode) {
-  const timer = roomTimers.get(roomCode);
+function clearTurnTimer(roomCode) {
+  const timer = roomTurnTimers.get(roomCode);
   if (timer) {
     clearTimeout(timer);
-    roomTimers.delete(roomCode);
+    roomTurnTimers.delete(roomCode);
   }
+}
+
+function clearVoteTimer(roomCode) {
+  const timer = roomVoteTimers.get(roomCode);
+  if (timer) {
+    clearTimeout(timer);
+    roomVoteTimers.delete(roomCode);
+  }
+}
+
+function clearAllRoomTimers(roomCode) {
+  clearTurnTimer(roomCode);
+  clearVoteTimer(roomCode);
 }
 
 function pushSystemMessage(roomCode, text) {
@@ -336,7 +360,7 @@ function pushSystemMessage(roomCode, text) {
 }
 
 function scheduleTurnTimer(roomCode) {
-  clearRoomTimer(roomCode);
+  clearTurnTimer(roomCode);
 
   const room = getRoom(roomCode);
   if (!room || room.phase !== "speaking" || room.game_over) return;
@@ -344,7 +368,8 @@ function scheduleTurnTimer(roomCode) {
   const turnEndsAt = Date.now() + TURN_DURATION_MS;
 
   updateRoom(roomCode, {
-    turn_ends_at: turnEndsAt
+    turn_ends_at: turnEndsAt,
+    vote_ends_at: null
   });
 
   emitRoom(roomCode);
@@ -353,7 +378,29 @@ function scheduleTurnTimer(roomCode) {
     handleTurnTimeout(roomCode);
   }, TURN_DURATION_MS);
 
-  roomTimers.set(roomCode, timeout);
+  roomTurnTimers.set(roomCode, timeout);
+}
+
+function scheduleVoteTimer(roomCode) {
+  clearVoteTimer(roomCode);
+
+  const room = getRoom(roomCode);
+  if (!room || room.phase !== "voting" || room.game_over) return;
+
+  const voteEndsAt = Date.now() + VOTE_DURATION_MS;
+
+  updateRoom(roomCode, {
+    turn_ends_at: null,
+    vote_ends_at: voteEndsAt
+  });
+
+  emitRoom(roomCode);
+
+  const timeout = setTimeout(() => {
+    finishVotingNow(roomCode);
+  }, VOTE_DURATION_MS);
+
+  roomVoteTimers.set(roomCode, timeout);
 }
 
 function assignRoles(roomCode) {
@@ -392,6 +439,7 @@ function assignRoles(roomCode) {
     votes: JSON.stringify({}),
     messages: JSON.stringify([]),
     turn_ends_at: null,
+    vote_ends_at: null,
     game_over: 0,
     winner: null
   });
@@ -411,7 +459,8 @@ function startNewRound(roomCode) {
     speaking_order: JSON.stringify(alivePlayers.map((p) => p.id)),
     votes: JSON.stringify({}),
     messages: JSON.stringify([]),
-    turn_ends_at: null
+    turn_ends_at: null,
+    vote_ends_at: null
   });
 
   scheduleTurnTimer(roomCode);
@@ -431,33 +480,36 @@ function checkWin(roomCode) {
   const counts = countAliveByRole(roomCode);
 
   if (counts.undercover === 0 && counts.mrwhite === 0) {
-    clearRoomTimer(roomCode);
+    clearAllRoomTimers(roomCode);
     updateRoom(roomCode, {
       game_over: 1,
       phase: "finished",
       turn_ends_at: null,
+      vote_ends_at: null,
       winner: "civils"
     });
     return true;
   }
 
   if (counts.undercover > 0 && counts.civil <= counts.undercover) {
-    clearRoomTimer(roomCode);
+    clearAllRoomTimers(roomCode);
     updateRoom(roomCode, {
       game_over: 1,
       phase: "finished",
       turn_ends_at: null,
+      vote_ends_at: null,
       winner: "undercover"
     });
     return true;
   }
 
   if (counts.mrwhite > 0 && counts.civil + counts.undercover === 1) {
-    clearRoomTimer(roomCode);
+    clearAllRoomTimers(roomCode);
     updateRoom(roomCode, {
       game_over: 1,
       phase: "finished",
       turn_ends_at: null,
+      vote_ends_at: null,
       winner: "mrwhite"
     });
     return true;
@@ -541,6 +593,21 @@ function isHost(player, room) {
   return room.host_player_id === player.id;
 }
 
+function startVotingPhase(roomCode) {
+  clearTurnTimer(roomCode);
+
+  const room = getRoom(roomCode);
+  if (!room) return;
+
+  updateRoom(roomCode, {
+    phase: "voting",
+    turn_ends_at: null,
+    vote_ends_at: null
+  });
+
+  scheduleVoteTimer(roomCode);
+}
+
 function advanceTurn(roomCode) {
   const room = getRoom(roomCode);
   if (!room) return;
@@ -549,13 +616,10 @@ function advanceTurn(roomCode) {
   const nextIndex = room.current_speaker_index + 1;
 
   if (nextIndex >= order.length) {
-    clearRoomTimer(roomCode);
     updateRoom(room.code, {
-      phase: "voting",
-      current_speaker_index: nextIndex,
-      turn_ends_at: null
+      current_speaker_index: nextIndex
     });
-    emitRoom(room.code);
+    startVotingPhase(room.code);
     return;
   }
 
@@ -574,9 +638,7 @@ function handleTurnTimeout(roomCode) {
   const currentSpeakerId = getCurrentSpeakerId(room);
   if (!currentSpeakerId) return;
 
-  const currentPlayer = db
-    .prepare("SELECT * FROM players WHERE id = ?")
-    .get(currentSpeakerId);
+  const currentPlayer = db.prepare("SELECT * FROM players WHERE id = ?").get(currentSpeakerId);
 
   if (currentPlayer) {
     pushSystemMessage(roomCode, `${currentPlayer.name} n'a rien envoyé.`);
@@ -584,6 +646,33 @@ function handleTurnTimeout(roomCode) {
 
   emitRoom(roomCode);
   advanceTurn(roomCode);
+}
+
+function finishVotingNow(roomCode) {
+  const room = getRoom(roomCode);
+  if (!room || room.phase !== "voting") return;
+
+  clearVoteTimer(roomCode);
+
+  const result = eliminateFromVotes(room.code);
+  io.to(room.code).emit("voteResult", result);
+
+  if (!result.tie && checkWin(room.code)) {
+    emitRoom(room.code);
+    return;
+  }
+
+  startNewRound(room.code);
+  emitRoom(room.code);
+}
+
+function everyoneAliveHasVoted(roomCode) {
+  const room = getRoom(roomCode);
+  if (!room) return false;
+
+  const votes = safeJsonParse(room.votes, {});
+  const alive = getAlivePlayers(roomCode);
+  return Object.keys(votes).length >= alive.length;
 }
 
 io.on("connection", (socket) => {
@@ -601,8 +690,8 @@ io.on("connection", (socket) => {
       db.prepare(`
         INSERT INTO rooms (
           code, host_player_id, started, phase, round, current_speaker_index,
-          speaking_order, votes, messages, turn_ends_at, game_over, winner, created_at, updated_at
-        ) VALUES (?, ?, 0, 'lobby', 0, 0, '[]', '{}', '[]', NULL, 0, NULL, ?, ?)
+          speaking_order, votes, messages, turn_ends_at, vote_ends_at, game_over, winner, created_at, updated_at
+        ) VALUES (?, ?, 0, 'lobby', 0, 0, '[]', '{}', '[]', NULL, NULL, 0, NULL, ?, ?)
       `).run(code, playerId, createdAt, createdAt);
 
       db.prepare(`
@@ -681,29 +770,6 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("reconnectPlayer", ({ playerToken }, callback) => {
-    try {
-      const player = getPlayerByToken(String(playerToken || ""));
-      if (!player) return callback({ ok: false, error: "Token invalide" });
-
-      updatePlayer(player.id, {
-        connected: 1,
-        socket_id: socket.id
-      });
-
-      socket.join(player.room_code);
-      emitRoom(player.room_code);
-
-      callback({
-        ok: true,
-        room: buildPublicRoom(player.room_code),
-        playerId: player.id
-      });
-    } catch {
-      callback({ ok: false, error: "Reconnexion impossible" });
-    }
-  });
-
   socket.on("startGame", (_, callback) => {
     const player = requirePlayer(socket, callback);
     if (!player) return;
@@ -724,21 +790,6 @@ io.on("connection", (socket) => {
     emitRoom(player.room_code);
 
     callback({ ok: true });
-  });
-
-  socket.on("getMySecret", (_, callback) => {
-    const player = requirePlayer(socket, callback);
-    if (!player) return;
-
-    const room = getRoom(player.room_code);
-    if (!room || !room.started) {
-      return callback({ ok: false, error: "Partie non démarrée" });
-    }
-
-    callback({
-      ok: true,
-      word: player.word
-    });
   });
 
   socket.on("sendTurnMessage", ({ text }, callback) => {
@@ -830,42 +881,10 @@ io.on("connection", (socket) => {
 
     emitRoom(room.code);
     callback({ ok: true });
-  });
 
-  socket.on("finishVoting", (_, callback) => {
-    const player = requirePlayer(socket, callback);
-    if (!player) return;
-
-    const room = getRoom(player.room_code);
-    if (!room) return callback({ ok: false, error: "Room introuvable" });
-    if (!isHost(player, room)) {
-      return callback({ ok: false, error: "Seul l'hôte peut clôturer" });
+    if (everyoneAliveHasVoted(room.code)) {
+      finishVotingNow(room.code);
     }
-    if (room.phase !== "voting") {
-      return callback({ ok: false, error: "Mauvaise phase" });
-    }
-
-    const alive = getAlivePlayers(room.code);
-    const votes = safeJsonParse(room.votes, {});
-
-    if (Object.keys(votes).length < alive.length) {
-      return callback({
-        ok: false,
-        error: "Tous les joueurs n'ont pas voté"
-      });
-    }
-
-    const result = eliminateFromVotes(room.code);
-    io.to(room.code).emit("voteResult", result);
-
-    if (!result.tie && checkWin(room.code)) {
-      emitRoom(room.code);
-      return callback({ ok: true });
-    }
-
-    startNewRound(room.code);
-    emitRoom(room.code);
-    callback({ ok: true });
   });
 
   socket.on("restartGame", (_, callback) => {
@@ -901,7 +920,7 @@ io.on("connection", (socket) => {
     const connectedPlayers = players.filter((p) => p.connected);
 
     if (connectedPlayers.length === 0) {
-      clearRoomTimer(room.code);
+      clearAllRoomTimers(room.code);
       db.prepare("DELETE FROM players WHERE room_code = ?").run(room.code);
       db.prepare("DELETE FROM rooms WHERE code = ?").run(room.code);
       return;

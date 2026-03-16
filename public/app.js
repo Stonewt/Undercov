@@ -11,6 +11,9 @@ const createBtn = document.getElementById("createBtn");
 const joinBtn = document.getElementById("joinBtn");
 const statusEl = document.getElementById("status");
 
+const roomControlsCard = document.getElementById("roomControlsCard");
+const leaveGameBtn = document.getElementById("leaveGameBtn");
+
 const lobby = document.getElementById("lobby");
 const roomCodeEl = document.getElementById("roomCode");
 const hostInfo = document.getElementById("hostInfo");
@@ -62,18 +65,34 @@ function clearSession() {
   localStorage.removeItem("playerToken");
 }
 
+function stopTimer() {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+  timerFill.style.width = "0%";
+  timerText.textContent = "--";
+  timerFill.style.background = "#22c55e";
+}
+
 function resetUI() {
   currentRoom = null;
+
   lobby.classList.add("hidden");
   secretCard.classList.add("hidden");
   chatCard.classList.add("hidden");
   voteCard.classList.add("hidden");
   resultCard.classList.add("hidden");
   endCard.classList.add("hidden");
+
+  roomControlsCard.classList.remove("hidden");
+  leaveGameBtn.classList.add("hidden");
+
   playersList.innerHTML = "";
   messagesList.innerHTML = "";
   voteButtons.innerHTML = "";
   revealList.innerHTML = "";
+
   roomCodeEl.textContent = "";
   hostInfo.textContent = "";
   phaseInfo.textContent = "";
@@ -81,6 +100,10 @@ function resetUI() {
   wordText.textContent = "";
   resultText.textContent = "";
   winnerText.textContent = "";
+  chatInput.value = "";
+  roomInput.value = "";
+
+  hideGameplayButtons();
   stopTimer();
 }
 
@@ -88,6 +111,18 @@ function hideGameplayButtons() {
   startBtn.classList.add("hidden");
   finishVotingBtn.classList.add("hidden");
   restartBtn.classList.add("hidden");
+}
+
+function updateRoomControlsVisibility(room) {
+  const inStartedGame = Boolean(room && room.started && !room.gameOver);
+
+  if (inStartedGame) {
+    roomControlsCard.classList.add("hidden");
+    leaveGameBtn.classList.remove("hidden");
+  } else {
+    roomControlsCard.classList.remove("hidden");
+    leaveGameBtn.classList.add("hidden");
+  }
 }
 
 function renderPlayers(room) {
@@ -195,22 +230,13 @@ function renderEndGame(room) {
   winnerText.textContent = `Gagnant : ${room.winner}`;
   revealList.innerHTML = "";
 
-  room.reveal.forEach((player) => {
+  (room.reveal || []).forEach((player) => {
     const li = document.createElement("li");
     li.textContent =
       `${player.name} : ${player.role}` +
       `${player.word ? ` | mot : ${player.word}` : " | pas de mot"}`;
     revealList.appendChild(li);
   });
-}
-
-function stopTimer() {
-  if (timerInterval) {
-    clearInterval(timerInterval);
-    timerInterval = null;
-  }
-  timerFill.style.width = "0%";
-  timerText.textContent = "--";
 }
 
 function renderTimer(room) {
@@ -234,14 +260,12 @@ function renderTimer(room) {
     timerFill.style.width = `${percent}%`;
     timerText.textContent = `${Math.ceil(remaining / 1000)} s`;
 
-    if (remaining <= 7000) {
+    if (remaining <= 3000) {
+      timerFill.style.background = "#ef4444";
+    } else if (remaining <= 7000) {
       timerFill.style.background = "#f59e0b";
     } else {
       timerFill.style.background = "#22c55e";
-    }
-
-    if (remaining <= 3000) {
-      timerFill.style.background = "#ef4444";
     }
 
     if (remaining <= 0) {
@@ -262,10 +286,11 @@ function renderRoom(room) {
   hostInfo.textContent = host ? `Hôte : ${host.name}` : "Pas d'hôte";
 
   if (!room.started) {
-    phaseInfo.textContent = "Phase : lobby";
+    phaseInfo.textContent = "";
     speakerInfo.textContent = "";
   } else {
-    phaseInfo.textContent = `Phase : ${room.phase} | Manche : ${room.round}`;
+    phaseInfo.textContent = `Manche : ${room.round}`;
+
     const speaker = room.players.find((p) => p.id === room.currentSpeakerId);
 
     if (room.phase === "speaking" && speaker) {
@@ -281,17 +306,44 @@ function renderRoom(room) {
   renderChat(room);
   renderTimer(room);
   hideGameplayButtons();
+  updateRoomControlsVisibility(room);
 
   const isHost = room.hostPlayerId === myPlayerId;
 
-  if (!room.started && isHost) startBtn.classList.remove("hidden");
+  if (!room.started && isHost) {
+    startBtn.classList.remove("hidden");
+  }
+
   if (room.started && !room.gameOver && room.phase === "voting" && isHost) {
     finishVotingBtn.classList.remove("hidden");
   }
-  if (room.gameOver && isHost) restartBtn.classList.remove("hidden");
+
+  if (room.gameOver && isHost) {
+    restartBtn.classList.remove("hidden");
+  }
 
   renderVoteButtons(room);
   renderEndGame(room);
+}
+
+function leaveCurrentGame() {
+  if (!currentRoom) {
+    clearSession();
+    resetUI();
+    setStatus("Tu as quitté la partie");
+    return;
+  }
+
+  socket.emit("leaveRoom", {}, (res) => {
+    clearSession();
+    resetUI();
+
+    if (res?.ok) {
+      setStatus("Tu as quitté la partie");
+    } else {
+      setStatus("Tu as quitté la partie");
+    }
+  });
 }
 
 createBtn.addEventListener("click", () => {
@@ -314,7 +366,9 @@ joinBtn.addEventListener("click", () => {
   const name = nameInput.value.trim();
   const code = roomInput.value.trim().toUpperCase();
 
-  if (!name || !code) return setStatus("Entre un pseudo et un code");
+  if (!name || !code) {
+    return setStatus("Entre un pseudo et un code");
+  }
 
   clearSession();
   resetUI();
@@ -365,6 +419,10 @@ chatInput.addEventListener("keydown", (e) => {
   }
 });
 
+leaveGameBtn.addEventListener("click", () => {
+  leaveCurrentGame();
+});
+
 socket.on("roomUpdated", (room) => {
   renderRoom(room);
 });
@@ -387,4 +445,25 @@ socket.on("voteResult", (result) => {
       `${result.eliminated.name} est éliminé.` +
       ` Son rôle était ${result.eliminated.role}.`;
   }
+});
+
+socket.on("connect", () => {
+  if (!myPlayerToken) return;
+
+  socket.emit("reconnectPlayer", { playerToken: myPlayerToken }, (res) => {
+    if (!res?.ok) {
+      clearSession();
+      resetUI();
+      return;
+    }
+
+    myPlayerId = res.playerId;
+    localStorage.setItem("playerId", myPlayerId);
+    renderRoom(res.room);
+    setStatus("Reconnecté");
+  });
+});
+
+socket.on("disconnect", () => {
+  stopTimer();
 });

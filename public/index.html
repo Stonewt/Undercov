@@ -3,19 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Undercover Online</title>
+  <title>Undercover</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="app-shell">
     <div class="topbar">
-      <h1>Undercover Online</h1>
+      <h1>Undercover</h1>
       <p id="status"></p>
     </div>
 
     <div class="main-grid">
       <div class="panel panel-left">
-        <div class="card compact-card">
+        <div class="card compact-card" id="roomControlsCard">
           <input id="nameInput" maxlength="20" placeholder="Ton pseudo" />
           <div class="row">
             <button id="createBtn">Créer une room</button>
@@ -91,6 +91,8 @@
         </div>
       </div>
     </div>
+
+    <button id="leaveGameBtn" class="leave-btn hidden">Quitter la partie</button>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>

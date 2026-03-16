@@ -9,26 +9,36 @@
 <body>
   <div class="app-shell">
     <div class="topbar">
+      <div></div>
       <h1>Undercover</h1>
-      <p id="status"></p>
+      <div id="statusBanner" class="status-banner hidden"></div>
     </div>
 
     <div class="layout-grid">
-      <aside class="ad-column">
-        <div class="ad-slot">Espace pub</div>
-        <div class="ad-slot">Espace pub</div>
+      <aside class="ad-column" id="leftAds">
+        <div class="ad-slot" data-ad="left-top">
+          <button class="ad-close" data-close-ad="left-top">×</button>
+          <span>Espace pub</span>
+        </div>
+        <div class="ad-slot" data-ad="left-bottom">
+          <button class="ad-close" data-close-ad="left-bottom">×</button>
+          <span>Espace pub</span>
+        </div>
       </aside>
 
       <div class="main-grid">
         <div class="panel panel-left">
-          <div class="card compact-card" id="roomSetupCard">
-            <input id="nameInput" maxlength="20" placeholder="Ton pseudo" />
-            <div class="row">
-              <button id="createBtn">Créer une room</button>
-            </div>
-            <div class="row">
-              <input id="roomInput" maxlength="6" placeholder="Code room" />
-              <button id="joinBtn">Rejoindre</button>
+          <div class="start-wrap" id="startWrap">
+            <div class="card compact-card" id="roomSetupCard">
+              <h2>Se connecter à une salle</h2>
+              <input id="nameInput" maxlength="20" placeholder="Ton pseudo" />
+              <div class="row">
+                <button id="createBtn">Créer une room</button>
+              </div>
+              <div class="row">
+                <input id="roomInput" maxlength="6" placeholder="Code room" />
+                <button id="joinBtn">Rejoindre</button>
+              </div>
             </div>
           </div>
 
@@ -52,7 +62,7 @@
           </div>
 
           <div class="card hidden compact-card" id="endCard">
-            <h2>Fin de partie</h2>
+            <h2 id="endTitle">Fin de partie</h2>
             <p id="winnerText"></p>
             <ul id="revealList"></ul>
           </div>
@@ -105,9 +115,15 @@
         </div>
       </div>
 
-      <aside class="ad-column">
-        <div class="ad-slot">Espace pub</div>
-        <div class="ad-slot">Espace pub</div>
+      <aside class="ad-column" id="rightAds">
+        <div class="ad-slot" data-ad="right-top">
+          <button class="ad-close" data-close-ad="right-top">×</button>
+          <span>Espace pub</span>
+        </div>
+        <div class="ad-slot" data-ad="right-bottom">
+          <button class="ad-close" data-close-ad="right-bottom">×</button>
+          <span>Espace pub</span>
+        </div>
       </aside>
     </div>
   </div>

@@ -23,22 +23,31 @@ body {
 }
 
 .topbar {
+  position: relative;
   flex: 0 0 auto;
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: 12px;
 }
 
 .topbar h1 {
   margin: 0;
-  font-size: 28px;
+  font-size: 30px;
+  justify-self: center;
 }
 
-.topbar p {
-  margin: 0;
+.status-banner {
+  justify-self: end;
+  background: rgba(37, 99, 235, 0.95);
+  padding: 10px 14px;
+  border-radius: 12px;
   font-size: 14px;
-  opacity: 0.9;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+}
+
+.status-banner.important {
+  background: rgba(22, 163, 74, 0.96);
+  font-weight: 700;
 }
 
 .layout-grid {
@@ -57,6 +66,7 @@ body {
 }
 
 .ad-slot {
+  position: relative;
   flex: 1 1 0;
   min-height: 180px;
   border-radius: 16px;
@@ -67,6 +77,19 @@ body {
   justify-content: center;
   color: rgba(255,255,255,0.55);
   font-size: 14px;
+}
+
+.ad-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 999px;
+  background: #374151;
+  font-size: 18px;
+  line-height: 1;
 }
 
 .main-grid {
@@ -89,6 +112,13 @@ body {
 
 .panel-center {
   min-height: 0;
+}
+
+.start-wrap {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .card {
@@ -282,11 +312,6 @@ button:disabled {
   margin-top: auto;
 }
 
-#status {
-  max-width: 480px;
-  text-align: right;
-}
-
 @media (max-width: 1320px) {
   .layout-grid {
     grid-template-columns: 120px minmax(0, 1fr) 120px;
@@ -299,7 +324,7 @@ button:disabled {
   }
 
   .ad-column {
-    display: none;
+    display: none !important;
   }
 
   .main-grid {

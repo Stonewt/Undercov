@@ -12,8 +12,10 @@ const nameInput = document.getElementById("nameInput");
 const roomInput = document.getElementById("roomInput");
 const createBtn = document.getElementById("createBtn");
 const joinBtn = document.getElementById("joinBtn");
-const statusEl = document.getElementById("status");
 
+const statusBanner = document.getElementById("statusBanner");
+
+const startWrap = document.getElementById("startWrap");
 const roomSetupCard = document.getElementById("roomSetupCard");
 const leaveWrap = document.getElementById("leaveWrap");
 const leaveBtn = document.getElementById("leaveBtn");
@@ -46,14 +48,23 @@ const resultCard = document.getElementById("resultCard");
 const resultText = document.getElementById("resultText");
 
 const endCard = document.getElementById("endCard");
+const endTitle = document.getElementById("endTitle");
 const winnerText = document.getElementById("winnerText");
 const revealList = document.getElementById("revealList");
 
 const timerFill = document.getElementById("timerFill");
 const timerText = document.getElementById("timerText");
 
-function setStatus(message) {
-  statusEl.textContent = message;
+function setStatus(message, important = false) {
+  statusBanner.textContent = message;
+  statusBanner.classList.remove("hidden");
+  statusBanner.classList.toggle("important", important);
+
+  clearTimeout(setStatus._timer);
+  setStatus._timer = setTimeout(() => {
+    statusBanner.classList.add("hidden");
+    statusBanner.classList.remove("important");
+  }, important ? 2200 : 1600);
 }
 
 function saveSession(playerId, playerToken) {
@@ -97,6 +108,7 @@ function resetUI() {
   resultCard.classList.add("hidden");
   endCard.classList.add("hidden");
   leaveWrap.classList.add("hidden");
+  startWrap.classList.remove("hidden");
   roomSetupCard.classList.remove("hidden");
 
   playersList.innerHTML = "";
@@ -228,6 +240,18 @@ function renderVoteButtons(room) {
   }
 }
 
+function getMyOutcome(room) {
+  if (!room.gameOver || !room.reveal) return null;
+
+  const me = room.reveal.find((p) => p.id === myPlayerId);
+  if (!me) return null;
+
+  if (room.winner === "civils" && me.role === "civil") return "Victoire";
+  if (room.winner === "undercover" && me.role === "undercover") return "Victoire";
+  if (room.winner === "mrwhite" && me.role === "mrwhite") return "Victoire";
+  return "Défaite";
+}
+
 function renderEndGame(room) {
   if (!room.gameOver) {
     endCard.classList.add("hidden");
@@ -235,7 +259,11 @@ function renderEndGame(room) {
   }
 
   endCard.classList.remove("hidden");
-  winnerText.textContent = `Gagnant : ${room.winner}`;
+
+  const outcome = getMyOutcome(room) || "Fin de partie";
+  endTitle.textContent = outcome;
+  winnerText.textContent = `Équipe gagnante : ${room.winner}`;
+
   revealList.innerHTML = "";
 
   room.reveal.forEach((player) => {
@@ -294,7 +322,7 @@ function renderRoom(room) {
 
   lobby.classList.remove("hidden");
   leaveWrap.classList.remove("hidden");
-  roomSetupCard.classList.add("hidden");
+  startWrap.classList.add("hidden");
 
   roomCodeEl.textContent = room.code;
 
@@ -332,6 +360,46 @@ function renderRoom(room) {
   renderEndGame(room);
 }
 
+function closeAd(adId) {
+  const ad = document.querySelector(`[data-ad="${adId}"]`);
+  if (!ad) return;
+  ad.classList.add("hidden");
+  localStorage.setItem(`adClosed:${adId}`, "1");
+
+  ["leftAds", "rightAds"].forEach((columnId) => {
+    const column = document.getElementById(columnId);
+    if (!column) return;
+    const visibleAds = [...column.querySelectorAll(".ad-slot:not(.hidden)")];
+    if (visibleAds.length === 0) {
+      column.classList.add("hidden");
+    }
+  });
+}
+
+function initAds() {
+  document.querySelectorAll("[data-close-ad]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      closeAd(btn.dataset.closeAd);
+    });
+  });
+
+  document.querySelectorAll("[data-ad]").forEach((ad) => {
+    const adId = ad.dataset.ad;
+    if (localStorage.getItem(`adClosed:${adId}`) === "1") {
+      ad.classList.add("hidden");
+    }
+  });
+
+  ["leftAds", "rightAds"].forEach((columnId) => {
+    const column = document.getElementById(columnId);
+    if (!column) return;
+    const visibleAds = [...column.querySelectorAll(".ad-slot:not(.hidden)")];
+    if (visibleAds.length === 0) {
+      column.classList.add("hidden");
+    }
+  });
+}
+
 createBtn.addEventListener("click", () => {
   const name = nameInput.value.trim();
   if (!name) return setStatus("Entre un pseudo");
@@ -340,7 +408,7 @@ createBtn.addEventListener("click", () => {
   resetUI();
 
   socket.emit("createRoom", { name }, (res) => {
-    if (!res.ok) return setStatus(res.error);
+    if (!res.ok) return setStatus(res.error, true);
 
     saveSession(res.playerId, res.playerToken);
     renderRoom(res.room);
@@ -352,13 +420,13 @@ joinBtn.addEventListener("click", () => {
   const name = nameInput.value.trim();
   const code = roomInput.value.trim().toUpperCase();
 
-  if (!name || !code) return setStatus("Entre un pseudo et un code");
+  if (!name || !code) return setStatus("Entre un pseudo et un code", true);
 
   clearSession();
   resetUI();
 
   socket.emit("joinRoom", { name, code }, (res) => {
-    if (!res.ok) return setStatus(res.error);
+    if (!res.ok) return setStatus(res.error, true);
 
     saveSession(res.playerId, res.playerToken);
     renderRoom(res.room);
@@ -368,22 +436,24 @@ joinBtn.addEventListener("click", () => {
 
 startBtn.addEventListener("click", () => {
   socket.emit("startGame", {}, (res) => {
-    if (!res.ok) return setStatus(res.error);
+    if (!res.ok) return setStatus(res.error, true);
     setStatus("Partie lancée");
   });
 });
 
 restartBtn.addEventListener("click", () => {
   socket.emit("restartGame", {}, (res) => {
-    if (!res.ok) return setStatus(res.error);
+    if (!res.ok) return setStatus(res.error, true);
     setStatus("Nouvelle partie lancée");
   });
 });
 
 leaveBtn.addEventListener("click", () => {
-  clearSession();
-  resetUI();
-  setStatus("Tu as quitté la partie.");
+  socket.emit("leaveRoom", {}, () => {
+    clearSession();
+    resetUI();
+    setStatus("Tu as quitté la partie.");
+  });
 });
 
 sendChatBtn.addEventListener("click", () => {
@@ -391,7 +461,7 @@ sendChatBtn.addEventListener("click", () => {
   if (!text) return;
 
   socket.emit("sendTurnMessage", { text }, (res) => {
-    if (!res.ok) return setStatus(res.error);
+    if (!res.ok) return setStatus(res.error, true);
     chatInput.value = "";
     setStatus("Indice envoyé");
   });
@@ -401,12 +471,12 @@ confirmVoteBtn.addEventListener("click", () => {
   if (!selectedVoteTargetId || voteAlreadySent) return;
 
   socket.emit("votePlayer", { targetId: selectedVoteTargetId }, (res) => {
-    if (!res.ok) return setStatus(res.error);
+    if (!res.ok) return setStatus(res.error, true);
 
     voteAlreadySent = true;
     confirmVoteBtn.disabled = true;
     selectedVoteText.textContent = `Vote confirmé contre ${selectedVoteTargetName}.`;
-    setStatus(`Vote envoyé contre ${selectedVoteTargetName}`);
+    setStatus("Vote envoyé", true);
   });
 });
 
@@ -444,3 +514,5 @@ socket.on("voteResult", (result) => {
       ` Son rôle était ${result.eliminated.role}.`;
   }
 });
+
+initAds();

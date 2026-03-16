@@ -179,10 +179,6 @@ function getPlayersByRoom(code) {
     .all(code);
 }
 
-function getPlayerByToken(token) {
-  return db.prepare("SELECT * FROM players WHERE player_token = ?").get(token);
-}
-
 function getPlayerBySocket(socketId) {
   return db.prepare("SELECT * FROM players WHERE socket_id = ?").get(socketId);
 }
@@ -304,6 +300,7 @@ function buildPublicRoom(code) {
     })),
     reveal: room.game_over
       ? players.map((p) => ({
+          id: p.id,
           name: p.name,
           role: p.role,
           word: p.word,
@@ -520,9 +517,7 @@ function checkWin(roomCode) {
 
 function eliminateFromVotes(roomCode) {
   const room = getRoom(roomCode);
-  if (!room) {
-    return { tie: true, eliminated: null };
-  }
+  if (!room) return { tie: true, eliminated: null };
 
   const votes = safeJsonParse(room.votes, {});
   const tally = {};
@@ -550,9 +545,7 @@ function eliminateFromVotes(roomCode) {
   }
 
   const eliminated = db.prepare("SELECT * FROM players WHERE id = ?").get(topPlayers[0]);
-  if (!eliminated) {
-    return { tie: true, eliminated: null };
-  }
+  if (!eliminated) return { tie: true, eliminated: null };
 
   updatePlayer(eliminated.id, { eliminated: 1 });
 
@@ -580,12 +573,10 @@ function sendSecrets(roomCode) {
 
 function requirePlayer(socket, callback) {
   const player = getPlayerBySocket(socket.id);
-
   if (!player) {
     callback?.({ ok: false, error: "Session invalide" });
     return null;
   }
-
   return player;
 }
 
@@ -675,13 +666,37 @@ function everyoneAliveHasVoted(roomCode) {
   return Object.keys(votes).length >= alive.length;
 }
 
+function removePlayerFromRoom(playerId, roomCode) {
+  const room = getRoom(roomCode);
+  if (!room) return;
+
+  const player = db.prepare("SELECT * FROM players WHERE id = ?").get(playerId);
+  if (!player) return;
+
+  db.prepare("DELETE FROM players WHERE id = ?").run(playerId);
+
+  const remainingPlayers = getPlayersByRoom(roomCode);
+
+  if (remainingPlayers.length === 0) {
+    clearAllRoomTimers(roomCode);
+    db.prepare("DELETE FROM rooms WHERE code = ?").run(roomCode);
+    return;
+  }
+
+  if (room.host_player_id === playerId) {
+    updateRoom(roomCode, {
+      host_player_id: remainingPlayers[0].id
+    });
+  }
+
+  emitRoom(roomCode);
+}
+
 io.on("connection", (socket) => {
   socket.on("createRoom", ({ name }, callback) => {
     try {
       let code = randomCode();
-      while (getRoom(code)) {
-        code = randomCode();
-      }
+      while (getRoom(code)) code = randomCode();
 
       const playerId = randomString(16);
       const playerToken = randomString(32);
@@ -902,6 +917,19 @@ io.on("connection", (socket) => {
     emitRoom(room.code);
 
     callback({ ok: true });
+  });
+
+  socket.on("leaveRoom", (_, callback) => {
+    const player = getPlayerBySocket(socket.id);
+    if (!player) {
+      callback?.({ ok: true });
+      return;
+    }
+
+    clearAllRoomTimers(player.room_code);
+    removePlayerFromRoom(player.id, player.room_code);
+
+    callback?.({ ok: true });
   });
 
   socket.on("disconnect", () => {

@@ -146,6 +146,15 @@ function sanitizeChatMessage(text) {
   return cleaned.split(" ")[0].slice(0, 24);
 }
 
+function normalizeWord(value) {
+  if (typeof value !== "string") return "";
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
 function safeJsonParse(value, fallback) {
   try {
     return JSON.parse(value);
@@ -175,6 +184,10 @@ function getPlayersByRoom(code) {
 
 function getPlayerBySocket(socketId) {
   return db.prepare("SELECT * FROM players WHERE socket_id = ?").get(socketId);
+}
+
+function getPlayerByToken(playerToken) {
+  return db.prepare("SELECT * FROM players WHERE player_token = ?").get(playerToken);
 }
 
 function updateRoom(code, patch) {
@@ -255,6 +268,23 @@ function updatePlayer(id, patch) {
 
 function getAlivePlayers(roomCode) {
   return getPlayersByRoom(roomCode).filter((p) => !p.eliminated);
+}
+
+function buildSpeakingOrderFromAlive(roomCode) {
+  const alivePlayers = shuffle(getAlivePlayers(roomCode));
+
+  if (alivePlayers.length <= 1) {
+    return alivePlayers.map((p) => p.id);
+  }
+
+  if (alivePlayers[0]?.role === "mrwhite") {
+    const swapIndex = alivePlayers.findIndex((p) => p.role !== "mrwhite");
+    if (swapIndex > 0) {
+      [alivePlayers[0], alivePlayers[swapIndex]] = [alivePlayers[swapIndex], alivePlayers[0]];
+    }
+  }
+
+  return alivePlayers.map((p) => p.id);
 }
 
 function getCurrentSpeakerId(room) {
@@ -421,14 +451,14 @@ function assignRoles(roomCode) {
     });
   });
 
-  const alivePlayers = shuffle(getAlivePlayers(roomCode));
+  const speakingOrder = buildSpeakingOrderFromAlive(roomCode);
 
   updateRoom(roomCode, {
     started: 1,
     phase: "speaking",
     round: 1,
     current_speaker_index: 0,
-    speaking_order: JSON.stringify(alivePlayers.map((p) => p.id)),
+    speaking_order: JSON.stringify(speakingOrder),
     votes: JSON.stringify({}),
     messages: JSON.stringify([]),
     turn_ends_at: null,
@@ -441,15 +471,16 @@ function assignRoles(roomCode) {
 }
 
 function startNewRound(roomCode) {
-  const alivePlayers = shuffle(getAlivePlayers(roomCode));
   const room = getRoom(roomCode);
   if (!room) return;
+
+  const speakingOrder = buildSpeakingOrderFromAlive(roomCode);
 
   updateRoom(roomCode, {
     phase: "speaking",
     round: room.round + 1,
     current_speaker_index: 0,
-    speaking_order: JSON.stringify(alivePlayers.map((p) => p.id)),
+    speaking_order: JSON.stringify(speakingOrder),
     votes: JSON.stringify({}),
     messages: JSON.stringify([]),
     turn_ends_at: null,
@@ -564,6 +595,13 @@ function sendSecrets(roomCode) {
         word: player.word
       });
     }
+  });
+}
+
+function sendSecretToPlayer(player) {
+  if (!player?.socket_id) return;
+  io.to(player.socket_id).emit("gameStarted", {
+    word: player.word
   });
 }
 
@@ -695,7 +733,7 @@ function removePlayerFromRoom(playerId, roomCode) {
     );
 
     if (newOrder.length === 0 && aliveRemaining.length > 0) {
-      newOrder = shuffle(aliveRemaining).map((p) => p.id);
+      newOrder = buildSpeakingOrderFromAlive(roomCode);
     }
 
     let newIndex = room.current_speaker_index;
@@ -743,6 +781,48 @@ function removeSocketFromPreviousRoom(socket) {
 }
 
 io.on("connection", (socket) => {
+  socket.on("resumeSession", ({ playerToken }, callback) => {
+    try {
+      if (!playerToken) {
+        return callback?.({ ok: false, error: "Token manquant" });
+      }
+
+      const player = getPlayerByToken(playerToken);
+      if (!player) {
+        return callback?.({ ok: false, error: "Session introuvable" });
+      }
+
+      const room = getRoom(player.room_code);
+      if (!room) {
+        return callback?.({ ok: false, error: "Room introuvable" });
+      }
+
+      updatePlayer(player.id, {
+        connected: 1,
+        socket_id: socket.id
+      });
+
+      socket.join(player.room_code);
+
+      const freshPlayer = getPlayerByToken(playerToken);
+
+      if (room.started) {
+        sendSecretToPlayer(freshPlayer);
+      }
+
+      emitRoom(player.room_code);
+
+      callback?.({
+        ok: true,
+        room: buildPublicRoom(player.room_code),
+        playerId: player.id,
+        playerToken: player.player_token
+      });
+    } catch {
+      callback?.({ ok: false, error: "Impossible de reprendre la session" });
+    }
+  });
+
   socket.on("createRoom", ({ name }, callback) => {
     try {
       removeSocketFromPreviousRoom(socket);
@@ -797,8 +877,9 @@ io.on("connection", (socket) => {
       const room = getRoom(roomCode);
 
       if (!room) return callback({ ok: false, error: "Room introuvable" });
-      if (room.started) {
-        return callback({ ok: false, error: "La partie a déjà commencé" });
+
+      if (room.started && !room.game_over) {
+        return callback({ ok: false, error: "La partie est déjà en cours" });
       }
 
       const players = getPlayersByRoom(roomCode);
@@ -881,6 +962,16 @@ io.on("connection", (socket) => {
 
     const cleanText = sanitizeChatMessage(text);
     if (!cleanText) return callback({ ok: false, error: "Message vide" });
+
+    if (
+      player.word &&
+      normalizeWord(cleanText) === normalizeWord(player.word)
+    ) {
+      return callback({
+        ok: false,
+        error: "Tu ne peux pas écrire ton mot secret"
+      });
+    }
 
     const messages = safeJsonParse(room.messages, []);
     const alreadySentThisTurn = messages.some(
@@ -1002,9 +1093,11 @@ io.on("connection", (socket) => {
     const connectedPlayers = players.filter((p) => p.connected);
 
     if (connectedPlayers.length === 0) {
-      clearAllRoomTimers(room.code);
-      db.prepare("DELETE FROM players WHERE room_code = ?").run(room.code);
-      db.prepare("DELETE FROM rooms WHERE code = ?").run(room.code);
+      if (!room.started || room.game_over) {
+        clearAllRoomTimers(room.code);
+        db.prepare("DELETE FROM players WHERE room_code = ?").run(room.code);
+        db.prepare("DELETE FROM rooms WHERE code = ?").run(room.code);
+      }
       return;
     }
 

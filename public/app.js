@@ -3,12 +3,14 @@ const socket = io();
 let currentRoom = null;
 let myPlayerId = localStorage.getItem("playerId") || null;
 let myPlayerToken = localStorage.getItem("playerToken") || null;
+let myRoomCode = localStorage.getItem("roomCode") || null;
 let timerInterval = null;
 let selectedVoteTargetId = null;
 let selectedVoteTargetName = null;
 let voteAlreadySent = false;
 let currentTurnKey = null;
 let autoSubmittedTurnKey = null;
+let triedResume = false;
 
 const nameInput = document.getElementById("nameInput");
 const roomInput = document.getElementById("roomInput");
@@ -69,18 +71,27 @@ function setStatus(message, important = false) {
   }, important ? 2200 : 1600);
 }
 
-function saveSession(playerId, playerToken) {
+function saveSession(playerId, playerToken, roomCode) {
   myPlayerId = playerId;
   myPlayerToken = playerToken;
+  myRoomCode = roomCode || myRoomCode;
+
   localStorage.setItem("playerId", playerId);
   localStorage.setItem("playerToken", playerToken);
+
+  if (myRoomCode) {
+    localStorage.setItem("roomCode", myRoomCode);
+  }
 }
 
 function clearSession() {
   myPlayerId = null;
   myPlayerToken = null;
+  myRoomCode = null;
+
   localStorage.removeItem("playerId");
   localStorage.removeItem("playerToken");
+  localStorage.removeItem("roomCode");
 }
 
 function normalizeSingleWordInput(value) {
@@ -263,7 +274,7 @@ function renderChat(room) {
   if (room.phase === "voting") {
     chatHelp.textContent = "Vote en cours.";
   } else if (isMyTurn) {
-    chatHelp.textContent = "Entre un seul mot. S'il reste écrit à la fin, il sera envoyé automatiquement.";
+    chatHelp.textContent = "Entre un seul mot. Tu ne peux pas écrire ton mot secret.";
   } else {
     chatHelp.textContent = "Ce n'est pas ton tour. Tu peux lire.";
   }
@@ -408,6 +419,8 @@ function renderTimer(room) {
 
 function renderRoom(room) {
   currentRoom = room;
+  myRoomCode = room.code;
+  localStorage.setItem("roomCode", room.code);
 
   lobby.classList.remove("hidden");
   leaveWrap.classList.remove("hidden");
@@ -501,6 +514,22 @@ function initAds() {
   });
 }
 
+function tryResumeSession() {
+  if (triedResume || !myPlayerToken) return;
+  triedResume = true;
+
+  socket.emit("resumeSession", { playerToken: myPlayerToken }, (res) => {
+    if (!res?.ok) {
+      clearSession();
+      return;
+    }
+
+    saveSession(res.playerId, res.playerToken, res.room?.code);
+    renderRoom(res.room);
+    setStatus("Session reprise");
+  });
+}
+
 createBtn.addEventListener("click", () => {
   const name = nameInput.value.trim();
   if (!name) return setStatus("Entre un pseudo", true);
@@ -511,7 +540,7 @@ createBtn.addEventListener("click", () => {
   socket.emit("createRoom", { name }, (res) => {
     if (!res.ok) return setStatus(res.error, true);
 
-    saveSession(res.playerId, res.playerToken);
+    saveSession(res.playerId, res.playerToken, res.room.code);
     renderRoom(res.room);
     setStatus("Room créée");
   });
@@ -529,7 +558,7 @@ joinBtn.addEventListener("click", () => {
   socket.emit("joinRoom", { name, code }, (res) => {
     if (!res.ok) return setStatus(res.error, true);
 
-    saveSession(res.playerId, res.playerToken);
+    saveSession(res.playerId, res.playerToken, res.room.code);
     renderRoom(res.room);
     setStatus("Room rejointe");
   });
@@ -603,6 +632,10 @@ chatInput.addEventListener("keydown", (e) => {
   }
 });
 
+socket.on("connect", () => {
+  tryResumeSession();
+});
+
 socket.on("roomUpdated", (room) => {
   if (room.phase !== "voting") {
     resetVoteSelection();
@@ -633,3 +666,4 @@ socket.on("voteResult", (result) => {
 });
 
 initAds();
+tryResumeSession();

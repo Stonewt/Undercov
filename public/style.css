@@ -15,25 +15,23 @@ body {
 }
 
 .app-shell {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  padding: 18px;
-  gap: 18px;
+  min-height: 100vh;
   position: relative;
+  padding: 18px 24px 24px;
 }
 
 .topbar {
   position: relative;
-  flex: 0 0 auto;
+  z-index: 20;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
+  margin-bottom: 18px;
 }
 
 .topbar h1 {
   margin: 0;
-  font-size: 30px;
+  font-size: 32px;
   justify-self: center;
 }
 
@@ -51,24 +49,136 @@ body {
   font-weight: 700;
 }
 
-/* Le jeu reste toujours centré */
-.layout-grid {
-  flex: 1 1 auto;
-  min-height: 0;
-  position: relative;
+.hidden {
+  display: none !important;
+}
+
+/* PUBS FIXES ET INDÉPENDANTES */
+.ad-rail {
+  position: fixed;
+  top: 88px;
+  bottom: 18px;
+  width: 150px;
   display: flex;
-  align-items: stretch;
+  flex-direction: column;
+  gap: 18px;
+  z-index: 5;
+}
+
+.ad-rail-left {
+  left: 18px;
+}
+
+.ad-rail-right {
+  right: 18px;
+}
+
+.ad-slot {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 180px;
+  border-radius: 18px;
+  border: 1px dashed rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,0.55);
+  font-size: 14px;
+  backdrop-filter: blur(2px);
+}
+
+.ad-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: #374151;
+  color: white;
+  font-size: 18px;
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(0,0,0,0.22);
+}
+
+.ad-close:active {
+  transform: translateY(2px);
+}
+
+/* CENTRE GLOBAL */
+.page-center {
+  width: 100%;
+  min-height: calc(100vh - 100px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 10;
+}
+
+/* ÉCRAN DE DÉPART VRAIMENT CENTRÉ */
+.start-screen {
+  width: 100%;
+  min-height: calc(100vh - 130px);
+  display: flex;
+  align-items: center;
   justify-content: center;
 }
 
-.main-grid {
+.start-card {
+  width: min(620px, 92vw);
+  background: #1f2937;
+  border-radius: 26px;
+  padding: 34px 34px 30px;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.32);
+}
+
+.start-card h2 {
+  margin: 0 0 10px 0;
+  text-align: center;
+  font-size: 34px;
+}
+
+.start-subtitle {
+  margin: 0 0 28px 0;
+  text-align: center;
+  font-size: 16px;
+  opacity: 0.85;
+}
+
+.form-block {
+  margin-bottom: 18px;
+}
+
+.form-block label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 15px;
+  opacity: 0.9;
+}
+
+.separator {
+  text-align: center;
+  margin: 16px 0;
+  opacity: 0.75;
+  font-size: 15px;
+}
+
+.join-row {
+  display: grid;
+  grid-template-columns: 1fr 180px;
+  gap: 12px;
+}
+
+.game-layout {
   width: min(1180px, 100%);
   min-height: 0;
   display: grid;
   grid-template-columns: 320px 1fr;
   gap: 18px;
-  position: relative;
-  z-index: 2;
 }
 
 .panel {
@@ -86,38 +196,11 @@ body {
   min-height: 0;
 }
 
-.start-wrap {
-  flex: 1 1 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100%;
-}
-
-/* Carte d'accueil plus grande et vraiment centrée */
-#roomSetupCard {
-  width: min(520px, 92vw);
-  padding: 26px;
-  border-radius: 22px;
-}
-
-#roomSetupCard h2 {
-  text-align: center;
-  font-size: 30px;
-  margin-bottom: 18px;
-}
-
-#roomSetupCard input,
-#roomSetupCard button {
-  font-size: 16px;
-  padding: 14px 16px;
-}
-
 .card {
   background: #1f2937;
-  border-radius: 16px;
-  padding: 14px;
-  box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.26);
 }
 
 .compact-card h2,
@@ -128,7 +211,7 @@ body {
 }
 
 .room-card {
-  height: 100%;
+  height: calc(100vh - 130px);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -153,7 +236,7 @@ body {
   min-height: 0;
   display: grid;
   grid-template-columns: 260px 1fr;
-  gap: 12px;
+  gap: 14px;
 }
 
 .players-box,
@@ -174,8 +257,8 @@ body {
   min-height: 0;
   overflow-y: auto;
   background: #111827;
-  border-radius: 12px;
-  padding: 10px;
+  border-radius: 14px;
+  padding: 12px;
   margin-bottom: 10px;
 }
 
@@ -191,9 +274,9 @@ body {
 
 input, button {
   border: none;
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 14px;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 15px;
 }
 
 input {
@@ -223,6 +306,13 @@ button:disabled {
   box-shadow: none;
 }
 
+.big-btn {
+  width: 100%;
+  min-height: 50px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
 .leave-btn {
   width: 100%;
   background: #374151;
@@ -232,10 +322,6 @@ button:disabled {
   display: flex;
   gap: 8px;
   align-items: center;
-}
-
-.hidden {
-  display: none !important;
 }
 
 .player-dead {
@@ -304,73 +390,33 @@ button:disabled {
   margin-top: auto;
 }
 
-/* Pubs en overlay indépendantes du centre du jeu */
-.ad-column {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 150px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  z-index: 1;
-}
-
-#ad-column-left,
-#leftAds {
-  left: 0;
-}
-
-#ad-column-right,
-#rightAds {
-  right: 0;
-}
-
-.ad-slot {
-  position: relative;
-  flex: 1 1 0;
-  min-height: 180px;
-  border-radius: 16px;
-  border: 1px dashed rgba(255,255,255,0.18);
-  background: rgba(255,255,255,0.03);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: rgba(255,255,255,0.55);
-  font-size: 14px;
-}
-
-.ad-close {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  border-radius: 999px;
-  background: #374151;
-  font-size: 18px;
-  line-height: 1;
-}
-
-@media (max-width: 1500px) {
-  .ad-column {
+@media (max-width: 1400px) {
+  .ad-rail {
     width: 120px;
   }
 }
 
-@media (max-width: 1320px) {
-  .ad-column {
+@media (max-width: 1240px) {
+  .ad-rail {
     display: none !important;
-  }
-
-  .main-grid {
-    width: min(1180px, 100%);
   }
 }
 
-@media (max-width: 1120px) {
-  .main-grid {
+@media (max-width: 980px) {
+  html, body {
+    overflow: auto;
+  }
+
+  .page-center {
+    align-items: flex-start;
+  }
+
+  .start-screen {
+    min-height: auto;
+    padding-top: 30px;
+  }
+
+  .game-layout {
     grid-template-columns: 1fr;
   }
 
@@ -378,20 +424,21 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
-  html, body {
-    overflow: auto;
-  }
-
-  .app-shell {
+  .room-card {
     height: auto;
-    min-height: 100vh;
-  }
-
-  .start-wrap {
     min-height: 70vh;
   }
 
-  #roomSetupCard {
-    width: min(560px, 95vw);
+  .join-row {
+    grid-template-columns: 1fr;
+  }
+
+  .start-card {
+    width: min(680px, 95vw);
+    padding: 26px 22px;
+  }
+
+  .start-card h2 {
+    font-size: 28px;
   }
 }

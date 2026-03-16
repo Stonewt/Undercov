@@ -38,10 +38,18 @@
     </div>
 
     <div class="card hidden" id="secretCard">
-      <h2>Ton rôle</h2>
-      <p id="roleText"></p>
+      <h2>Ton mot secret</h2>
       <p id="wordText"></p>
-      <button id="revealBtn">Afficher mon secret</button>
+    </div>
+
+    <div class="card hidden" id="chatCard">
+      <h2>Chat de la manche</h2>
+      <div id="messagesList" class="messages"></div>
+      <div class="row">
+        <input id="chatInput" maxlength="80" placeholder="Entre ton mot ou ton indice" />
+        <button id="sendChatBtn">Envoyer</button>
+      </div>
+      <p id="chatHelp"></p>
     </div>
 
     <div class="card hidden" id="voteCard">

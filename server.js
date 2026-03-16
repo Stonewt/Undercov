@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS rooms (
   current_speaker_index INTEGER NOT NULL DEFAULT 0,
   speaking_order TEXT NOT NULL DEFAULT '[]',
   votes TEXT NOT NULL DEFAULT '{}',
+  messages TEXT NOT NULL DEFAULT '[]',
   game_over INTEGER NOT NULL DEFAULT 0,
   winner TEXT,
   created_at TEXT NOT NULL,
@@ -62,6 +63,15 @@ CREATE TABLE IF NOT EXISTS players (
   FOREIGN KEY(room_code) REFERENCES rooms(code)
 );
 `);
+
+function columnExists(tableName, columnName) {
+  const cols = db.prepare(`PRAGMA table_info(${tableName})`).all();
+  return cols.some(c => c.name === columnName);
+}
+
+if (!columnExists("rooms", "messages")) {
+  db.exec(`ALTER TABLE rooms ADD COLUMN messages TEXT NOT NULL DEFAULT '[]'`);
+}
 
 app.use(helmet({
   contentSecurityPolicy: false
@@ -119,6 +129,11 @@ function sanitizeName(name) {
   return cleaned || "Joueur";
 }
 
+function sanitizeChatMessage(text) {
+  if (typeof text !== "string") return "";
+  return text.trim().replace(/\s+/g, " ").slice(0, 80);
+}
+
 function safeJsonParse(value, fallback) {
   try {
     return JSON.parse(value);
@@ -171,6 +186,7 @@ function updateRoom(code, patch) {
         current_speaker_index = ?,
         speaking_order = ?,
         votes = ?,
+        messages = ?,
         game_over = ?,
         winner = ?,
         updated_at = ?
@@ -183,6 +199,7 @@ function updateRoom(code, patch) {
     next.current_speaker_index,
     next.speaking_order,
     next.votes,
+    next.messages,
     next.game_over,
     next.winner,
     next.updated_at,
@@ -229,6 +246,7 @@ function buildPublicRoom(code) {
   const players = getPlayersByRoom(code);
   const speakingOrder = safeJsonParse(room.speaking_order, []);
   const currentSpeakerId = speakingOrder[room.current_speaker_index] || null;
+  const messages = safeJsonParse(room.messages, []);
 
   return {
     code: room.code,
@@ -239,6 +257,7 @@ function buildPublicRoom(code) {
     currentSpeakerId,
     gameOver: Boolean(room.game_over),
     winner: room.winner,
+    messages,
     players: players.map((p) => ({
       id: p.id,
       name: p.name,
@@ -296,6 +315,7 @@ function assignRoles(roomCode) {
     current_speaker_index: 0,
     speaking_order: JSON.stringify(alivePlayers.map((p) => p.id)),
     votes: JSON.stringify({}),
+    messages: JSON.stringify([]),
     game_over: 0,
     winner: null
   });
@@ -310,7 +330,8 @@ function startNewRound(roomCode) {
     round: room.round + 1,
     current_speaker_index: 0,
     speaking_order: JSON.stringify(alivePlayers.map((p) => p.id)),
-    votes: JSON.stringify({})
+    votes: JSON.stringify({}),
+    messages: JSON.stringify([])
   });
 }
 
@@ -394,7 +415,6 @@ function sendSecrets(roomCode) {
   players.forEach((player) => {
     if (player.socket_id) {
       io.to(player.socket_id).emit("gameStarted", {
-        role: player.role,
         word: player.word
       });
     }
@@ -425,8 +445,8 @@ io.on("connection", (socket) => {
       db.prepare(`
         INSERT INTO rooms (
           code, host_player_id, started, phase, round, current_speaker_index,
-          speaking_order, votes, game_over, winner, created_at, updated_at
-        ) VALUES (?, ?, 0, 'lobby', 0, 0, '[]', '{}', 0, NULL, ?, ?)
+          speaking_order, votes, messages, game_over, winner, created_at, updated_at
+        ) VALUES (?, ?, 0, 'lobby', 0, 0, '[]', '{}', '[]', 0, NULL, ?, ?)
       `).run(code, playerId, createdAt, createdAt);
 
       db.prepare(`
@@ -539,9 +559,53 @@ io.on("connection", (socket) => {
 
     callback({
       ok: true,
-      role: player.role,
       word: player.word
     });
+  });
+
+  socket.on("sendTurnMessage", ({ text }, callback) => {
+    const player = requirePlayer(socket, callback);
+    if (!player) return;
+
+    const room = getRoom(player.room_code);
+    if (!room) return callback({ ok: false, error: "Room introuvable" });
+    if (room.phase !== "speaking") return callback({ ok: false, error: "Le chat est fermé" });
+    if (player.eliminated) return callback({ ok: false, error: "Tu es éliminé" });
+
+    const speakingOrder = safeJsonParse(room.speaking_order, []);
+    const currentSpeakerId = speakingOrder[room.current_speaker_index] || null;
+
+    if (player.id !== currentSpeakerId) {
+      return callback({ ok: false, error: "Ce n'est pas ton tour" });
+    }
+
+    const cleanText = sanitizeChatMessage(text);
+    if (!cleanText) return callback({ ok: false, error: "Message vide" });
+
+    const messages = safeJsonParse(room.messages, []);
+    const alreadySentThisTurn = messages.some(
+      (msg) => msg.round === room.round && msg.playerId === player.id
+    );
+
+    if (alreadySentThisTurn) {
+      return callback({ ok: false, error: "Tu as déjà envoyé ton mot pour ce tour" });
+    }
+
+    messages.push({
+      id: randomString(10),
+      playerId: player.id,
+      playerName: player.name,
+      text: cleanText,
+      round: room.round,
+      createdAt: nowIso()
+    });
+
+    updateRoom(room.code, {
+      messages: JSON.stringify(messages)
+    });
+
+    emitRoom(room.code);
+    callback({ ok: true });
   });
 
   socket.on("nextSpeaker", (_, callback) => {
@@ -554,6 +618,17 @@ io.on("connection", (socket) => {
     if (room.phase !== "speaking") return callback({ ok: false, error: "Mauvaise phase" });
 
     const order = safeJsonParse(room.speaking_order, []);
+    const currentSpeakerId = order[room.current_speaker_index] || null;
+
+    const messages = safeJsonParse(room.messages, []);
+    const currentSpeakerSent = messages.some(
+      (msg) => msg.round === room.round && msg.playerId === currentSpeakerId
+    );
+
+    if (!currentSpeakerSent) {
+      return callback({ ok: false, error: "Le joueur actuel doit d'abord envoyer son mot" });
+    }
+
     const nextIndex = room.current_speaker_index + 1;
 
     if (nextIndex >= order.length) {

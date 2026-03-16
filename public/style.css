@@ -7,7 +7,7 @@ body {
 }
 
 .container {
-  max-width: 800px;
+  max-width: 900px;
   margin: 0 auto;
 }
 
@@ -66,4 +66,22 @@ ul {
   display: block;
   text-align: left;
   margin-bottom: 8px;
+}
+
+.messages {
+  max-height: 300px;
+  overflow-y: auto;
+  background: #111827;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.message {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.message:last-child {
+  border-bottom: none;
 }

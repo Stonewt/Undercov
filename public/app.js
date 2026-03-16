@@ -23,9 +23,13 @@ const finishVotingBtn = document.getElementById("finishVotingBtn");
 const restartBtn = document.getElementById("restartBtn");
 
 const secretCard = document.getElementById("secretCard");
-const roleText = document.getElementById("roleText");
 const wordText = document.getElementById("wordText");
-const revealBtn = document.getElementById("revealBtn");
+
+const chatCard = document.getElementById("chatCard");
+const messagesList = document.getElementById("messagesList");
+const chatInput = document.getElementById("chatInput");
+const sendChatBtn = document.getElementById("sendChatBtn");
+const chatHelp = document.getElementById("chatHelp");
 
 const voteCard = document.getElementById("voteCard");
 const voteButtons = document.getElementById("voteButtons");
@@ -68,15 +72,64 @@ function renderPlayers(room) {
     if (player.id === myPlayerId) label += " (toi)";
 
     li.textContent = label;
-    if (player.eliminated) li.classList.add("player-dead");
+
+    if (player.eliminated) {
+      li.classList.add("player-dead");
+    }
+
     playersList.appendChild(li);
   });
+}
+
+function renderMessages(room) {
+  messagesList.innerHTML = "";
+  const messages = room.messages || [];
+
+  messages.forEach((msg) => {
+    const div = document.createElement("div");
+    div.className = "message";
+    div.textContent = `${msg.playerName} : ${msg.text}`;
+    messagesList.appendChild(div);
+  });
+
+  messagesList.scrollTop = messagesList.scrollHeight;
+}
+
+function renderChat(room) {
+  if (!room.started || room.gameOver) {
+    chatCard.classList.add("hidden");
+    return;
+  }
+
+  chatCard.classList.remove("hidden");
+
+  renderMessages(room);
+
+  const me = room.players.find((p) => p.id === myPlayerId);
+
+  const isMyTurn =
+    room.phase === "speaking" &&
+    room.currentSpeakerId === myPlayerId &&
+    me &&
+    !me.eliminated;
+
+  chatInput.disabled = !isMyTurn;
+  sendChatBtn.disabled = !isMyTurn;
+
+  if (room.phase !== "speaking") {
+    chatHelp.textContent = "Le chat est fermé pendant le vote.";
+  } else if (isMyTurn) {
+    chatHelp.textContent = "C'est ton tour : écris ton indice.";
+  } else {
+    chatHelp.textContent = "Ce n'est pas ton tour.";
+  }
 }
 
 function renderVoteButtons(room) {
   voteButtons.innerHTML = "";
 
   const me = room.players.find((p) => p.id === myPlayerId);
+
   if (!me || me.eliminated || room.phase !== "voting" || room.gameOver) {
     voteCard.classList.add("hidden");
     return;
@@ -90,12 +143,14 @@ function renderVoteButtons(room) {
       const btn = document.createElement("button");
       btn.className = "vote-btn";
       btn.textContent = `Voter contre ${player.name}`;
+
       btn.onclick = () => {
         socket.emit("votePlayer", { targetId: player.id }, (res) => {
           if (!res.ok) return setStatus(res.error);
-          setStatus(`Vote enregistré contre ${player.name}`);
+          setStatus(`Vote envoyé contre ${player.name}`);
         });
       };
+
       voteButtons.appendChild(btn);
     });
 }
@@ -107,25 +162,30 @@ function renderEndGame(room) {
   }
 
   endCard.classList.remove("hidden");
+
   winnerText.textContent = `Gagnant : ${room.winner}`;
   revealList.innerHTML = "";
 
   room.reveal.forEach((player) => {
     const li = document.createElement("li");
+
     li.textContent =
       `${player.name} : ${player.role}` +
-      `${player.word ? ` | mot : ${player.word}` : " | pas de mot"}` +
-      `${player.eliminated ? " | éliminé" : ""}`;
+      `${player.word ? ` | mot : ${player.word}` : " | pas de mot"}`;
+
     revealList.appendChild(li);
   });
 }
 
 function renderRoom(room) {
   currentRoom = room;
+
   lobby.classList.remove("hidden");
+
   roomCodeEl.textContent = room.code;
 
   const host = room.players.find((p) => p.id === room.hostPlayerId);
+
   hostInfo.textContent = host ? `Hôte : ${host.name}` : "Pas d'hôte";
 
   if (!room.started) {
@@ -133,48 +193,53 @@ function renderRoom(room) {
     speakerInfo.textContent = "";
   } else {
     phaseInfo.textContent = `Phase : ${room.phase} | Manche : ${room.round}`;
+
     const speaker = room.players.find((p) => p.id === room.currentSpeakerId);
 
     if (room.phase === "speaking" && speaker) {
-      speakerInfo.textContent = `C'est à ${speaker.name} de parler`;
+      speakerInfo.textContent = `Tour de ${speaker.name}`;
     } else if (room.phase === "voting") {
-      speakerInfo.textContent = "Tout le monde vote";
+      speakerInfo.textContent = "Vote en cours";
     } else {
       speakerInfo.textContent = "";
     }
   }
 
   renderPlayers(room);
+  renderChat(room);
+
   hideGameplayButtons();
 
   const isHost = room.hostPlayerId === myPlayerId;
 
   if (!room.started && isHost) startBtn.classList.remove("hidden");
+
   if (room.started && !room.gameOver && room.phase === "speaking" && isHost) {
     nextSpeakerBtn.classList.remove("hidden");
   }
+
   if (room.started && !room.gameOver && room.phase === "voting" && isHost) {
     finishVotingBtn.classList.remove("hidden");
   }
+
   if (room.gameOver && isHost) restartBtn.classList.remove("hidden");
 
   renderVoteButtons(room);
   renderEndGame(room);
-
-  if (room.gameOver) {
-    voteCard.classList.add("hidden");
-  }
 }
 
 createBtn.addEventListener("click", () => {
   const name = nameInput.value.trim();
+
   if (!name) return setStatus("Entre un pseudo");
 
   socket.emit("createRoom", { name }, (res) => {
     if (!res.ok) return setStatus(res.error);
 
     saveSession(res.playerId, res.playerToken);
+
     renderRoom(res.room);
+
     setStatus("Room créée");
   });
 });
@@ -189,7 +254,9 @@ joinBtn.addEventListener("click", () => {
     if (!res.ok) return setStatus(res.error);
 
     saveSession(res.playerId, res.playerToken);
+
     renderRoom(res.room);
+
     setStatus("Room rejointe");
   });
 });
@@ -216,21 +283,26 @@ finishVotingBtn.addEventListener("click", () => {
 restartBtn.addEventListener("click", () => {
   socket.emit("restartGame", {}, (res) => {
     if (!res.ok) return setStatus(res.error);
-    resultCard.classList.add("hidden");
-    endCard.classList.add("hidden");
     setStatus("Nouvelle partie lancée");
   });
 });
 
-revealBtn.addEventListener("click", () => {
-  socket.emit("getMySecret", {}, (res) => {
+sendChatBtn.addEventListener("click", () => {
+  const text = chatInput.value.trim();
+
+  if (!text) return;
+
+  socket.emit("sendTurnMessage", { text }, (res) => {
     if (!res.ok) return setStatus(res.error);
 
-    secretCard.classList.remove("hidden");
-    roleText.textContent = `Rôle : ${res.role}`;
-    wordText.textContent =
-      res.role === "mrwhite" ? "Tu n'as pas de mot." : `Mot : ${res.word}`;
+    chatInput.value = "";
   });
+});
+
+chatInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !sendChatBtn.disabled) {
+    sendChatBtn.click();
+  }
 });
 
 socket.on("connect", () => {
@@ -238,9 +310,13 @@ socket.on("connect", () => {
 
   socket.emit("reconnectPlayer", { playerToken: myPlayerToken }, (res) => {
     if (!res?.ok) return;
+
     myPlayerId = res.playerId;
+
     localStorage.setItem("playerId", myPlayerId);
+
     renderRoom(res.room);
+
     setStatus("Reconnecté");
   });
 });
@@ -249,14 +325,13 @@ socket.on("roomUpdated", (room) => {
   renderRoom(room);
 });
 
-socket.on("gameStarted", ({ role, word }) => {
+socket.on("gameStarted", ({ word }) => {
   secretCard.classList.remove("hidden");
+
   resultCard.classList.add("hidden");
   endCard.classList.add("hidden");
 
-  roleText.textContent = `Rôle : ${role}`;
-  wordText.textContent =
-    role === "mrwhite" ? "Tu n'as pas de mot." : `Mot : ${word}`;
+  wordText.textContent = word ? `Mot : ${word}` : "Tu n'as pas de mot.";
 
   setStatus("La partie commence");
 });

@@ -101,20 +101,12 @@ app.use(
 
 app.use(express.static(path.join(__dirname, "public")));
 
-const wordPairs = [
-  ["chat", "tigre"],
-  ["pizza", "burger"],
-  ["soleil", "lune"],
-  ["plage", "désert"],
-  ["voiture", "moto"],
-  ["pomme", "poire"],
-  ["livre", "magazine"],
-  ["train", "métro"],
-  ["café", "thé"],
-  ["stylo", "crayon"],
-  ["forêt", "jungle"],
-  ["mer", "océan"]
-];
+const wordPairs = JSON.parse(
+  fs.readFileSync(
+    path.join(__dirname, "undercover_word_pairs_1000.json"),
+    "utf8"
+  )
+);
 
 const roomTurnTimers = new Map();
 const roomVoteTimers = new Map();

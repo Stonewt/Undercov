@@ -14,6 +14,8 @@ const createBtn = document.getElementById("createBtn");
 const joinBtn = document.getElementById("joinBtn");
 
 const statusBanner = document.getElementById("statusBanner");
+const topRoomInfo = document.getElementById("topRoomInfo");
+const topHostInfo = document.getElementById("topHostInfo");
 
 const startWrap = document.getElementById("startWrap");
 const roomSetupCard = document.getElementById("roomSetupCard");
@@ -111,6 +113,11 @@ function resetUI() {
   startWrap.classList.remove("hidden");
   roomSetupCard.classList.remove("hidden");
 
+  topRoomInfo.classList.add("hidden");
+  topHostInfo.classList.add("hidden");
+  topRoomInfo.textContent = "";
+  topHostInfo.textContent = "";
+
   playersList.innerHTML = "";
   messagesList.innerHTML = "";
   voteButtons.innerHTML = "";
@@ -138,17 +145,43 @@ function renderPlayers(room) {
 
   room.players.forEach((player) => {
     const li = document.createElement("li");
-    let label = player.name;
-
-    if (!player.connected) label += " (déconnecté)";
-    if (player.eliminated) label += " - éliminé";
-    if (player.id === room.currentSpeakerId) label += " ← joue";
-    if (player.id === myPlayerId) label += " (toi)";
-
-    li.textContent = label;
 
     if (player.eliminated) {
       li.classList.add("player-dead");
+    }
+
+    if (player.id === room.currentSpeakerId && room.phase === "speaking" && !room.gameOver) {
+      li.classList.add("player-current");
+    }
+
+    const nameLine = document.createElement("span");
+    nameLine.className = "player-name";
+
+    let mainLabel = player.name;
+    if (player.id === myPlayerId) mainLabel += " (toi)";
+    nameLine.textContent = mainLabel;
+
+    li.appendChild(nameLine);
+
+    const subParts = [];
+
+    if (player.id === room.currentSpeakerId && room.phase === "speaking" && !room.gameOver) {
+      subParts.push("réfléchit");
+    }
+
+    if (!player.connected) {
+      subParts.push("déconnecté");
+    }
+
+    if (player.eliminated) {
+      subParts.push("éliminé");
+    }
+
+    if (subParts.length > 0) {
+      const subLine = document.createElement("span");
+      subLine.className = "player-sub";
+      subLine.textContent = subParts.join(" • ");
+      li.appendChild(subLine);
     }
 
     playersList.appendChild(li);
@@ -327,7 +360,12 @@ function renderRoom(room) {
   roomCodeEl.textContent = room.code;
 
   const host = room.players.find((p) => p.id === room.hostPlayerId);
+
   hostInfo.textContent = host ? `Hôte : ${host.name}` : "Pas d'hôte";
+  topRoomInfo.textContent = `Room ${room.code}`;
+  topHostInfo.textContent = host ? `Hôte : ${host.name}` : "Pas d'hôte";
+  topRoomInfo.classList.remove("hidden");
+  topHostInfo.classList.remove("hidden");
 
   if (!room.started) {
     phaseInfo.textContent = "Manche 0";
@@ -338,9 +376,9 @@ function renderRoom(room) {
     const speaker = room.players.find((p) => p.id === room.currentSpeakerId);
 
     if (room.phase === "speaking" && speaker) {
-      speakerInfo.textContent = `Tour de ${speaker.name}`;
+      speakerInfo.textContent = `${speaker.name} réfléchit`;
     } else if (room.phase === "voting") {
-      speakerInfo.textContent = `Vote en cours (${room.voteCount}/${room.players.filter(p => !p.eliminated).length})`;
+      speakerInfo.textContent = `Vote en cours (${room.voteCount}/${room.players.filter((p) => !p.eliminated).length})`;
     } else {
       speakerInfo.textContent = "";
     }

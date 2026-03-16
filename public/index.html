@@ -8,9 +8,21 @@
 </head>
 <body>
   <div class="app-shell">
+    <div class="bg-orb orb-1"></div>
+    <div class="bg-orb orb-2"></div>
+    <div class="bg-grid"></div>
+
     <div class="topbar">
-      <div></div>
+      <div class="topbar-side topbar-left">
+        <div id="topRoomInfo" class="top-meta hidden"></div>
+      </div>
+
       <h1>Undercover</h1>
+
+      <div class="topbar-side topbar-right">
+        <div id="topHostInfo" class="top-meta hidden"></div>
+      </div>
+
       <div id="statusBanner" class="status-banner hidden"></div>
     </div>
 
@@ -18,24 +30,25 @@
       <div class="ad-slot" data-ad="left-top">
         <button class="ad-close" data-close-ad="left-top">×</button>
       </div>
-      <div class="ad-slot" data-ad="left-top">
-        <button class="ad-close" data-close-ad="left-top">×</button>
+      <div class="ad-slot" data-ad="left-bottom">
+        <button class="ad-close" data-close-ad="left-bottom">×</button>
       </div>
     </aside>
 
     <aside class="ad-rail ad-rail-right" id="rightAds">
-      <div class="ad-slot" data-ad="left-top">
-        <button class="ad-close" data-close-ad="left-top">×</button>
+      <div class="ad-slot" data-ad="right-top">
+        <button class="ad-close" data-close-ad="right-top">×</button>
       </div>
-      <div class="ad-slot" data-ad="left-top">
-        <button class="ad-close" data-close-ad="left-top">×</button>
+      <div class="ad-slot" data-ad="right-bottom">
+        <button class="ad-close" data-close-ad="right-bottom">×</button>
       </div>
     </aside>
 
     <main class="page-center">
       <div class="start-screen" id="startWrap">
         <div class="start-card" id="roomSetupCard">
-          <h2>Se connecter à une salle</h2>
+          <div class="start-badge">Jeu multijoueur</div>
+          <h2>Entre dans la partie</h2>
           <p class="start-subtitle">Crée une room ou rejoins-en une avec un code.</p>
 
           <div class="form-block">
@@ -58,7 +71,7 @@
 
       <div class="game-layout">
         <div class="panel panel-left">
-          <div class="card hidden compact-card" id="secretCard">
+          <div class="card hidden compact-card accent-card" id="secretCard">
             <h2>Ton mot</h2>
             <p id="wordText"></p>
           </div>
@@ -90,42 +103,47 @@
 
         <div class="panel panel-center">
           <div class="card room-card hidden" id="lobby">
-            <div class="room-header">
-              <div>
-                <h2>Room <span id="roomCode"></span></h2>
-                <p id="hostInfo"></p>
-                <p id="phaseInfo"></p>
-                <p id="speakerInfo"></p>
-              </div>
-              <div class="room-actions">
-                <button id="startBtn" class="hidden">Lancer</button>
-                <button id="restartBtn" class="hidden">Rejouer</button>
-              </div>
-            </div>
-
             <div class="timer-wrap">
-              <div class="timer-label">Temps restant</div>
+              <div class="timer-header-line">
+                <div class="timer-label">Temps restant</div>
+                <div id="timerText" class="timer-text">--</div>
+              </div>
               <div class="timer-bar">
                 <div id="timerFill" class="timer-fill"></div>
               </div>
-              <div id="timerText" class="timer-text">--</div>
             </div>
 
             <div class="room-content">
               <div class="players-box">
-                <h3>Joueurs</h3>
+                <div class="section-title-row">
+                  <h3>Joueurs</h3>
+                </div>
                 <ul id="playersList"></ul>
               </div>
 
               <div class="chat-box hidden" id="chatCard">
-                <h3>Chat de la manche</h3>
+                <div class="chat-top-infos">
+                  <p id="phaseInfo" class="phase-line"></p>
+                  <p id="speakerInfo" class="speaker-line"></p>
+                </div>
+
+                <div class="section-title-row">
+                  <h3>Chat de la manche</h3>
+                </div>
+
                 <div id="messagesList" class="messages"></div>
-                <div class="row">
+
+                <div class="row message-input-row">
                   <input id="chatInput" maxlength="80" placeholder="Entre ton indice" />
                   <button id="sendChatBtn">Envoyer</button>
                 </div>
                 <p id="chatHelp"></p>
               </div>
+            </div>
+
+            <div class="room-actions room-actions-bottom">
+              <button id="startBtn" class="hidden">Lancer</button>
+              <button id="restartBtn" class="hidden">Rejouer</button>
             </div>
           </div>
         </div>

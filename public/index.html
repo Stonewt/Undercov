@@ -7,8 +7,6 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-
-  <!-- INTRO -->
   <div id="introOverlay" class="intro-overlay">
     <div id="introScene" class="intro-scene">
       <div class="logo-scene">
@@ -17,9 +15,51 @@
         <div class="dots"></div>
 
         <div class="logo-mark">
-          <svg width="140" height="140" viewBox="0 0 140 140">
-            <circle cx="70" cy="70" r="38" fill="none" stroke="rgba(80,130,255,0.3)"/>
-            <circle cx="70" cy="70" r="38" fill="none" stroke="rgba(80,130,255,0.2)"/>
+          <svg width="140" height="140" viewBox="0 0 140 140" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <radialGradient id="introIrisGrad" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#5a9fff"/>
+                <stop offset="60%" stop-color="#1a4fcc"/>
+                <stop offset="100%" stop-color="#0a1a5c"/>
+              </radialGradient>
+              <radialGradient id="introPupilGrad" cx="40%" cy="40%" r="50%">
+                <stop offset="0%" stop-color="#1a2a60"/>
+                <stop offset="100%" stop-color="#000510"/>
+              </radialGradient>
+              <radialGradient id="introIrisAmber" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#e07a20"/>
+                <stop offset="55%" stop-color="#a04e0a"/>
+                <stop offset="100%" stop-color="#3a1500"/>
+              </radialGradient>
+              <clipPath id="eyeClip">
+                <ellipse cx="70" cy="70" rx="46" ry="28"/>
+              </clipPath>
+            </defs>
+
+            <circle class="pulse" cx="70" cy="70" r="38" fill="none" stroke="rgba(80,130,255,0.3)" stroke-width="1"/>
+            <circle class="pulse2" cx="70" cy="70" r="38" fill="none" stroke="rgba(80,130,255,0.2)" stroke-width="1"/>
+
+            <path d="M14 62 Q14 30 70 26 Q126 30 126 62 Q126 78 110 78 Q96 72 70 72 Q44 72 30 78 Q14 78 14 62Z"
+                  fill="#0d1530" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+
+            <ellipse cx="44" cy="58" rx="18" ry="13" fill="#080b16"/>
+            <ellipse cx="96" cy="58" rx="18" ry="13" fill="#080b16"/>
+
+            <ellipse cx="44" cy="58" rx="14" ry="10" fill="url(#introIrisGrad)"/>
+            <ellipse cx="44" cy="58" rx="7" ry="7" fill="url(#introPupilGrad)"/>
+            <ellipse cx="41" cy="55" rx="2" ry="2" fill="rgba(255,255,255,0.4)"/>
+
+            <ellipse cx="96" cy="58" rx="14" ry="10" fill="url(#introIrisAmber)"/>
+            <ellipse cx="96" cy="58" rx="7" ry="7" fill="url(#introPupilGrad)"/>
+            <ellipse cx="93" cy="55" rx="2" ry="2" fill="rgba(255,255,255,0.35)"/>
+
+            <g clip-path="url(#eyeClip)" transform="translate(52,0)">
+              <rect class="scan-line" x="-4" y="50" width="36" height="1.5" rx="1" fill="rgba(224,122,32,0.9)"/>
+            </g>
+
+            <path d="M58 72 Q70 80 82 72" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="1.5"/>
+            <path d="M14 62 Q14 30 70 26 Q126 30 126 62 Q126 78 110 78 Q96 72 70 72 Q44 72 30 78 Q14 78 14 62Z"
+                  fill="none" stroke="rgba(80,130,255,0.2)" stroke-width="1"/>
           </svg>
         </div>
 
@@ -34,85 +74,298 @@
     </div>
   </div>
 
-  <!-- APP -->
   <div class="app-shell">
+    <div class="topbar">
+      <div class="topbar-side topbar-left">
+        <div id="topRoomInfo" class="top-meta hidden"></div>
+      </div>
+
+      <div class="brand-title">
+        <h1 class="brand-logo">
+          <span class="brand-under">UNDER</span><span class="brand-cover">COVER</span>
+        </h1>
+      </div>
+
+      <div class="topbar-side topbar-right">
+        <div id="topHostInfo" class="top-meta hidden"></div>
+      </div>
+
+      <div id="statusBanner" class="status-banner hidden"></div>
+    </div>
+
+    <aside class="ad-rail ad-rail-left" id="leftAds">
+      <div class="ad-slot" data-ad="left-top">
+        <button class="ad-close" data-close-ad="left-top">×</button>
+      </div>
+      <div class="ad-slot" data-ad="left-bottom">
+        <button class="ad-close" data-close-ad="left-bottom">×</button>
+      </div>
+    </aside>
+
+    <aside class="ad-rail ad-rail-right" id="rightAds">
+      <div class="ad-slot" data-ad="right-top">
+        <button class="ad-close" data-close-ad="right-top">×</button>
+      </div>
+      <div class="ad-slot" data-ad="right-bottom">
+        <button class="ad-close" data-close-ad="right-bottom">×</button>
+      </div>
+    </aside>
 
     <main class="page-center">
-
-      <!-- PAGE ACCUEIL -->
       <div class="start-screen" id="startWrap">
-
         <div class="landing-layout">
-
-          <!-- LEFT : LOGIN -->
           <section class="login-card" id="roomSetupCard">
+            <div class="start-content start-content-full">
+              <h2>Se connecter à une salle</h2>
+              <p class="start-subtitle">Crée une room ou rejoins-en une avec un code.</p>
 
-            <h2>Se connecter à une salle</h2>
-            <p class="start-subtitle">Crée une room ou rejoins-en une avec un code.</p>
+              <div class="form-block hidden" id="resumeBlock">
+                <button id="resumeBtn" class="big-btn">Reprendre ma partie</button>
+              </div>
 
-            <div class="form-block hidden" id="resumeBlock">
-              <button id="resumeBtn" class="big-btn">Reprendre ma partie</button>
+              <div class="separator hidden" id="resumeSeparator">ou</div>
+
+              <div class="form-block">
+                <label for="nameInput">Pseudo</label>
+                <input id="nameInput" maxlength="20" placeholder="Ton pseudo" />
+              </div>
+
+              <div class="form-block">
+                <button id="createBtn" class="big-btn">Créer une room</button>
+              </div>
+
+              <div class="separator">ou</div>
+
+              <div class="join-row">
+                <input id="roomInput" placeholder="Code room" />
+                <button id="joinBtn" class="big-btn">Rejoindre</button>
+              </div>
             </div>
-
-            <div class="separator hidden" id="resumeSeparator">ou</div>
-
-            <div class="form-block">
-              <label>Pseudo</label>
-              <input id="nameInput" maxlength="20" placeholder="Ton pseudo" />
-            </div>
-
-            <div class="form-block">
-              <button id="createBtn" class="big-btn">Créer une room</button>
-            </div>
-
-            <div class="separator">ou</div>
-
-            <div class="join-row">
-              <input id="roomInput" placeholder="Code room" />
-              <button id="joinBtn" class="big-btn">Rejoindre</button>
-            </div>
-
           </section>
 
-          <!-- RIGHT -->
           <section class="landing-right">
-
-            <!-- LOGO SANS FOND -->
             <div class="logo-free">
-              <svg width="220" height="220" viewBox="0 0 400 400">
-                <circle cx="200" cy="200" r="120" fill="none" stroke="#3b82f6" />
-                <circle cx="200" cy="200" r="80" fill="none" stroke="#f97316" />
+              <svg width="220" height="220" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <radialGradient id="bgGlowHome" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="#1a3796" stop-opacity="0.4"/>
+                    <stop offset="100%" stop-color="#080b16" stop-opacity="0"/>
+                  </radialGradient>
+                  <radialGradient id="irisGradHome" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="#5a9fff"/>
+                    <stop offset="60%" stop-color="#1a4fcc"/>
+                    <stop offset="100%" stop-color="#0a1a5c"/>
+                  </radialGradient>
+                  <radialGradient id="pupilGradHome" cx="40%" cy="40%" r="50%">
+                    <stop offset="0%" stop-color="#1a2a60"/>
+                    <stop offset="100%" stop-color="#000510"/>
+                  </radialGradient>
+                  <radialGradient id="irisAmberHome" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="#e07a20"/>
+                    <stop offset="55%" stop-color="#a04e0a"/>
+                    <stop offset="100%" stop-color="#3a1500"/>
+                  </radialGradient>
+                  <radialGradient id="warmGlowHome" cx="60%" cy="70%" r="50%">
+                    <stop offset="0%" stop-color="#c85a0f" stop-opacity="0.25"/>
+                    <stop offset="100%" stop-color="#080b16" stop-opacity="0"/>
+                  </radialGradient>
+                  <pattern id="dotsHome" x="0" y="0" width="30" height="30" patternUnits="userSpaceOnUse">
+                    <circle cx="1" cy="1" r="1" fill="rgba(80,120,220,0.10)"/>
+                  </pattern>
+                </defs>
+
+                <rect width="400" height="400" rx="32" fill="#080b16"/>
+                <ellipse cx="200" cy="160" rx="220" ry="160" fill="url(#bgGlowHome)"/>
+                <ellipse cx="260" cy="300" rx="180" ry="130" fill="url(#warmGlowHome)"/>
+                <rect width="400" height="400" rx="32" fill="url(#dotsHome)"/>
+
+                <circle cx="200" cy="178" r="108" fill="none" stroke="rgba(80,130,255,0.18)" stroke-width="1"/>
+                <circle cx="200" cy="178" r="122" fill="none" stroke="rgba(80,130,255,0.10)" stroke-width="1"/>
+
+                <path d="M84 168 Q84 100 200 90 Q316 100 316 168 Q316 200 292 200 Q264 192 200 192 Q136 192 108 200 Q84 200 84 168Z"
+                      fill="#0d1530" stroke="rgba(80,130,255,0.22)" stroke-width="1.2"/>
+
+                <ellipse cx="148" cy="158" rx="44" ry="32" fill="#080b16"/>
+                <ellipse cx="252" cy="158" rx="44" ry="32" fill="#080b16"/>
+
+                <ellipse cx="148" cy="158" rx="36" ry="26" fill="url(#irisGradHome)"/>
+                <ellipse cx="148" cy="158" rx="18" ry="18" fill="url(#pupilGradHome)"/>
+                <ellipse cx="140" cy="150" rx="5" ry="5" fill="rgba(255,255,255,0.38)"/>
+
+                <ellipse cx="252" cy="158" rx="36" ry="26" fill="url(#irisAmberHome)"/>
+                <ellipse cx="252" cy="158" rx="18" ry="18" fill="url(#pupilGradHome)"/>
+                <ellipse cx="244" cy="150" rx="5" ry="5" fill="rgba(255,255,255,0.32)"/>
               </svg>
             </div>
 
-            <!-- RÈGLES -->
             <div class="rules-card">
               <h3>Règles</h3>
               <ul>
                 <li>Chaque joueur reçoit un rôle secret.</li>
-                <li>Les civils ont le même mot.</li>
-                <li>Les undercovers ont un mot différent.</li>
+                <li>Les civils partagent le même mot.</li>
+                <li>Les undercovers ont un mot proche mais différent.</li>
                 <li>Mr White n’a aucun mot.</li>
-                <li>Un mot chacun à tour de rôle.</li>
-                <li>Interdit de dire son mot exact.</li>
-                <li>Vote après chaque manche.</li>
-                <li>Civils gagnent si tous les intrus sont éliminés.</li>
-                <li>Undercover gagne s’il devient majoritaire.</li>
-                <li>Mr White gagne s’il reste en duel final.</li>
+                <li>À tour de rôle, chacun donne un seul mot comme indice.</li>
+                <li>Tu ne peux pas écrire exactement ton mot secret.</li>
+                <li>Ensuite, tout le monde vote contre un joueur.</li>
+                <li>Les civils gagnent si tous les intrus sont éliminés.</li>
+                <li>Les undercovers gagnent s’ils deviennent au moins aussi nombreux que les civils.</li>
+                <li>Mr White gagne s’il ne reste plus qu’un seul autre joueur vivant face à lui.</li>
+                <li>Si personne ne donne d’indice pendant toute une manche, la partie s’arrête.</li>
               </ul>
             </div>
-
           </section>
-
         </div>
       </div>
 
-    </main>
+      <div class="game-layout">
+        <div class="panel panel-left">
+          <div class="card hidden compact-card" id="secretCard">
+            <h2>Ton mot</h2>
+            <p id="wordText"></p>
+          </div>
 
+          <div class="card hidden compact-card" id="compositionCard">
+            <h2>Configuration</h2>
+            <p id="compositionHelp"></p>
+
+            <div class="form-block">
+              <label for="undercoverCountInput">Nombre d'undercover</label>
+              <input id="undercoverCountInput" type="number" min="1" step="1" value="1" />
+            </div>
+
+            <div class="form-block">
+              <label for="mrWhiteCountInput">Mr White</label>
+              <input id="mrWhiteCountInput" type="number" min="0" max="1" step="1" value="0" />
+            </div>
+
+            <div class="form-block">
+              <label for="turnDurationInput">Durée d'un tour (15 à 45 s)</label>
+              <input id="turnDurationInput" type="number" min="15" max="45" step="1" value="30" />
+            </div>
+
+            <div class="form-block">
+              <label for="voteDurationInput">Durée du débat / vote (15 à 45 s)</label>
+              <input id="voteDurationInput" type="number" min="15" max="45" step="1" value="30" />
+            </div>
+
+            <div class="form-block">
+              <label for="categorySelect">Catégorie</label>
+              <select id="categorySelect"></select>
+            </div>
+
+            <div class="form-block">
+              <label for="subcategorySelect">Sous-catégorie</label>
+              <select id="subcategorySelect"></select>
+            </div>
+
+            <p id="compositionSummary"></p>
+          </div>
+
+          <div class="card hidden compact-card" id="voteCard">
+            <h2>Vote</h2>
+            <div id="voteButtons"></div>
+            <div class="vote-confirm-wrap">
+              <p id="selectedVoteText">Aucun joueur sélectionné.</p>
+              <button id="confirmVoteBtn" disabled>Confirmer mon vote</button>
+            </div>
+          </div>
+
+          <div class="card hidden compact-card" id="resultCard">
+            <h2>Résultat</h2>
+            <p id="resultText"></p>
+          </div>
+
+          <div class="bottom-left-actions hidden" id="leaveWrap">
+            <button id="leaveBtn" class="leave-btn">Quitter la partie</button>
+          </div>
+        </div>
+
+        <div class="panel panel-center">
+          <div class="card room-card hidden" id="lobby">
+            <div class="timer-wrap">
+              <div class="timer-header-line">
+                <div class="timer-label">Temps restant</div>
+                <div id="timerText" class="timer-text">--</div>
+              </div>
+              <div class="timer-bar">
+                <div id="timerFill" class="timer-fill"></div>
+              </div>
+            </div>
+
+            <div class="room-content">
+              <div class="players-box">
+                <h3>Joueurs</h3>
+                <ul id="playersList"></ul>
+              </div>
+
+              <div class="chat-box hidden" id="chatCard">
+                <div class="chat-top-infos">
+                  <p id="phaseInfo" class="phase-line"></p>
+                  <p id="speakerInfo" class="speaker-line"></p>
+                </div>
+
+                <div class="role-dolls-wrap">
+                  <div class="role-dolls-title">Composition visuelle</div>
+                  <div id="roleDolls" class="role-dolls"></div>
+                </div>
+
+                <h3>Chat de la manche</h3>
+                <div id="messagesList" class="messages"></div>
+                <div class="row">
+                  <input id="chatInput" maxlength="24" placeholder="Entre un mot" />
+                  <button id="sendChatBtn">Envoyer</button>
+                </div>
+                <p id="chatHelp"></p>
+              </div>
+
+              <div class="waiting-box hidden" id="waitingCard">
+                <h2 class="waiting-title">SALON D'ATTENTE</h2>
+                <p id="waitingText">En attente du lancement de la partie par l'hôte…</p>
+
+                <div class="role-dolls-wrap">
+                  <div class="role-dolls-title">Composition visuelle</div>
+                  <div id="waitingRoleDolls" class="role-dolls"></div>
+                </div>
+
+                <div class="waiting-meta">
+                  <div class="waiting-meta-item">
+                    <span class="waiting-meta-label">Catégorie</span>
+                    <span id="waitingCategory">--</span>
+                  </div>
+                  <div class="waiting-meta-item">
+                    <span class="waiting-meta-label">Sous-catégorie</span>
+                    <span id="waitingSubcategory">--</span>
+                  </div>
+                  <div class="waiting-meta-item">
+                    <span class="waiting-meta-label">Tour</span>
+                    <span id="waitingTurnDuration">--</span>
+                  </div>
+                  <div class="waiting-meta-item">
+                    <span class="waiting-meta-label">Vote</span>
+                    <span id="waitingVoteDuration">--</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="end-box hidden" id="endCard">
+                <h2 id="endTitle">Fin de partie</h2>
+                <p id="winnerText"></p>
+                <ul id="revealList"></ul>
+              </div>
+            </div>
+
+            <div class="room-actions room-actions-bottom">
+              <button id="startBtn" class="hidden">Lancer</button>
+              <button id="restartBtn" class="hidden">Rejouer</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="app.js"></script>
-
 </body>
 </html>

@@ -1,7 +1,8 @@
 html, body {
-  height: 100%;
+  min-height: 100%;
   margin: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 body {
@@ -188,7 +189,7 @@ body::after {
 .scan-line { animation: scan 2.8s ease-in-out infinite; }
 
 .app-shell {
-  height: 100dvh;
+  min-height: 100dvh;
   min-height: 100svh;
   display: flex;
   flex-direction: column;
@@ -296,19 +297,19 @@ body::after {
   width: 100%;
   min-height: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  overflow: visible;
+  padding: 8px 0 24px;
 }
 
 .landing-stack {
-  width: min(760px, 100%);
+  width: min(1240px, 100%);
   margin: 0 auto;
-  padding: 8px 12px 18px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 26px;
+  gap: 28px;
 }
 
 .landing-header {
@@ -323,6 +324,7 @@ body::after {
   display: flex;
   justify-content: center;
   align-items: center;
+  min-height: 240px;
   width: 100%;
   background: transparent;
   border: none;
@@ -332,38 +334,38 @@ body::after {
 .logo-free::before {
   content: "";
   position: absolute;
-  width: 340px;
-  height: 340px;
+  width: 360px;
+  height: 360px;
   border-radius: 50%;
   background:
-    radial-gradient(circle, rgba(59,130,246,0.14) 0%, rgba(59,130,246,0.06) 34%, transparent 68%),
-    radial-gradient(circle at 64% 62%, rgba(249,115,22,0.11) 0%, transparent 56%);
-  filter: blur(16px);
+    radial-gradient(circle, rgba(59,130,246,0.16) 0%, rgba(59,130,246,0.07) 32%, transparent 70%),
+    radial-gradient(circle at 65% 62%, rgba(249,115,22,0.14) 0%, transparent 55%);
+  filter: blur(18px);
   pointer-events: none;
 }
 
 .logo-free svg {
   position: relative;
+  z-index: 1;
   display: block;
-  width: 230px;
-  height: 230px;
-  filter: drop-shadow(0 16px 28px rgba(0,0,0,0.24));
+  width: 240px;
+  height: 240px;
+  filter: drop-shadow(0 18px 28px rgba(0,0,0,0.26));
 }
 
 .landing-cards {
   width: 100%;
-  max-width: 640px;
+  max-width: 1180px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 22px;
-  justify-items: center;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
 }
 
 .login-card,
 .rules-card {
-  width: 100%;
-  min-height: auto;
+  min-height: 420px;
   background: rgba(31, 41, 55, 0.88);
   border: 1px solid rgba(255,255,255,0.07);
   border-radius: 24px;
@@ -946,6 +948,11 @@ button:disabled {
 }
 
 @media (max-width: 1100px) {
+  .landing-cards {
+    grid-template-columns: 1fr;
+    max-width: 700px;
+  }
+
   .game-layout {
     grid-template-columns: 1fr;
   }
@@ -960,12 +967,7 @@ button:disabled {
 }
 
 @media (max-width: 820px) {
-  html, body {
-    overflow: auto;
-  }
-
   .app-shell {
-    height: auto;
     min-height: 100svh;
     min-height: 100dvh;
     padding:
@@ -990,9 +992,11 @@ button:disabled {
   }
 
   .landing-stack {
-    width: 100%;
-    padding: 4px 0 18px;
-    gap: 20px;
+    gap: 22px;
+  }
+
+  .logo-free {
+    min-height: 180px;
   }
 
   .logo-free svg {

@@ -468,6 +468,7 @@ function renderWaitingRoom(room) {
 
   if (!shouldShow) return;
 
+  renderRoleDolls(room);
   waitingText.textContent = "En attente du lancement de la partie par l'hôte…";
   waitingCategory.textContent = room.selectedCategory || "--";
   waitingSubcategory.textContent = room.selectedSubcategory || "--";
@@ -924,7 +925,7 @@ createBtn.addEventListener("click", () => {
   resetUI();
 
   socket.emit("createRoom", { name }, (res) => {
-    if (!res.ok) return setStatus(res.error, true);
+    if (!res?.ok) return setStatus(res?.error || "Impossible de créer la room", true);
 
     saveSession(res.playerId, res.playerToken, res.room.code);
     renderRoom(res.room);
@@ -943,7 +944,7 @@ joinBtn.addEventListener("click", () => {
   const existingToken = myRoomCode === code ? myPlayerToken : null;
 
   socket.emit("joinRoom", { name, code, playerToken: existingToken }, (res) => {
-    if (!res.ok) return setStatus(res.error, true);
+    if (!res?.ok) return setStatus(res?.error || "Impossible de rejoindre la room", true);
 
     saveSession(res.playerId, res.playerToken, res.room.code);
     renderRoom(res.room);
@@ -979,7 +980,7 @@ startBtn.addEventListener("click", () => {
   const settings = currentRoom ? getSelectedSettings(currentRoom) : null;
 
   socket.emit("startGame", { composition, settings }, (res) => {
-    if (!res.ok) return setStatus(res.error, true);
+    if (!res?.ok) return setStatus(res?.error || "Impossible de lancer", true);
     playClickSound("success");
     setStatus("Partie lancée");
   });
@@ -990,7 +991,7 @@ restartBtn.addEventListener("click", () => {
   const settings = currentRoom ? getSelectedSettings(currentRoom) : null;
 
   socket.emit("restartGame", { composition, settings }, (res) => {
-    if (!res.ok) return setStatus(res.error, true);
+    if (!res?.ok) return setStatus(res?.error || "Impossible de relancer", true);
     playClickSound("success");
     setStatus("Nouvelle partie lancée");
   });
@@ -1010,7 +1011,7 @@ sendChatBtn.addEventListener("click", () => {
   if (!text) return;
 
   socket.emit("sendTurnMessage", { text }, (res) => {
-    if (!res.ok) return setStatus(res.error, true);
+    if (!res?.ok) return setStatus(res?.error || "Impossible d'envoyer", true);
     chatInput.value = "";
     sendChatBtn.disabled = true;
     playClickSound("success");
@@ -1022,7 +1023,7 @@ confirmVoteBtn.addEventListener("click", () => {
   if (!selectedVoteTargetId || voteAlreadySent) return;
 
   socket.emit("votePlayer", { targetId: selectedVoteTargetId }, (res) => {
-    if (!res.ok) return setStatus(res.error, true);
+    if (!res?.ok) return setStatus(res?.error || "Impossible de voter", true);
 
     voteAlreadySent = true;
     confirmVoteBtn.disabled = true;

@@ -775,6 +775,32 @@ function removeSocketFromPreviousRoom(socket) {
 }
 
 io.on("connection", (socket) => {
+  socket.on("checkSession", ({ playerToken, roomCode }, callback) => {
+    try {
+      if (!playerToken || !roomCode) {
+        return callback?.({ ok: false, error: "Session invalide" });
+      }
+
+      const player = getPlayerByToken(playerToken);
+      if (!player) {
+        return callback?.({ ok: false, error: "Session introuvable" });
+      }
+
+      const room = getRoom(String(roomCode).toUpperCase().trim());
+      if (!room || player.room_code !== room.code) {
+        return callback?.({ ok: false, error: "Room introuvable" });
+      }
+
+      callback?.({
+        ok: true,
+        roomCode: room.code,
+        playerId: player.id
+      });
+    } catch {
+      callback?.({ ok: false, error: "Impossible de vérifier la session" });
+    }
+  });
+
   socket.on("resumeSession", ({ playerToken }, callback) => {
     try {
       if (!playerToken) {

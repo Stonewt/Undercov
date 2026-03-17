@@ -117,17 +117,19 @@ function validateStoredSession() {
     return;
   }
 
-  socket.emit("resumeSession", { playerToken: myPlayerToken }, (res) => {
-    if (!res?.ok) {
-      clearSession();
-      updateResumeUI(false);
-      return;
-    }
+  socket.emit(
+    "checkSession",
+    { playerToken: myPlayerToken, roomCode: myRoomCode },
+    (res) => {
+      if (!res?.ok) {
+        clearSession();
+        updateResumeUI(false);
+        return;
+      }
 
-    socket.emit("leaveRoom", {}, () => {
       updateResumeUI(true);
-    });
-  });
+    }
+  );
 }
 
 function normalizeSingleWordInput(value) {
@@ -162,7 +164,7 @@ function resetUI() {
 
   lobby.classList.add("hidden");
   secretCard.classList.add("hidden");
-  compositionCard.classList.add("hidden");
+  if (compositionCard) compositionCard.classList.add("hidden");
   chatCard.classList.add("hidden");
   voteCard.classList.add("hidden");
   resultCard.classList.add("hidden");
@@ -186,8 +188,8 @@ function resetUI() {
   wordText.textContent = "";
   resultText.textContent = "";
   winnerText.textContent = "";
-  compositionHelp.textContent = "";
-  compositionSummary.textContent = "";
+  if (compositionHelp) compositionHelp.textContent = "";
+  if (compositionSummary) compositionSummary.textContent = "";
   chatInput.value = "";
 
   resetVoteSelection();
@@ -459,6 +461,10 @@ function renderTimer(room) {
 }
 
 function clampCompositionValues(room) {
+  if (!undercoverCountInput || !mrWhiteCountInput) {
+    return { undercoverCount: 1, mrwhiteCount: 0, civilCount: room.players.length - 1 };
+  }
+
   const playerCount = room.players.length;
 
   if (playerCount <= 3) {
@@ -509,6 +515,10 @@ function getSelectedComposition(room) {
 }
 
 function renderComposition(room) {
+  if (!compositionCard || !compositionHelp || !compositionSummary || !undercoverCountInput || !mrWhiteCountInput) {
+    return;
+  }
+
   const isHost = room.hostPlayerId === myPlayerId;
   const canConfigure = !room.started && !room.gameOver && isHost;
 
@@ -542,8 +552,7 @@ function renderComposition(room) {
 
   compositionHelp.textContent = "À partir de 4 joueurs, l'hôte choisit la composition.";
   compositionSummary.textContent =
-    `${values.civilCount} civil(s) • ` +
-    `${values.undercoverCount} undercover(s)` +
+    `${values.civilCount} civil(s) • ${values.undercoverCount} undercover(s)` +
     `${values.mrwhiteCount ? " • 1 Mr White" : ""}`;
 }
 
@@ -668,7 +677,7 @@ joinBtn.addEventListener("click", () => {
 
   if (!name || !code) return setStatus("Entre un pseudo et un code", true);
 
-  const existingToken = myPlayerToken;
+  const existingToken = myRoomCode === code ? myPlayerToken : null;
 
   socket.emit("joinRoom", { name, code, playerToken: existingToken }, (res) => {
     if (!res.ok) return setStatus(res.error, true);
@@ -772,17 +781,17 @@ chatInput.addEventListener("keydown", (e) => {
   }
 });
 
-undercoverCountInput.addEventListener("input", () => {
-  if (currentRoom) {
-    renderComposition(currentRoom);
-  }
-});
+if (undercoverCountInput) {
+  undercoverCountInput.addEventListener("input", () => {
+    if (currentRoom) renderComposition(currentRoom);
+  });
+}
 
-mrWhiteCountInput.addEventListener("input", () => {
-  if (currentRoom) {
-    renderComposition(currentRoom);
-  }
-});
+if (mrWhiteCountInput) {
+  mrWhiteCountInput.addEventListener("input", () => {
+    if (currentRoom) renderComposition(currentRoom);
+  });
+}
 
 socket.on("roomUpdated", (room) => {
   if (room.phase !== "voting") {

@@ -295,12 +295,11 @@ body::after {
 
 .start-screen {
   width: 100%;
-  min-height: 0;
+  min-height: calc(100vh - 70px);
   display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  overflow: visible;
-  padding: 8px 0 24px;
+  align-items: center;   /* 👉 centre vertical */
+  justify-content: center; /* 👉 centre horizontal */
+  padding: 20px 0;
 }
 
 .landing-stack {

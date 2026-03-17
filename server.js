@@ -325,13 +325,15 @@ function buildPublicRoom(code) {
       eliminated: Boolean(p.eliminated)
     })),
     reveal: room.game_over
-      ? players.map((p) => ({
-          id: p.id,
-          name: p.name,
-          role: p.role,
-          word: p.word,
-          eliminated: Boolean(p.eliminated)
-        }))
+      ? players
+          .filter((p) => p.role)
+          .map((p) => ({
+            id: p.id,
+            name: p.name,
+            role: p.role,
+            word: p.word,
+            eliminated: Boolean(p.eliminated)
+          }))
       : null
   };
 }
@@ -705,6 +707,39 @@ function everyoneAliveHasVoted(roomCode) {
   return Object.keys(votes).length >= alive.length;
 }
 
+function handlePlayerDeparture(playerId, roomCode) {
+  const room = getRoom(roomCode);
+  if (!room) return;
+
+  const player = db.prepare("SELECT * FROM players WHERE id = ?").get(playerId);
+  if (!player) return;
+
+  updatePlayer(player.id, {
+    connected: 0,
+    socket_id: null
+  });
+
+  const players = getPlayersByRoom(room.code);
+  const connectedPlayers = players.filter((p) => p.connected);
+
+  if (connectedPlayers.length === 0) {
+    if (!room.started || room.game_over) {
+      clearAllRoomTimers(room.code);
+      db.prepare("DELETE FROM players WHERE room_code = ?").run(room.code);
+      db.prepare("DELETE FROM rooms WHERE code = ?").run(room.code);
+    }
+    return;
+  }
+
+  if (room.host_player_id === player.id) {
+    updateRoom(room.code, {
+      host_player_id: connectedPlayers[0].id
+    });
+  }
+
+  emitRoom(room.code);
+}
+
 function removePlayerFromRoom(playerId, roomCode) {
   const room = getRoom(roomCode);
   if (!room) return;
@@ -777,7 +812,7 @@ function removeSocketFromPreviousRoom(socket) {
   if (!existingPlayer) return;
 
   socket.leave(existingPlayer.room_code);
-  removePlayerFromRoom(existingPlayer.id, existingPlayer.room_code);
+  handlePlayerDeparture(existingPlayer.id, existingPlayer.room_code);
 }
 
 io.on("connection", (socket) => {
@@ -874,15 +909,48 @@ io.on("connection", (socket) => {
       removeSocketFromPreviousRoom(socket);
 
       const roomCode = String(code || "").toUpperCase().trim();
+      const cleanName = sanitizeName(name);
       const room = getRoom(roomCode);
 
       if (!room) return callback({ ok: false, error: "Room introuvable" });
 
-      if (room.started && !room.game_over) {
-        return callback({ ok: false, error: "La partie est déjà en cours" });
+      const players = getPlayersByRoom(roomCode);
+
+      const existingPlayer = players.find(
+        (p) => p.name === cleanName && !p.connected
+      );
+
+      if (existingPlayer) {
+        updatePlayer(existingPlayer.id, {
+          connected: 1,
+          socket_id: socket.id
+        });
+
+        socket.join(roomCode);
+
+        const freshPlayer = db.prepare("SELECT * FROM players WHERE id = ?").get(existingPlayer.id);
+
+        if (room.started && !room.game_over) {
+          sendSecretToPlayer(freshPlayer);
+        }
+
+        emitRoom(roomCode);
+
+        return callback({
+          ok: true,
+          room: buildPublicRoom(roomCode),
+          playerToken: existingPlayer.player_token,
+          playerId: existingPlayer.id
+        });
       }
 
-      const players = getPlayersByRoom(roomCode);
+      if (room.started && !room.game_over) {
+        return callback({
+          ok: false,
+          error: "La partie est déjà en cours. Seuls les anciens joueurs peuvent revenir."
+        });
+      }
+
       if (players.length >= 12) {
         return callback({ ok: false, error: "La room est pleine" });
       }
@@ -899,7 +967,7 @@ io.on("connection", (socket) => {
       `).run(
         playerId,
         roomCode,
-        sanitizeName(name),
+        cleanName,
         playerToken,
         socket.id,
         createdAt,
@@ -1072,7 +1140,7 @@ io.on("connection", (socket) => {
     }
 
     socket.leave(player.room_code);
-    removePlayerFromRoom(player.id, player.room_code);
+    handlePlayerDeparture(player.id, player.room_code);
 
     callback?.({ ok: true });
   });
@@ -1081,33 +1149,7 @@ io.on("connection", (socket) => {
     const player = getPlayerBySocket(socket.id);
     if (!player) return;
 
-    updatePlayer(player.id, {
-      connected: 0,
-      socket_id: null
-    });
-
-    const room = getRoom(player.room_code);
-    if (!room) return;
-
-    const players = getPlayersByRoom(room.code);
-    const connectedPlayers = players.filter((p) => p.connected);
-
-    if (connectedPlayers.length === 0) {
-      if (!room.started || room.game_over) {
-        clearAllRoomTimers(room.code);
-        db.prepare("DELETE FROM players WHERE room_code = ?").run(room.code);
-        db.prepare("DELETE FROM rooms WHERE code = ?").run(room.code);
-      }
-      return;
-    }
-
-    if (room.host_player_id === player.id) {
-      updateRoom(room.code, {
-        host_player_id: connectedPlayers[0].id
-      });
-    }
-
-    emitRoom(room.code);
+    handlePlayerDeparture(player.id, player.room_code);
   });
 });
 

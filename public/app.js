@@ -366,7 +366,7 @@ function renderEndGame(room) {
     const li = document.createElement("li");
     li.textContent =
       `${player.name} : ${player.role}` +
-      `${player.word ? ` | ${player.word}` : " | pas de mot"}`;
+      `${player.word ? ` | ${player.word}` : ""}`;
     revealList.appendChild(li);
   });
 }

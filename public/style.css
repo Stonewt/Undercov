@@ -196,7 +196,7 @@ body::after {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  padding: 14px 20px 20px;
+  align-items: center;
 }
 
 .topbar {
@@ -209,8 +209,7 @@ body::after {
   min-height: 56px;
   margin-bottom: 14px;
   width: 100%;
-  margin-left: auto;
-  margin-right: auto;
+  padding: 14px 20px 0 20px;
 }
 
 .brand-title {
@@ -293,11 +292,9 @@ body::after {
   align-items: center;
   justify-content: center;
   position: relative;
-  margin-left: auto;
-  margin-right: auto;
   z-index: 10;
   width: 100%;
-  max-width: 100%;
+  padding: 0 20px 20px 20px;
 }
 
 /* ===== ACCUEIL ===== */

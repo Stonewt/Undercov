@@ -39,6 +39,12 @@ const restartBtn = document.getElementById("restartBtn");
 const secretCard = document.getElementById("secretCard");
 const wordText = document.getElementById("wordText");
 
+const compositionCard = document.getElementById("compositionCard");
+const compositionHelp = document.getElementById("compositionHelp");
+const compositionSummary = document.getElementById("compositionSummary");
+const undercoverCountInput = document.getElementById("undercoverCountInput");
+const mrWhiteCountInput = document.getElementById("mrWhiteCountInput");
+
 const chatCard = document.getElementById("chatCard");
 const messagesList = document.getElementById("messagesList");
 const chatInput = document.getElementById("chatInput");
@@ -156,6 +162,7 @@ function resetUI() {
 
   lobby.classList.add("hidden");
   secretCard.classList.add("hidden");
+  compositionCard.classList.add("hidden");
   chatCard.classList.add("hidden");
   voteCard.classList.add("hidden");
   resultCard.classList.add("hidden");
@@ -179,6 +186,8 @@ function resetUI() {
   wordText.textContent = "";
   resultText.textContent = "";
   winnerText.textContent = "";
+  compositionHelp.textContent = "";
+  compositionSummary.textContent = "";
   chatInput.value = "";
 
   resetVoteSelection();
@@ -225,6 +234,7 @@ function renderPlayers(room) {
 
     let mainLabel = player.name;
     if (player.id === myPlayerId) mainLabel += " (toi)";
+    if (player.id === room.hostPlayerId) mainLabel += " 👑";
     nameLine.textContent = mainLabel;
     li.appendChild(nameLine);
 
@@ -448,6 +458,95 @@ function renderTimer(room) {
   timerInterval = setInterval(tick, 200);
 }
 
+function clampCompositionValues(room) {
+  const playerCount = room.players.length;
+
+  if (playerCount <= 3) {
+    undercoverCountInput.value = "1";
+    mrWhiteCountInput.value = "0";
+    return {
+      undercoverCount: 1,
+      mrwhiteCount: 0,
+      civilCount: 2
+    };
+  }
+
+  let undercoverCount = Number.parseInt(undercoverCountInput.value, 10);
+  let mrwhiteCount = Number.parseInt(mrWhiteCountInput.value, 10);
+
+  if (!Number.isInteger(undercoverCount)) undercoverCount = 1;
+  if (!Number.isInteger(mrwhiteCount)) mrwhiteCount = 0;
+
+  mrwhiteCount = Math.max(0, Math.min(1, mrwhiteCount));
+  undercoverCount = Math.max(1, undercoverCount);
+
+  const maxUndercover = Math.max(1, playerCount - mrwhiteCount - 1);
+  undercoverCount = Math.min(undercoverCount, maxUndercover);
+
+  let civilCount = playerCount - undercoverCount - mrwhiteCount;
+
+  if (civilCount < 1) {
+    undercoverCount = Math.max(1, playerCount - mrwhiteCount - 1);
+    civilCount = playerCount - undercoverCount - mrwhiteCount;
+  }
+
+  undercoverCountInput.value = String(undercoverCount);
+  mrWhiteCountInput.value = String(mrwhiteCount);
+
+  return {
+    undercoverCount,
+    mrwhiteCount,
+    civilCount
+  };
+}
+
+function getSelectedComposition(room) {
+  const values = clampCompositionValues(room);
+  return {
+    undercoverCount: values.undercoverCount,
+    mrwhiteCount: values.mrwhiteCount
+  };
+}
+
+function renderComposition(room) {
+  const isHost = room.hostPlayerId === myPlayerId;
+  const canConfigure = !room.started && !room.gameOver && isHost;
+
+  if (!canConfigure) {
+    compositionCard.classList.add("hidden");
+    return;
+  }
+
+  compositionCard.classList.remove("hidden");
+
+  const playerCount = room.players.length;
+
+  if (playerCount <= 3) {
+    undercoverCountInput.disabled = true;
+    mrWhiteCountInput.disabled = true;
+    undercoverCountInput.value = "1";
+    mrWhiteCountInput.value = "0";
+    compositionHelp.textContent = "À 3 joueurs : composition fixe.";
+    compositionSummary.textContent = "2 civils • 1 undercover";
+    return;
+  }
+
+  undercoverCountInput.disabled = false;
+  mrWhiteCountInput.disabled = false;
+  undercoverCountInput.min = "1";
+  undercoverCountInput.max = String(playerCount - 1);
+  mrWhiteCountInput.min = "0";
+  mrWhiteCountInput.max = "1";
+
+  const values = clampCompositionValues(room);
+
+  compositionHelp.textContent = "À partir de 4 joueurs, l'hôte choisit la composition.";
+  compositionSummary.textContent =
+    `${values.civilCount} civil(s) • ` +
+    `${values.undercoverCount} undercover(s)` +
+    `${values.mrwhiteCount ? " • 1 Mr White" : ""}`;
+}
+
 function renderRoom(room) {
   currentRoom = room;
   myRoomCode = room.code;
@@ -492,6 +591,7 @@ function renderRoom(room) {
   }
 
   renderPlayers(room);
+  renderComposition(room);
   renderChat(room);
   renderTimer(room);
   hideGameplayButtons();
@@ -568,10 +668,9 @@ joinBtn.addEventListener("click", () => {
 
   if (!name || !code) return setStatus("Entre un pseudo et un code", true);
 
-  clearSession();
-  resetUI();
+  const existingToken = myPlayerToken;
 
-  socket.emit("joinRoom", { name, code }, (res) => {
+  socket.emit("joinRoom", { name, code, playerToken: existingToken }, (res) => {
     if (!res.ok) return setStatus(res.error, true);
 
     saveSession(res.playerId, res.playerToken, res.room.code);
@@ -602,14 +701,18 @@ resumeBtn.addEventListener("click", () => {
 });
 
 startBtn.addEventListener("click", () => {
-  socket.emit("startGame", {}, (res) => {
+  const composition = currentRoom ? getSelectedComposition(currentRoom) : null;
+
+  socket.emit("startGame", { composition }, (res) => {
     if (!res.ok) return setStatus(res.error, true);
     setStatus("Partie lancée");
   });
 });
 
 restartBtn.addEventListener("click", () => {
-  socket.emit("restartGame", {}, (res) => {
+  const composition = currentRoom ? getSelectedComposition(currentRoom) : null;
+
+  socket.emit("restartGame", { composition }, (res) => {
     if (!res.ok) return setStatus(res.error, true);
     setStatus("Nouvelle partie lancée");
   });
@@ -617,8 +720,8 @@ restartBtn.addEventListener("click", () => {
 
 leaveBtn.addEventListener("click", () => {
   socket.emit("leaveRoom", {}, () => {
-    clearSession();
     resetUI();
+    validateStoredSession();
     setStatus("Tu as quitté la partie.");
   });
 });
@@ -666,6 +769,18 @@ chatInput.addEventListener("input", () => {
 chatInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !sendChatBtn.disabled) {
     sendChatBtn.click();
+  }
+});
+
+undercoverCountInput.addEventListener("input", () => {
+  if (currentRoom) {
+    renderComposition(currentRoom);
+  }
+});
+
+mrWhiteCountInput.addEventListener("input", () => {
+  if (currentRoom) {
+    renderComposition(currentRoom);
   }
 });
 

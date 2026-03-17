@@ -81,6 +81,23 @@
             <p id="wordText"></p>
           </div>
 
+          <div class="card hidden compact-card" id="compositionCard">
+            <h2>Composition</h2>
+            <p id="compositionHelp"></p>
+
+            <div class="form-block">
+              <label for="undercoverCountInput">Nombre d'undercover</label>
+              <input id="undercoverCountInput" type="number" min="1" step="1" value="1" />
+            </div>
+
+            <div class="form-block">
+              <label for="mrWhiteCountInput">Mr White</label>
+              <input id="mrWhiteCountInput" type="number" min="0" max="1" step="1" value="0" />
+            </div>
+
+            <p id="compositionSummary"></p>
+          </div>
+
           <div class="card hidden compact-card" id="voteCard">
             <h2>Vote</h2>
             <div id="voteButtons"></div>

@@ -428,20 +428,52 @@ function scheduleVoteTimer(roomCode) {
   roomVoteTimers.set(roomCode, timeout);
 }
 
-function assignRoles(roomCode) {
+function normalizeComposition(playerCount, rawComposition) {
+  if (playerCount < 3) return null;
+
+  if (playerCount === 3) {
+    return {
+      undercoverCount: 1,
+      mrwhiteCount: 0,
+      civilCount: 2
+    };
+  }
+
+  const undercoverCount = Number.parseInt(rawComposition?.undercoverCount, 10);
+  const mrwhiteCount = Number.parseInt(rawComposition?.mrwhiteCount, 10);
+
+  if (!Number.isInteger(undercoverCount) || undercoverCount < 1) return null;
+  if (!Number.isInteger(mrwhiteCount) || ![0, 1].includes(mrwhiteCount)) return null;
+
+  const civilCount = playerCount - undercoverCount - mrwhiteCount;
+  if (civilCount < 1) return null;
+
+  return {
+    undercoverCount,
+    mrwhiteCount,
+    civilCount
+  };
+}
+
+function assignRoles(roomCode, composition) {
   const players = shuffle(getPlayersByRoom(roomCode));
+  const normalized = normalizeComposition(players.length, composition);
+
+  if (!normalized) {
+    throw new Error("Composition invalide");
+  }
+
   const [civilWord, undercoverWord] =
     wordPairs[Math.floor(Math.random() * wordPairs.length)];
-  const withMrWhite = players.length >= 5;
 
   players.forEach((player, index) => {
     let role = "civil";
     let word = civilWord;
 
-    if (index === 0) {
+    if (index < normalized.undercoverCount) {
       role = "undercover";
       word = undercoverWord;
-    } else if (withMrWhite && index === 1) {
+    } else if (index < normalized.undercoverCount + normalized.mrwhiteCount) {
       role = "mrwhite";
       word = null;
     }
@@ -731,80 +763,7 @@ function handlePlayerDeparture(playerId, roomCode) {
     return;
   }
 
-  if (room.host_player_id === player.id) {
-    updateRoom(room.code, {
-      host_player_id: connectedPlayers[0].id
-    });
-  }
-
   emitRoom(room.code);
-}
-
-function removePlayerFromRoom(playerId, roomCode) {
-  const room = getRoom(roomCode);
-  if (!room) return;
-
-  db.prepare("DELETE FROM players WHERE id = ?").run(playerId);
-
-  const remainingPlayers = getPlayersByRoom(roomCode);
-
-  if (remainingPlayers.length === 0) {
-    clearAllRoomTimers(roomCode);
-    db.prepare("DELETE FROM rooms WHERE code = ?").run(roomCode);
-    return;
-  }
-
-  const patch = {};
-
-  if (room.host_player_id === playerId) {
-    patch.host_player_id = remainingPlayers[0].id;
-  }
-
-  if (room.started && !room.game_over) {
-    const oldOrder = safeJsonParse(room.speaking_order, []);
-    const aliveRemaining = remainingPlayers.filter((p) => !p.eliminated);
-    let newOrder = oldOrder.filter((id) =>
-      aliveRemaining.some((p) => p.id === id)
-    );
-
-    if (newOrder.length === 0 && aliveRemaining.length > 0) {
-      newOrder = buildSpeakingOrderFromAlive(roomCode);
-    }
-
-    let newIndex = room.current_speaker_index;
-    const removedIndex = oldOrder.indexOf(playerId);
-
-    if (removedIndex !== -1 && removedIndex < newIndex) {
-      newIndex -= 1;
-    }
-
-    if (newIndex >= newOrder.length) {
-      newIndex = Math.max(0, newOrder.length - 1);
-    }
-
-    patch.speaking_order = JSON.stringify(newOrder);
-    patch.current_speaker_index = newIndex;
-
-    const votes = safeJsonParse(room.votes, {});
-    delete votes[playerId];
-
-    for (const voterId of Object.keys(votes)) {
-      if (votes[voterId] === playerId) {
-        delete votes[voterId];
-      }
-    }
-
-    patch.votes = JSON.stringify(votes);
-  }
-
-  updateRoom(roomCode, patch);
-
-  if (checkWin(roomCode)) {
-    emitRoom(roomCode);
-    return;
-  }
-
-  emitRoom(roomCode);
 }
 
 function removeSocketFromPreviousRoom(socket) {
@@ -904,7 +863,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("joinRoom", ({ name, code }, callback) => {
+  socket.on("joinRoom", ({ name, code, playerToken }, callback) => {
     try {
       removeSocketFromPreviousRoom(socket);
 
@@ -914,21 +873,18 @@ io.on("connection", (socket) => {
 
       if (!room) return callback({ ok: false, error: "Room introuvable" });
 
-      const players = getPlayersByRoom(roomCode);
+      const tokenPlayer = playerToken ? getPlayerByToken(playerToken) : null;
 
-      const existingPlayer = players.find(
-        (p) => p.name === cleanName && !p.connected
-      );
-
-      if (existingPlayer) {
-        updatePlayer(existingPlayer.id, {
+      if (tokenPlayer && tokenPlayer.room_code === roomCode) {
+        updatePlayer(tokenPlayer.id, {
+          name: cleanName,
           connected: 1,
           socket_id: socket.id
         });
 
         socket.join(roomCode);
 
-        const freshPlayer = db.prepare("SELECT * FROM players WHERE id = ?").get(existingPlayer.id);
+        const freshPlayer = db.prepare("SELECT * FROM players WHERE id = ?").get(tokenPlayer.id);
 
         if (room.started && !room.game_over) {
           sendSecretToPlayer(freshPlayer);
@@ -939,8 +895,8 @@ io.on("connection", (socket) => {
         return callback({
           ok: true,
           room: buildPublicRoom(roomCode),
-          playerToken: existingPlayer.player_token,
-          playerId: existingPlayer.id
+          playerToken: freshPlayer.player_token,
+          playerId: freshPlayer.id
         });
       }
 
@@ -951,12 +907,13 @@ io.on("connection", (socket) => {
         });
       }
 
+      const players = getPlayersByRoom(roomCode);
       if (players.length >= 12) {
         return callback({ ok: false, error: "La room est pleine" });
       }
 
       const playerId = randomString(16);
-      const playerToken = randomString(32);
+      const newPlayerToken = randomString(32);
       const createdAt = nowIso();
 
       db.prepare(`
@@ -968,7 +925,7 @@ io.on("connection", (socket) => {
         playerId,
         roomCode,
         cleanName,
-        playerToken,
+        newPlayerToken,
         socket.id,
         createdAt,
         createdAt
@@ -980,7 +937,7 @@ io.on("connection", (socket) => {
       callback({
         ok: true,
         room: buildPublicRoom(roomCode),
-        playerToken,
+        playerToken: newPlayerToken,
         playerId
       });
     } catch {
@@ -988,7 +945,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("startGame", (_, callback) => {
+  socket.on("startGame", ({ composition } = {}, callback) => {
     const player = requirePlayer(socket, callback);
     if (!player) return;
 
@@ -1003,11 +960,19 @@ io.on("connection", (socket) => {
       return callback({ ok: false, error: "Il faut au moins 3 joueurs" });
     }
 
-    assignRoles(player.room_code);
-    sendSecrets(player.room_code);
-    emitRoom(player.room_code);
+    const normalized = normalizeComposition(players.length, composition);
+    if (!normalized) {
+      return callback({ ok: false, error: "Composition invalide" });
+    }
 
-    callback({ ok: true });
+    try {
+      assignRoles(player.room_code, normalized);
+      sendSecrets(player.room_code);
+      emitRoom(player.room_code);
+      callback({ ok: true });
+    } catch {
+      callback({ ok: false, error: "Impossible de lancer la partie" });
+    }
   });
 
   socket.on("sendTurnMessage", ({ text }, callback) => {
@@ -1115,7 +1080,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("restartGame", (_, callback) => {
+  socket.on("restartGame", ({ composition } = {}, callback) => {
     const player = requirePlayer(socket, callback);
     if (!player) return;
 
@@ -1125,11 +1090,20 @@ io.on("connection", (socket) => {
       return callback({ ok: false, error: "Seul l'hôte peut relancer" });
     }
 
-    assignRoles(room.code);
-    sendSecrets(room.code);
-    emitRoom(room.code);
+    const players = getPlayersByRoom(player.room_code);
+    const normalized = normalizeComposition(players.length, composition);
+    if (!normalized) {
+      return callback({ ok: false, error: "Composition invalide" });
+    }
 
-    callback({ ok: true });
+    try {
+      assignRoles(room.code, normalized);
+      sendSecrets(room.code);
+      emitRoom(room.code);
+      callback({ ok: true });
+    } catch {
+      callback({ ok: false, error: "Impossible de relancer la partie" });
+    }
   });
 
   socket.on("leaveRoom", (_, callback) => {

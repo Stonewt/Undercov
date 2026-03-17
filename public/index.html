@@ -88,12 +88,15 @@
 
       <div class="topbar-side topbar-right">
         <div id="topHostInfo" class="top-meta hidden"></div>
+        <div class="hidden" id="leaveWrap">
+          <button id="leaveBtn" class="leave-btn topbar-leave-btn">Quitter</button>
+        </div>
       </div>
 
       <div id="statusBanner" class="status-banner hidden"></div>
     </div>
 
-    <aside class="ad-rail ad-rail-left" id="leftAds">
+    <aside class="ad-rail ad-rail-left hidden" id="leftAds">
       <div class="ad-slot" data-ad="left-top">
         <button class="ad-close" data-close-ad="left-top">×</button>
       </div>
@@ -102,7 +105,7 @@
       </div>
     </aside>
 
-    <aside class="ad-rail ad-rail-right" id="rightAds">
+    <aside class="ad-rail ad-rail-right hidden" id="rightAds">
       <div class="ad-slot" data-ad="right-top">
         <button class="ad-close" data-close-ad="right-top">×</button>
       </div>
@@ -113,37 +116,12 @@
 
     <main class="page-center">
       <div class="start-screen" id="startWrap">
-        <div class="landing-layout">
-          <section class="login-card" id="roomSetupCard">
-            <div class="start-content start-content-full">
-              <h2>Se connecter à une salle</h2>
-              <p class="start-subtitle">Crée une room ou rejoins-en une avec un code.</p>
+        <div class="landing-stack">
+          <div class="landing-header">
+            <h1 class="landing-title">
+              <span class="brand-under">UNDER</span><span class="brand-cover">COVER</span>
+            </h1>
 
-              <div class="form-block hidden" id="resumeBlock">
-                <button id="resumeBtn" class="big-btn">Reprendre ma partie</button>
-              </div>
-
-              <div class="separator hidden" id="resumeSeparator">ou</div>
-
-              <div class="form-block">
-                <label for="nameInput">Pseudo</label>
-                <input id="nameInput" maxlength="20" placeholder="Ton pseudo" />
-              </div>
-
-              <div class="form-block">
-                <button id="createBtn" class="big-btn">Créer une room</button>
-              </div>
-
-              <div class="separator">ou</div>
-
-              <div class="join-row">
-                <input id="roomInput" placeholder="Code room" />
-                <button id="joinBtn" class="big-btn">Rejoindre</button>
-              </div>
-            </div>
-          </section>
-
-          <section class="landing-right">
             <div class="logo-free">
               <svg width="220" height="220" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
                 <defs>
@@ -197,8 +175,39 @@
                 <ellipse cx="244" cy="150" rx="5" ry="5" fill="rgba(255,255,255,0.32)"/>
               </svg>
             </div>
+          </div>
 
-            <div class="rules-card">
+          <div class="landing-cards">
+            <section class="login-card" id="roomSetupCard">
+              <div class="start-content start-content-full">
+                <h2>Se connecter à une salle</h2>
+                <p class="start-subtitle">Crée une room ou rejoins-en une avec un code.</p>
+
+                <div class="form-block hidden" id="resumeBlock">
+                  <button id="resumeBtn" class="big-btn">Reprendre ma partie</button>
+                </div>
+
+                <div class="separator hidden" id="resumeSeparator">ou</div>
+
+                <div class="form-block">
+                  <label for="nameInput">Pseudo</label>
+                  <input id="nameInput" maxlength="20" placeholder="Ton pseudo" />
+                </div>
+
+                <div class="form-block">
+                  <button id="createBtn" class="big-btn">Créer une room</button>
+                </div>
+
+                <div class="separator">ou</div>
+
+                <div class="join-row">
+                  <input id="roomInput" placeholder="Code room" />
+                  <button id="joinBtn" class="big-btn">Rejoindre</button>
+                </div>
+              </div>
+            </section>
+
+            <section class="rules-card">
               <h3>Règles</h3>
               <ul>
                 <li>Chaque joueur reçoit un rôle secret.</li>
@@ -213,8 +222,8 @@
                 <li>Mr White gagne s’il ne reste plus qu’un seul autre joueur vivant face à lui.</li>
                 <li>Si personne ne donne d’indice pendant toute une manche, la partie s’arrête.</li>
               </ul>
-            </div>
-          </section>
+            </section>
+          </div>
         </div>
       </div>
 
@@ -274,10 +283,6 @@
           <div class="card hidden compact-card" id="resultCard">
             <h2>Résultat</h2>
             <p id="resultText"></p>
-          </div>
-
-          <div class="bottom-left-actions hidden" id="leaveWrap">
-            <button id="leaveBtn" class="leave-btn">Quitter la partie</button>
           </div>
         </div>
 

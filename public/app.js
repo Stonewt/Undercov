@@ -92,7 +92,6 @@ window.addEventListener("load", () => {
 
   setTimeout(() => {
     scene.classList.add("intro-hidden");
-
     setTimeout(() => {
       intro.remove();
     }, 900);
@@ -326,6 +325,9 @@ function resetUI() {
 
   if (categorySelect) categorySelect.innerHTML = "";
   if (subcategorySelect) subcategorySelect.innerHTML = "";
+
+  endCard.dataset.renderedRound = "";
+  endCard.dataset.renderedWinner = "";
 
   resetVoteSelection();
   stopTimer();
@@ -568,6 +570,10 @@ function renderEndGame(room) {
     return;
   }
 
+  const alreadyRendered =
+    endCard.dataset.renderedRound === String(room.round) &&
+    endCard.dataset.renderedWinner === String(room.winner);
+
   endCard.classList.remove("hidden");
 
   const outcome = getMyOutcome(room) || "Fin de partie";
@@ -577,28 +583,33 @@ function renderEndGame(room) {
       ? "La partie a été interrompue : aucun indice n'a été donné pendant la manche."
       : `Équipe gagnante : ${room.winner}`;
 
-  revealList.innerHTML = "";
+  if (!alreadyRendered) {
+    revealList.innerHTML = "";
 
-  room.reveal.forEach((player, index) => {
-    const li = document.createElement("li");
-    li.className = "reveal-item";
-    li.style.animationDelay = `${index * 120}ms`;
+    room.reveal.forEach((player, index) => {
+      const li = document.createElement("li");
+      li.className = "reveal-item";
+      li.style.animationDelay = `${index * 120}ms`;
 
-    const badge = document.createElement("span");
-    badge.className = `reveal-role-badge ${player.role}`;
-    badge.textContent = player.role;
+      const badge = document.createElement("span");
+      badge.className = `reveal-role-badge ${player.role}`;
+      badge.textContent = player.role;
 
-    const text = document.createElement("span");
-    text.className = "reveal-main-text";
-    text.textContent =
-      `${player.name}` + `${player.word ? ` • ${player.word}` : " • aucun mot"}`;
+      const text = document.createElement("span");
+      text.className = "reveal-main-text";
+      text.textContent =
+        `${player.name}` + `${player.word ? ` • ${player.word}` : " • aucun mot"}`;
 
-    li.appendChild(badge);
-    li.appendChild(text);
-    revealList.appendChild(li);
-  });
+      li.appendChild(badge);
+      li.appendChild(text);
+      revealList.appendChild(li);
+    });
 
-  playClickSound("reveal");
+    endCard.dataset.renderedRound = String(room.round);
+    endCard.dataset.renderedWinner = String(room.winner);
+
+    playClickSound("reveal");
+  }
 }
 
 function renderTimer(room) {
@@ -664,7 +675,7 @@ function renderTimer(room) {
   };
 
   tick();
-  timerInterval = setInterval(tick, 200);
+  timerInterval = setInterval(tick, 250);
 }
 
 function clampCompositionValues(room) {

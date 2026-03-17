@@ -56,6 +56,7 @@ const chatInput = document.getElementById("chatInput");
 const sendChatBtn = document.getElementById("sendChatBtn");
 const chatHelp = document.getElementById("chatHelp");
 const roleDolls = document.getElementById("roleDolls");
+const waitingRoleDolls = document.getElementById("waitingRoleDolls");
 
 const waitingCard = document.getElementById("waitingCard");
 const waitingText = document.getElementById("waitingText");
@@ -280,6 +281,7 @@ function resetUI() {
   voteButtons.innerHTML = "";
   revealList.innerHTML = "";
   if (roleDolls) roleDolls.innerHTML = "";
+  if (waitingRoleDolls) waitingRoleDolls.innerHTML = "";
 
   phaseInfo.textContent = "";
   speakerInfo.textContent = "";
@@ -366,10 +368,10 @@ function renderPlayers(room) {
   });
 }
 
-function renderRoleDolls(room) {
-  if (!roleDolls) return;
+function fillRoleDolls(container, room) {
+  if (!container) return;
 
-  roleDolls.innerHTML = "";
+  container.innerHTML = "";
 
   const composition = room.roleComposition || {};
   const dolls = [];
@@ -390,8 +392,13 @@ function renderRoleDolls(room) {
 
     doll.appendChild(head);
     doll.appendChild(body);
-    roleDolls.appendChild(doll);
+    container.appendChild(doll);
   });
+}
+
+function renderRoleDolls(room) {
+  fillRoleDolls(roleDolls, room);
+  fillRoleDolls(waitingRoleDolls, room);
 }
 
 function renderMessages(room) {

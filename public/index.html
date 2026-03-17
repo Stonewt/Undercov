@@ -60,9 +60,6 @@
             <path d="M58 72 Q70 80 82 72" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="1.5"/>
             <path d="M14 62 Q14 30 70 26 Q126 30 126 62 Q126 78 110 78 Q96 72 70 72 Q44 72 30 78 Q14 78 14 62Z"
                   fill="none" stroke="rgba(80,130,255,0.2)" stroke-width="1"/>
-
-            <line x1="14" y1="50" x2="6" y2="42" stroke="rgba(224,122,32,0.5)" stroke-width="1.5" stroke-linecap="round"/>
-            <line x1="126" y1="50" x2="134" y2="42" stroke="rgba(80,130,255,0.5)" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
         </div>
 
@@ -98,92 +95,92 @@
 
     <main class="page-center">
       <div class="start-screen" id="startWrap">
-        <div class="start-card" id="roomSetupCard">
-          <div class="start-layout">
-            <section class="start-login-panel">
-              <div class="start-content start-content-full">
-                <h2>Se connecter à une salle</h2>
-                <p class="start-subtitle">Crée une room ou rejoins-en une avec un code.</p>
+        <div class="start-shell">
+          <section class="start-login-panel" id="roomSetupCard">
+            <div class="start-content start-content-full">
+              <h2>Se connecter à une salle</h2>
+              <p class="start-subtitle">Crée une room ou rejoins-en une avec un code.</p>
 
-                <div class="form-block hidden" id="resumeBlock">
-                  <button id="resumeBtn" class="big-btn">Reprendre ma partie</button>
-                </div>
-
-                <div class="separator hidden" id="resumeSeparator">ou</div>
-
-                <div class="form-block">
-                  <label for="nameInput">Pseudo</label>
-                  <input id="nameInput" maxlength="20" placeholder="Ton pseudo" />
-                </div>
-
-                <div class="form-block">
-                  <button id="createBtn" class="big-btn">Créer une room</button>
-                </div>
-
-                <div class="separator">ou</div>
-
-                <div class="join-row">
-                  <input id="roomInput" placeholder="Code room" />
-                  <button id="joinBtn" class="big-btn">Rejoindre</button>
-                </div>
-              </div>
-            </section>
-
-            <aside class="start-info-panel">
-              <div class="home-logo-side">
-                <svg width="180" height="180" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
-                  <defs>
-                    <radialGradient id="bgGlowHome" cx="50%" cy="50%" r="50%">
-                      <stop offset="0%" stop-color="#1a3796" stop-opacity="0.4"/>
-                      <stop offset="100%" stop-color="#080b16" stop-opacity="0"/>
-                    </radialGradient>
-                    <radialGradient id="irisGradHome" cx="50%" cy="50%" r="50%">
-                      <stop offset="0%" stop-color="#5a9fff"/>
-                      <stop offset="60%" stop-color="#1a4fcc"/>
-                      <stop offset="100%" stop-color="#0a1a5c"/>
-                    </radialGradient>
-                    <radialGradient id="pupilGradHome" cx="40%" cy="40%" r="50%">
-                      <stop offset="0%" stop-color="#1a2a60"/>
-                      <stop offset="100%" stop-color="#000510"/>
-                    </radialGradient>
-                    <radialGradient id="irisAmberHome" cx="50%" cy="50%" r="50%">
-                      <stop offset="0%" stop-color="#e07a20"/>
-                      <stop offset="55%" stop-color="#a04e0a"/>
-                      <stop offset="100%" stop-color="#3a1500"/>
-                    </radialGradient>
-                    <radialGradient id="warmGlowHome" cx="60%" cy="70%" r="50%">
-                      <stop offset="0%" stop-color="#c85a0f" stop-opacity="0.25"/>
-                      <stop offset="100%" stop-color="#080b16" stop-opacity="0"/>
-                    </radialGradient>
-                    <pattern id="dotsHome" x="0" y="0" width="30" height="30" patternUnits="userSpaceOnUse">
-                      <circle cx="1" cy="1" r="1" fill="rgba(80,120,220,0.10)"/>
-                    </pattern>
-                  </defs>
-
-                  <rect width="400" height="400" rx="32" fill="#080b16"/>
-                  <ellipse cx="200" cy="160" rx="220" ry="160" fill="url(#bgGlowHome)"/>
-                  <ellipse cx="260" cy="300" rx="180" ry="130" fill="url(#warmGlowHome)"/>
-                  <rect width="400" height="400" rx="32" fill="url(#dotsHome)"/>
-
-                  <circle cx="200" cy="178" r="108" fill="none" stroke="rgba(80,130,255,0.18)" stroke-width="1"/>
-                  <circle cx="200" cy="178" r="122" fill="none" stroke="rgba(80,130,255,0.10)" stroke-width="1"/>
-
-                  <path d="M84 168 Q84 100 200 90 Q316 100 316 168 Q316 200 292 200 Q264 192 200 192 Q136 192 108 200 Q84 200 84 168Z"
-                        fill="#0d1530" stroke="rgba(80,130,255,0.22)" stroke-width="1.2"/>
-
-                  <ellipse cx="148" cy="158" rx="44" ry="32" fill="#080b16"/>
-                  <ellipse cx="252" cy="158" rx="44" ry="32" fill="#080b16"/>
-
-                  <ellipse cx="148" cy="158" rx="36" ry="26" fill="url(#irisGradHome)"/>
-                  <ellipse cx="148" cy="158" rx="18" ry="18" fill="url(#pupilGradHome)"/>
-                  <ellipse cx="140" cy="150" rx="5" ry="5" fill="rgba(255,255,255,0.38)"/>
-
-                  <ellipse cx="252" cy="158" rx="36" ry="26" fill="url(#irisAmberHome)"/>
-                  <ellipse cx="252" cy="158" rx="18" ry="18" fill="url(#pupilGradHome)"/>
-                  <ellipse cx="244" cy="150" rx="5" ry="5" fill="rgba(255,255,255,0.32)"/>
-                </svg>
+              <div class="form-block hidden" id="resumeBlock">
+                <button id="resumeBtn" class="big-btn">Reprendre ma partie</button>
               </div>
 
+              <div class="separator hidden" id="resumeSeparator">ou</div>
+
+              <div class="form-block">
+                <label for="nameInput">Pseudo</label>
+                <input id="nameInput" maxlength="20" placeholder="Ton pseudo" />
+              </div>
+
+              <div class="form-block">
+                <button id="createBtn" class="big-btn">Créer une room</button>
+              </div>
+
+              <div class="separator">ou</div>
+
+              <div class="join-row">
+                <input id="roomInput" placeholder="Code room" />
+                <button id="joinBtn" class="big-btn">Rejoindre</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="start-side-column">
+            <div class="home-logo-plain">
+              <svg width="210" height="210" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <radialGradient id="bgGlowHome" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="#1a3796" stop-opacity="0.4"/>
+                    <stop offset="100%" stop-color="#080b16" stop-opacity="0"/>
+                  </radialGradient>
+                  <radialGradient id="irisGradHome" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="#5a9fff"/>
+                    <stop offset="60%" stop-color="#1a4fcc"/>
+                    <stop offset="100%" stop-color="#0a1a5c"/>
+                  </radialGradient>
+                  <radialGradient id="pupilGradHome" cx="40%" cy="40%" r="50%">
+                    <stop offset="0%" stop-color="#1a2a60"/>
+                    <stop offset="100%" stop-color="#000510"/>
+                  </radialGradient>
+                  <radialGradient id="irisAmberHome" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="#e07a20"/>
+                    <stop offset="55%" stop-color="#a04e0a"/>
+                    <stop offset="100%" stop-color="#3a1500"/>
+                  </radialGradient>
+                  <radialGradient id="warmGlowHome" cx="60%" cy="70%" r="50%">
+                    <stop offset="0%" stop-color="#c85a0f" stop-opacity="0.25"/>
+                    <stop offset="100%" stop-color="#080b16" stop-opacity="0"/>
+                  </radialGradient>
+                  <pattern id="dotsHome" x="0" y="0" width="30" height="30" patternUnits="userSpaceOnUse">
+                    <circle cx="1" cy="1" r="1" fill="rgba(80,120,220,0.10)"/>
+                  </pattern>
+                </defs>
+
+                <rect width="400" height="400" rx="32" fill="#080b16"/>
+                <ellipse cx="200" cy="160" rx="220" ry="160" fill="url(#bgGlowHome)"/>
+                <ellipse cx="260" cy="300" rx="180" ry="130" fill="url(#warmGlowHome)"/>
+                <rect width="400" height="400" rx="32" fill="url(#dotsHome)"/>
+
+                <circle cx="200" cy="178" r="108" fill="none" stroke="rgba(80,130,255,0.18)" stroke-width="1"/>
+                <circle cx="200" cy="178" r="122" fill="none" stroke="rgba(80,130,255,0.10)" stroke-width="1"/>
+
+                <path d="M84 168 Q84 100 200 90 Q316 100 316 168 Q316 200 292 200 Q264 192 200 192 Q136 192 108 200 Q84 200 84 168Z"
+                      fill="#0d1530" stroke="rgba(80,130,255,0.22)" stroke-width="1.2"/>
+
+                <ellipse cx="148" cy="158" rx="44" ry="32" fill="#080b16"/>
+                <ellipse cx="252" cy="158" rx="44" ry="32" fill="#080b16"/>
+
+                <ellipse cx="148" cy="158" rx="36" ry="26" fill="url(#irisGradHome)"/>
+                <ellipse cx="148" cy="158" rx="18" ry="18" fill="url(#pupilGradHome)"/>
+                <ellipse cx="140" cy="150" rx="5" ry="5" fill="rgba(255,255,255,0.38)"/>
+
+                <ellipse cx="252" cy="158" rx="36" ry="26" fill="url(#irisAmberHome)"/>
+                <ellipse cx="252" cy="158" rx="18" ry="18" fill="url(#pupilGradHome)"/>
+                <ellipse cx="244" cy="150" rx="5" ry="5" fill="rgba(255,255,255,0.32)"/>
+              </svg>
+            </div>
+
+            <aside class="rules-panel">
               <div class="rules-box side-rules">
                 <h3>Règles</h3>
                 <ul>
@@ -201,7 +198,7 @@
                 </ul>
               </div>
             </aside>
-          </div>
+          </section>
         </div>
       </div>
 

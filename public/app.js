@@ -96,15 +96,32 @@ function clearSession() {
   localStorage.removeItem("roomCode");
 }
 
-function updateResumeUI() {
-  const hasResume = Boolean(myPlayerToken && myRoomCode);
+function updateResumeUI(canResume = false) {
+  resumeBlock.classList.toggle("hidden", !canResume);
+  resumeSeparator.classList.toggle("hidden", !canResume);
 
-  resumeBlock.classList.toggle("hidden", !hasResume);
-  resumeSeparator.classList.toggle("hidden", !hasResume);
-
-  if (resumeBtn && hasResume) {
+  if (resumeBtn && canResume && myRoomCode) {
     resumeBtn.textContent = `Reprendre ma partie (${myRoomCode})`;
   }
+}
+
+function validateStoredSession() {
+  if (!myPlayerToken || !myRoomCode) {
+    updateResumeUI(false);
+    return;
+  }
+
+  socket.emit("resumeSession", { playerToken: myPlayerToken }, (res) => {
+    if (!res?.ok) {
+      clearSession();
+      updateResumeUI(false);
+      return;
+    }
+
+    socket.emit("leaveRoom", {}, () => {
+      updateResumeUI(true);
+    });
+  });
 }
 
 function normalizeSingleWordInput(value) {
@@ -166,7 +183,7 @@ function resetUI() {
 
   resetVoteSelection();
   stopTimer();
-  updateResumeUI();
+  updateResumeUI(false);
 }
 
 function hideGameplayButtons() {
@@ -540,7 +557,7 @@ createBtn.addEventListener("click", () => {
 
     saveSession(res.playerId, res.playerToken, res.room.code);
     renderRoom(res.room);
-    updateResumeUI();
+    updateResumeUI(true);
     setStatus("Room créée");
   });
 });
@@ -559,14 +576,14 @@ joinBtn.addEventListener("click", () => {
 
     saveSession(res.playerId, res.playerToken, res.room.code);
     renderRoom(res.room);
-    updateResumeUI();
+    updateResumeUI(true);
     setStatus("Room rejointe");
   });
 });
 
 resumeBtn.addEventListener("click", () => {
   if (!myPlayerToken) {
-    updateResumeUI();
+    updateResumeUI(false);
     return setStatus("Aucune session à reprendre", true);
   }
 
@@ -579,7 +596,7 @@ resumeBtn.addEventListener("click", () => {
 
     saveSession(res.playerId, res.playerToken, res.room.code);
     renderRoom(res.room);
-    updateResumeUI();
+    updateResumeUI(true);
     setStatus("Reconnexion réussie");
   });
 });
@@ -687,4 +704,4 @@ socket.on("voteResult", (result) => {
 });
 
 initAds();
-updateResumeUI();
+validateStoredSession();

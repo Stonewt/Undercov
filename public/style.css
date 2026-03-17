@@ -297,29 +297,31 @@ body::after {
 }
 
 .landing-stack {
-  width: min(1320px, 98vw);
+  width: min(1240px, 100%);
   margin: 0 auto;
+  padding: 0 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 28px;
+  gap: 40px;
 }
 
 .landing-header {
+  width: 100%;
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse;
   align-items: center;
   justify-content: center;
-  gap: 18px;
-  width: 100%;
+  gap: 26px;
+  text-align: center;
 }
 
 .landing-title {
   margin: 0;
-  font-size: 52px;
+  font-size: 50px;
   font-weight: 300;
-  letter-spacing: 5px;
+  letter-spacing: 6px;
   line-height: 1;
   text-align: center;
   text-transform: uppercase;
@@ -330,30 +332,48 @@ body::after {
 }
 
 .logo-free {
+  position: relative;
   display: flex;
   justify-content: center;
   align-items: center;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.logo-free::before {
+  content: "";
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  width: 360px;
+  height: 360px;
+  border-radius: 50%;
   background:
-    radial-gradient(circle at 12% 8%, rgba(59,130,246,0.15), transparent 24%),
-    radial-gradient(circle at 85% 10%, rgba(249,115,22,0.14), transparent 22%),
-    radial-gradient(circle at 50% 50%, rgba(255,255,255,0.02), transparent 45%),
-    linear-gradient(135deg, #07101f 0%, #0b1530 32%, #111827 58%, #1f2937 78%, #2b160f 100%);
-  border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 28px;
-  padding: 18px;
-  box-shadow: 0 18px 42px rgba(0,0,0,0.30);
+    radial-gradient(circle, rgba(59,130,246,0.16) 0%, rgba(59,130,246,0.08) 32%, transparent 68%),
+    radial-gradient(circle at 62% 62%, rgba(249,115,22,0.12) 0%, transparent 58%);
+  filter: blur(18px);
+  pointer-events: none;
+  z-index: 0;
 }
 
 .logo-free svg {
+  position: relative;
+  z-index: 1;
   display: block;
-  filter: drop-shadow(0 16px 32px rgba(0,0,0,0.28));
+  width: 240px;
+  height: 240px;
+  filter: drop-shadow(0 18px 30px rgba(0,0,0,0.26));
 }
 
 .landing-cards {
-  width: min(1180px, 100%);
+  width: 100%;
+  max-width: 1180px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: minmax(420px, 540px) minmax(420px, 540px);
+  grid-template-columns: repeat(2, minmax(0, 520px));
   justify-content: center;
   gap: 28px;
   align-items: stretch;
@@ -946,7 +966,7 @@ button:disabled {
 @media (max-width: 1100px) {
   .landing-cards {
     grid-template-columns: 1fr;
-    width: min(700px, 100%);
+    max-width: 700px;
   }
 
   .login-card,
@@ -993,6 +1013,15 @@ button:disabled {
     justify-self: center;
   }
 
+  .landing-stack {
+    gap: 28px;
+    padding: 10px 8px 24px;
+  }
+
+  .landing-header {
+    gap: 18px;
+  }
+
   .landing-title {
     font-size: 34px;
     letter-spacing: 3px;
@@ -1004,8 +1033,13 @@ button:disabled {
   }
 
   .logo-free svg {
-    width: 170px;
-    height: 170px;
+    width: 180px;
+    height: 180px;
+  }
+
+  .logo-free::before {
+    width: 250px;
+    height: 250px;
   }
 
   .join-row {

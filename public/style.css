@@ -309,12 +309,12 @@ body::after {
 }
 
 .landing-stack {
-  width: min(1240px, calc(100% - 40px));
-  margin: 0 auto;
-  display: grid;
-  grid-template-rows: auto auto;
-  justify-items: center;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 30px;
+  max-width: 1240px;
 }
 
 .landing-header {
@@ -436,6 +436,39 @@ body::after {
   display: grid;
   grid-template-columns: 1fr 190px;
   gap: 14px;
+}
+
+.mobile-tabs {
+  display: none;
+  width: 100%;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.mobile-tab-btn {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.65);
+  padding: 10px 20px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mobile-tab-btn.active {
+  background: linear-gradient(180deg, #3b82f6, #2563eb);
+  border-color: rgba(255,255,255,0.2);
+  color: white;
+  box-shadow: 0 4px 12px rgba(59,130,246,0.3);
+}
+
+.mobile-tab-btn:hover:not(.active) {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.16);
+  color: rgba(255,255,255,0.85);
 }
 
 /* ===== JEU ===== */
@@ -989,6 +1022,30 @@ button:disabled {
     padding: 12px;
   }
 
+  .mobile-tabs {
+    display: flex;
+  }
+
+  .landing-cards {
+    grid-template-columns: 1fr;
+  }
+
+  #rulesCard {
+    display: none;
+  }
+
+  #rulesCard.active {
+    display: flex;
+  }
+
+  #roomSetupCard {
+    display: flex;
+  }
+
+  #roomSetupCard.hidden-tab {
+    display: none;
+  }
+
   .topbar {
     grid-template-columns: 1fr;
     gap: 10px;
@@ -1061,5 +1118,24 @@ button:disabled {
 
   .rules-card h3 {
     font-size: 24px;
+  }
+
+  .landing-cards {
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .rules-card {
+    display: none;
+  }
+
+  .login-card {
+    width: 100%;
+    min-height: auto;
+  }
+
+  .landing-stack {
+    gap: 20px;
+    padding: 0 20px;
   }
 }

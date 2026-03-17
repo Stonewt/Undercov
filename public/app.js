@@ -84,6 +84,35 @@ const timerText = document.getElementById("timerText");
 
 let audioCtx = null;
 
+// Mobile tabs functionality
+function initMobileTabs() {
+  const mobileTabs = document.getElementById("mobileTabs");
+  const tabButtons = document.querySelectorAll(".mobile-tab-btn");
+  const loginCard = document.getElementById("roomSetupCard");
+  const rulesCard = document.getElementById("rulesCard");
+
+  if (!mobileTabs) return;
+
+  tabButtons.forEach(button => {
+    button.addEventListener("click", () => {
+      const tabName = button.getAttribute("data-tab");
+      
+      // Update active button
+      tabButtons.forEach(btn => btn.classList.remove("active"));
+      button.classList.add("active");
+      
+      // Update visible card
+      if (tabName === "login") {
+        loginCard.classList.remove("hidden-tab");
+        rulesCard.classList.remove("active");
+      } else if (tabName === "rules") {
+        loginCard.classList.add("hidden-tab");
+        rulesCard.classList.add("active");
+      }
+    });
+  });
+}
+
 window.addEventListener("load", () => {
   const intro = document.getElementById("introOverlay");
   const scene = document.getElementById("introScene");
@@ -94,6 +123,7 @@ window.addEventListener("load", () => {
     scene.classList.add("intro-hidden");
     setTimeout(() => {
       intro.remove();
+      initMobileTabs();
     }, 900);
   }, 2300);
 });

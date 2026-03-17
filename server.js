@@ -228,6 +228,9 @@ function getWordPairsForSelection(category, subcategory) {
   return wordCatalog[selection.category]?.[selection.subcategory] || [];
 }
 
+const roomTurnTimers = new Map();
+const roomVoteTimers = new Map();
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -297,6 +300,10 @@ function getPlayersByRoom(code) {
   return db
     .prepare("SELECT * FROM players WHERE room_code = ? ORDER BY created_at ASC")
     .all(code);
+}
+
+function getVisiblePlayersByRoom(code) {
+  return getPlayersByRoom(code).filter((p) => p.connected);
 }
 
 function getPlayerBySocket(socketId) {
@@ -447,16 +454,28 @@ function getCurrentSpeakerId(room) {
   return speakingOrder[room.current_speaker_index] || null;
 }
 
+function countConfiguredRoles(roomCode) {
+  const allPlayers = getPlayersByRoom(roomCode);
+
+  return {
+    civil: allPlayers.filter((p) => p.role === "civil").length,
+    undercover: allPlayers.filter((p) => p.role === "undercover").length,
+    mrwhite: allPlayers.filter((p) => p.role === "mrwhite").length
+  };
+}
+
 function buildPublicRoom(code) {
   const room = getRoom(code);
   if (!room) return null;
 
-  const players = getPlayersByRoom(code);
+  const players = getVisiblePlayersByRoom(code);
+  const allPlayers = getPlayersByRoom(code);
   const currentSpeakerId = getCurrentSpeakerId(room);
   const messages = safeJsonParse(room.messages, []);
   const votes = safeJsonParse(room.votes, {});
   const speakingOrder = safeJsonParse(room.speaking_order, []);
   const categoryOptions = getCategoryOptions();
+  const roleComposition = countConfiguredRoles(code);
 
   return {
     code: room.code,
@@ -475,6 +494,7 @@ function buildPublicRoom(code) {
     selectedCategory: room.selected_category,
     selectedSubcategory: room.selected_subcategory,
     categoryOptions,
+    roleComposition,
     gameOver: Boolean(room.game_over),
     winner: room.winner,
     messages,
@@ -486,7 +506,7 @@ function buildPublicRoom(code) {
       eliminated: Boolean(p.eliminated)
     })),
     reveal: room.game_over
-      ? players
+      ? allPlayers
           .filter((p) => p.role)
           .map((p) => ({
             id: p.id,
@@ -956,8 +976,13 @@ function removeSocketFromPreviousRoom(socket) {
   handlePlayerDeparture(existingPlayer.id, existingPlayer.room_code);
 }
 
-const roomTurnTimers = new Map();
-const roomVoteTimers = new Map();
+function findDisconnectedPlayerByName(roomCode, name) {
+  const cleanName = sanitizeName(name).toLowerCase();
+
+  return getPlayersByRoom(roomCode).find(
+    (p) => !p.connected && p.name.trim().toLowerCase() === cleanName
+  );
+}
 
 io.on("connection", (socket) => {
   socket.on("checkSession", ({ playerToken, roomCode }, callback) => {
@@ -1127,6 +1152,26 @@ io.on("connection", (socket) => {
         return callback({
           ok: false,
           error: "La partie est déjà en cours. Seuls les anciens joueurs peuvent revenir."
+        });
+      }
+
+      const reusableDisconnectedPlayer = findDisconnectedPlayerByName(roomCode, cleanName);
+
+      if (reusableDisconnectedPlayer) {
+        updatePlayer(reusableDisconnectedPlayer.id, {
+          name: cleanName,
+          connected: 1,
+          socket_id: socket.id
+        });
+
+        socket.join(roomCode);
+        emitRoom(roomCode);
+
+        return callback({
+          ok: true,
+          room: buildPublicRoom(roomCode),
+          playerToken: reusableDisconnectedPlayer.player_token,
+          playerId: reusableDisconnectedPlayer.id
         });
       }
 
@@ -1309,7 +1354,7 @@ io.on("connection", (socket) => {
       .prepare("SELECT * FROM players WHERE id = ? AND room_code = ?")
       .get(targetId, room.code);
 
-    if (!target || target.eliminated) {
+    if (!target || target.eliminated || !target.connected) {
       return callback({ ok: false, error: "Cible invalide" });
     }
 

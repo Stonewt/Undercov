@@ -1,7 +1,7 @@
 html, body {
-  height: 100%;
+  min-height: 100%;
   margin: 0;
-  overflow: hidden;
+  overflow: auto;
 }
 
 body {
@@ -48,7 +48,7 @@ body::after {
 }
 
 .app-shell {
-  min-height: 100vh;
+  min-height: 100dvh;
   position: relative;
   padding: 18px 24px 24px;
 }
@@ -70,41 +70,25 @@ body::after {
   justify-self: center;
 }
 
-.topbar h1 {
+.brand-logo {
   margin: 0;
   font-size: 34px;
-  font-weight: 900;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
-  background: linear-gradient(
-    90deg,
-    #60a5fa 0%,
-    #93c5fd 20%,
-    #ffffff 38%,
-    #fdba74 62%,
-    #f97316 82%,
-    #fb923c 100%
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  text-transform: none;
+  line-height: 1;
   text-shadow:
-    0 0 14px rgba(59,130,246,0.22),
-    0 0 24px rgba(249,115,22,0.18),
-    0 2px 18px rgba(0,0,0,0.35);
-  position: relative;
+    0 0 14px rgba(59,130,246,0.16),
+    0 0 18px rgba(249,115,22,0.14),
+    0 2px 18px rgba(0,0,0,0.32);
 }
 
-.topbar h1::after {
-  content: "UNDERCOVER";
-  position: absolute;
-  left: 0;
-  top: 0;
-  z-index: -1;
-  color: rgba(255,255,255,0.06);
-  filter: blur(10px);
-  transform: translateY(2px) scale(1.02);
-  pointer-events: none;
+.brand-under {
+  color: #60a5fa;
+}
+
+.brand-cover {
+  color: #fb923c;
 }
 
 .topbar-side {
@@ -208,9 +192,9 @@ body::after {
 
 .page-center {
   width: 100%;
-  min-height: calc(100vh - 100px);
+  min-height: calc(100dvh - 100px);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   position: relative;
   z-index: 10;
@@ -218,10 +202,11 @@ body::after {
 
 .start-screen {
   width: 100%;
-  min-height: calc(100vh - 130px);
+  min-height: calc(100dvh - 130px);
   display: flex;
   align-items: center;
   justify-content: center;
+  padding-bottom: 20px;
 }
 
 .start-card {
@@ -286,6 +271,7 @@ body::after {
   display: grid;
   grid-template-columns: 320px 1fr;
   gap: 20px;
+  padding-bottom: 20px;
 }
 
 .panel {
@@ -296,7 +282,7 @@ body::after {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .panel-center {
@@ -323,10 +309,11 @@ body::after {
 }
 
 .room-card {
-  height: calc(100vh - 130px);
+  min-height: 640px;
+  height: auto;
+  max-height: none;
   display: flex;
   flex-direction: column;
-  min-height: 0;
   padding-top: 16px;
 }
 
@@ -511,9 +498,67 @@ body::after {
   min-height: 20px;
 }
 
+.role-dolls-wrap {
+  margin-bottom: 14px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(8, 18, 36, 0.56);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+.role-dolls-title {
+  font-size: 13px;
+  font-weight: 700;
+  opacity: 0.78;
+  margin-bottom: 10px;
+}
+
+.role-dolls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.role-doll {
+  width: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.role-doll-head {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.role-doll-body {
+  width: 18px;
+  height: 14px;
+  border-radius: 10px 10px 7px 7px;
+  background: currentColor;
+  box-shadow: 0 0 10px rgba(255,255,255,0.08) inset;
+}
+
+.role-doll.civil {
+  color: #60a5fa;
+}
+
+.role-doll.undercover {
+  color: #fb923c;
+}
+
+.role-doll.mrwhite {
+  color: #f8fafc;
+}
+
 .messages {
   flex: 1 1 auto;
-  min-height: 0;
+  min-height: 180px;
+  max-height: 340px;
   overflow-y: auto;
   background: rgba(8, 18, 36, 0.85);
   border-radius: 16px;
@@ -778,10 +823,6 @@ button:disabled {
 }
 
 @media (max-width: 980px) {
-  html, body {
-    overflow: auto;
-  }
-
   .page-center {
     align-items: flex-start;
   }

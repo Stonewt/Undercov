@@ -10,6 +10,7 @@ let selectedVoteTargetName = null;
 let voteAlreadySent = false;
 let currentTurnKey = null;
 let autoSubmittedTurnKey = null;
+let previousVisiblePlayerIds = [];
 
 const nameInput = document.getElementById("nameInput");
 const roomInput = document.getElementById("roomInput");
@@ -54,6 +55,7 @@ const messagesList = document.getElementById("messagesList");
 const chatInput = document.getElementById("chatInput");
 const sendChatBtn = document.getElementById("sendChatBtn");
 const chatHelp = document.getElementById("chatHelp");
+const roleDolls = document.getElementById("roleDolls");
 
 const waitingCard = document.getElementById("waitingCard");
 const waitingText = document.getElementById("waitingText");
@@ -92,7 +94,7 @@ function ensureAudio() {
   }
 }
 
-function playClickSound(type = "default") {
+function playTone({ type = "triangle", from = 440, to = 660, duration = 0.08, gain = 0.05 } = {}) {
   ensureAudio();
   if (!audioCtx) return;
 
@@ -100,29 +102,48 @@ function playClickSound(type = "default") {
   const oscillator = audioCtx.createOscillator();
   const gainNode = audioCtx.createGain();
 
+  oscillator.type = type;
   oscillator.connect(gainNode);
   gainNode.connect(audioCtx.destination);
 
-  if (type === "soft") {
-    oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(520, now);
-    oscillator.frequency.exponentialRampToValueAtTime(760, now + 0.04);
-  } else if (type === "success") {
-    oscillator.type = "triangle";
-    oscillator.frequency.setValueAtTime(660, now);
-    oscillator.frequency.exponentialRampToValueAtTime(990, now + 0.06);
-  } else {
-    oscillator.type = "triangle";
-    oscillator.frequency.setValueAtTime(420, now);
-    oscillator.frequency.exponentialRampToValueAtTime(620, now + 0.03);
-  }
+  oscillator.frequency.setValueAtTime(from, now);
+  oscillator.frequency.exponentialRampToValueAtTime(Math.max(to, 0.001), now + duration);
 
   gainNode.gain.setValueAtTime(0.0001, now);
-  gainNode.gain.exponentialRampToValueAtTime(0.05, now + 0.01);
-  gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
+  gainNode.gain.exponentialRampToValueAtTime(gain, now + 0.01);
+  gainNode.gain.exponentialRampToValueAtTime(0.0001, now + duration);
 
   oscillator.start(now);
-  oscillator.stop(now + 0.1);
+  oscillator.stop(now + duration + 0.01);
+}
+
+function playClickSound(type = "default") {
+  if (type === "soft") {
+    playTone({ type: "sine", from: 520, to: 760, duration: 0.05, gain: 0.035 });
+    return;
+  }
+
+  if (type === "success") {
+    playTone({ type: "triangle", from: 660, to: 980, duration: 0.09, gain: 0.05 });
+    return;
+  }
+
+  if (type === "join") {
+    playTone({ type: "triangle", from: 520, to: 840, duration: 0.1, gain: 0.05 });
+    return;
+  }
+
+  if (type === "leave") {
+    playTone({ type: "sawtooth", from: 420, to: 220, duration: 0.1, gain: 0.04 });
+    return;
+  }
+
+  if (type === "vote") {
+    playTone({ type: "square", from: 500, to: 680, duration: 0.07, gain: 0.035 });
+    return;
+  }
+
+  playTone({ type: "triangle", from: 420, to: 620, duration: 0.04, gain: 0.04 });
 }
 
 function attachUiSounds() {
@@ -235,6 +256,7 @@ function resetUI() {
   currentRoom = null;
   currentTurnKey = null;
   autoSubmittedTurnKey = null;
+  previousVisiblePlayerIds = [];
 
   lobby.classList.add("hidden");
   secretCard.classList.add("hidden");
@@ -257,6 +279,7 @@ function resetUI() {
   messagesList.innerHTML = "";
   voteButtons.innerHTML = "";
   revealList.innerHTML = "";
+  if (roleDolls) roleDolls.innerHTML = "";
 
   phaseInfo.textContent = "";
   speakerInfo.textContent = "";
@@ -328,10 +351,6 @@ function renderPlayers(room) {
       subParts.push("réfléchit");
     }
 
-    if (!player.connected) {
-      subParts.push("déconnecté");
-    }
-
     if (player.eliminated) {
       subParts.push("éliminé");
     }
@@ -344,6 +363,34 @@ function renderPlayers(room) {
     }
 
     playersList.appendChild(li);
+  });
+}
+
+function renderRoleDolls(room) {
+  if (!roleDolls) return;
+
+  roleDolls.innerHTML = "";
+
+  const composition = room.roleComposition || {};
+  const dolls = [];
+
+  for (let i = 0; i < (composition.civil || 0); i++) dolls.push("civil");
+  for (let i = 0; i < (composition.undercover || 0); i++) dolls.push("undercover");
+  for (let i = 0; i < (composition.mrwhite || 0); i++) dolls.push("mrwhite");
+
+  dolls.forEach((role) => {
+    const doll = document.createElement("div");
+    doll.className = `role-doll ${role}`;
+
+    const head = document.createElement("div");
+    head.className = "role-doll-head";
+
+    const body = document.createElement("div");
+    body.className = "role-doll-body";
+
+    doll.appendChild(head);
+    doll.appendChild(body);
+    roleDolls.appendChild(doll);
   });
 }
 
@@ -383,6 +430,7 @@ function renderChat(room) {
   }
 
   chatCard.classList.remove("hidden");
+  renderRoleDolls(room);
   renderMessages(room);
 
   const me = room.players.find((p) => p.id === myPlayerId);
@@ -741,7 +789,28 @@ function renderComposition(room) {
     ` • ${settings.category || "--"} / ${settings.subcategory || "--"}`;
 }
 
+function handlePresenceSounds(room) {
+  const currentIds = (room.players || []).map((p) => p.id);
+  if (!previousVisiblePlayerIds.length) {
+    previousVisiblePlayerIds = currentIds;
+    return;
+  }
+
+  const joined = currentIds.filter((id) => !previousVisiblePlayerIds.includes(id));
+  const left = previousVisiblePlayerIds.filter((id) => !currentIds.includes(id));
+
+  if (joined.length > 0) {
+    playClickSound("join");
+  } else if (left.length > 0) {
+    playClickSound("leave");
+  }
+
+  previousVisiblePlayerIds = currentIds;
+}
+
 function renderRoom(room) {
+  handlePresenceSounds(room);
+
   currentRoom = room;
   myRoomCode = room.code;
   localStorage.setItem("roomCode", room.code);
@@ -872,7 +941,7 @@ joinBtn.addEventListener("click", () => {
     saveSession(res.playerId, res.playerToken, res.room.code);
     renderRoom(res.room);
     updateResumeUI(true);
-    playClickSound("success");
+    playClickSound("join");
     setStatus("Room rejointe");
   });
 });
@@ -893,7 +962,7 @@ resumeBtn.addEventListener("click", () => {
     saveSession(res.playerId, res.playerToken, res.room.code);
     renderRoom(res.room);
     updateResumeUI(true);
-    playClickSound("success");
+    playClickSound("join");
     setStatus("Reconnexion réussie");
   });
 });
@@ -924,6 +993,7 @@ leaveBtn.addEventListener("click", () => {
   socket.emit("leaveRoom", {}, () => {
     resetUI();
     validateStoredSession();
+    playClickSound("leave");
     setStatus("Tu as quitté la partie.");
   });
 });
@@ -950,7 +1020,7 @@ confirmVoteBtn.addEventListener("click", () => {
     voteAlreadySent = true;
     confirmVoteBtn.disabled = true;
     selectedVoteText.textContent = `Vote confirmé contre ${selectedVoteTargetName}.`;
-    playClickSound("success");
+    playClickSound("vote");
     setStatus("Vote envoyé", true);
   });
 });
@@ -1050,6 +1120,8 @@ socket.on("voteResult", (result) => {
       `${result.eliminated.name} est éliminé.` +
       ` Son rôle était ${result.eliminated.role}.`;
   }
+
+  playClickSound("vote");
 });
 
 attachUiSounds();

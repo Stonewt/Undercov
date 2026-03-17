@@ -348,7 +348,8 @@ body::after {
 
 .players-box,
 .chat-box,
-.end-box {
+.end-box,
+.waiting-box {
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -404,10 +405,52 @@ body::after {
 }
 
 .chat-box,
-.end-box {
+.end-box,
+.waiting-box {
   background: rgba(255,255,255,0.03);
   border-radius: 18px;
   padding: 14px;
+}
+
+.waiting-box {
+  justify-content: center;
+  background:
+    radial-gradient(circle at top, rgba(96,165,250,0.14), transparent 28%),
+    linear-gradient(180deg, rgba(17,24,39,0.98), rgba(31,41,55,0.96));
+  border: 1px solid rgba(96,165,250,0.22);
+}
+
+.waiting-box h2 {
+  font-size: 30px;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.waiting-box p {
+  text-align: center;
+  font-size: 18px;
+  margin-bottom: 20px;
+}
+
+.waiting-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.waiting-meta-item {
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(8,18,36,0.55);
+  border: 1px solid rgba(255,255,255,0.06);
+  text-align: center;
+}
+
+.waiting-meta-label {
+  display: block;
+  font-size: 13px;
+  opacity: 0.75;
+  margin-bottom: 6px;
 }
 
 .end-box {
@@ -509,20 +552,21 @@ body::after {
   color: rgba(255,255,255,0.86);
 }
 
-input, button {
+input, button, select {
   border: none;
   border-radius: 14px;
   padding: 13px 15px;
   font-size: 15px;
 }
 
-input {
+input, select {
   width: 100%;
   background: rgba(255,255,255,0.92);
   color: #111827;
 }
 
-input:disabled {
+input:disabled,
+select:disabled {
   background: rgba(148,163,184,0.28);
   color: rgba(255,255,255,0.65);
   cursor: not-allowed;
@@ -675,6 +719,19 @@ button:disabled {
   font-size: 13px;
 }
 
+#compositionHelp,
+#compositionSummary {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: rgba(255,255,255,0.86);
+}
+
+#compositionSummary {
+  margin-top: 4px;
+  font-weight: 700;
+  color: #fdba74;
+}
+
 @keyframes fadeUp {
   from {
     opacity: 0;
@@ -778,16 +835,8 @@ button:disabled {
   #wordText {
     font-size: 30px;
   }
-}
-#compositionHelp,
-#compositionSummary {
-  margin: 0 0 12px 0;
-  font-size: 14px;
-  color: rgba(255,255,255,0.86);
-}
 
-#compositionSummary {
-  margin-top: 4px;
-  font-weight: 700;
-  color: #fdba74;
+  .waiting-meta {
+    grid-template-columns: 1fr;
+  }
 }

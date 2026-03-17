@@ -13,8 +13,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = Number(process.env.PORT || 3000);
-const TURN_DURATION_MS = 30_000;
-const VOTE_DURATION_MS = 30_000;
+const DEFAULT_TURN_DURATION_MS = 30_000;
+const DEFAULT_VOTE_DURATION_MS = 30_000;
+const MIN_DURATION_SECONDS = 15;
+const MAX_DURATION_SECONDS = 45;
 
 const app = express();
 const server = http.createServer(app);
@@ -47,6 +49,10 @@ CREATE TABLE IF NOT EXISTS rooms (
   messages TEXT NOT NULL DEFAULT '[]',
   turn_ends_at INTEGER,
   vote_ends_at INTEGER,
+  turn_duration_ms INTEGER NOT NULL DEFAULT 30000,
+  vote_duration_ms INTEGER NOT NULL DEFAULT 30000,
+  selected_category TEXT,
+  selected_subcategory TEXT,
   game_over INTEGER NOT NULL DEFAULT 0,
   winner TEXT,
   created_at TEXT NOT NULL,
@@ -83,6 +89,18 @@ if (!columnExists("rooms", "turn_ends_at")) {
 if (!columnExists("rooms", "vote_ends_at")) {
   db.exec(`ALTER TABLE rooms ADD COLUMN vote_ends_at INTEGER`);
 }
+if (!columnExists("rooms", "turn_duration_ms")) {
+  db.exec(`ALTER TABLE rooms ADD COLUMN turn_duration_ms INTEGER NOT NULL DEFAULT 30000`);
+}
+if (!columnExists("rooms", "vote_duration_ms")) {
+  db.exec(`ALTER TABLE rooms ADD COLUMN vote_duration_ms INTEGER NOT NULL DEFAULT 30000`);
+}
+if (!columnExists("rooms", "selected_category")) {
+  db.exec(`ALTER TABLE rooms ADD COLUMN selected_category TEXT`);
+}
+if (!columnExists("rooms", "selected_subcategory")) {
+  db.exec(`ALTER TABLE rooms ADD COLUMN selected_subcategory TEXT`);
+}
 
 app.use(
   helmet({
@@ -101,15 +119,114 @@ app.use(
 
 app.use(express.static(path.join(__dirname, "public")));
 
-const wordPairs = JSON.parse(
+const rawWordData = JSON.parse(
   fs.readFileSync(
     path.join(__dirname, "undercover_word_pairs_1000.json"),
     "utf8"
   )
 );
 
-const roomTurnTimers = new Map();
-const roomVoteTimers = new Map();
+function isValidWordPair(pair) {
+  return (
+    Array.isArray(pair) &&
+    pair.length >= 2 &&
+    typeof pair[0] === "string" &&
+    typeof pair[1] === "string" &&
+    pair[0].trim() &&
+    pair[1].trim()
+  );
+}
+
+function buildWordCatalog(raw) {
+  const fallbackCatalog = {
+    Sport: {
+      Foot: [],
+      Basket: []
+    },
+    "Pop culture": {
+      "Animé": [],
+      Musique: []
+    }
+  };
+
+  if (Array.isArray(raw)) {
+    return {
+      "Toutes catégories": {
+        "Général": raw.filter(isValidWordPair)
+      }
+    };
+  }
+
+  const catalog = {};
+
+  if (raw && typeof raw === "object") {
+    for (const [categoryName, subcategories] of Object.entries(raw)) {
+      if (!subcategories || typeof subcategories !== "object") continue;
+
+      const cleanSubcategories = {};
+
+      for (const [subcategoryName, pairs] of Object.entries(subcategories)) {
+        const validPairs = Array.isArray(pairs) ? pairs.filter(isValidWordPair) : [];
+        cleanSubcategories[subcategoryName] = validPairs;
+      }
+
+      if (Object.keys(cleanSubcategories).length > 0) {
+        catalog[categoryName] = cleanSubcategories;
+      }
+    }
+  }
+
+  if (Object.keys(catalog).length === 0) {
+    return fallbackCatalog;
+  }
+
+  return catalog;
+}
+
+const wordCatalog = buildWordCatalog(rawWordData);
+
+function getCategoryOptions() {
+  return Object.entries(wordCatalog).map(([name, subcats]) => ({
+    name,
+    subcategories: Object.keys(subcats)
+  }));
+}
+
+function normalizeCategorySelection(category, subcategory) {
+  const categories = Object.keys(wordCatalog);
+
+  if (categories.length === 0) {
+    return {
+      category: null,
+      subcategory: null
+    };
+  }
+
+  const selectedCategory =
+    typeof category === "string" && wordCatalog[category]
+      ? category
+      : categories[0];
+
+  const subcategories = Object.keys(wordCatalog[selectedCategory] || {});
+  const selectedSubcategory =
+    typeof subcategory === "string" &&
+    wordCatalog[selectedCategory]?.[subcategory]
+      ? subcategory
+      : subcategories[0] || null;
+
+  return {
+    category: selectedCategory,
+    subcategory: selectedSubcategory
+  };
+}
+
+function getWordPairsForSelection(category, subcategory) {
+  const selection = normalizeCategorySelection(category, subcategory);
+
+  if (!selection.category || !selection.subcategory) return [];
+
+  return wordCatalog[selection.category]?.[selection.subcategory] || [];
+}
 
 function nowIso() {
   return new Date().toISOString();
@@ -190,6 +307,36 @@ function getPlayerByToken(playerToken) {
   return db.prepare("SELECT * FROM players WHERE player_token = ?").get(playerToken);
 }
 
+function normalizeDurationSeconds(value, fallbackSeconds = 30) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isInteger(parsed)) return fallbackSeconds;
+  return Math.max(MIN_DURATION_SECONDS, Math.min(MAX_DURATION_SECONDS, parsed));
+}
+
+function normalizeGameSettings(settings = {}, room = null) {
+  const selection = normalizeCategorySelection(
+    settings.category ?? room?.selected_category,
+    settings.subcategory ?? room?.selected_subcategory
+  );
+
+  const turnSeconds = normalizeDurationSeconds(
+    settings.turnDurationSeconds,
+    room?.turn_duration_ms ? Math.round(room.turn_duration_ms / 1000) : 30
+  );
+
+  const voteSeconds = normalizeDurationSeconds(
+    settings.voteDurationSeconds,
+    room?.vote_duration_ms ? Math.round(room.vote_duration_ms / 1000) : 30
+  );
+
+  return {
+    turnDurationMs: turnSeconds * 1000,
+    voteDurationMs: voteSeconds * 1000,
+    category: selection.category,
+    subcategory: selection.subcategory
+  };
+}
+
 function updateRoom(code, patch) {
   const room = getRoom(code);
   if (!room) return;
@@ -212,6 +359,10 @@ function updateRoom(code, patch) {
         messages = ?,
         turn_ends_at = ?,
         vote_ends_at = ?,
+        turn_duration_ms = ?,
+        vote_duration_ms = ?,
+        selected_category = ?,
+        selected_subcategory = ?,
         game_over = ?,
         winner = ?,
         updated_at = ?
@@ -227,6 +378,10 @@ function updateRoom(code, patch) {
     next.messages,
     next.turn_ends_at,
     next.vote_ends_at,
+    next.turn_duration_ms,
+    next.vote_duration_ms,
+    next.selected_category,
+    next.selected_subcategory,
     next.game_over,
     next.winner,
     next.updated_at,
@@ -301,6 +456,7 @@ function buildPublicRoom(code) {
   const messages = safeJsonParse(room.messages, []);
   const votes = safeJsonParse(room.votes, {});
   const speakingOrder = safeJsonParse(room.speaking_order, []);
+  const categoryOptions = getCategoryOptions();
 
   return {
     code: room.code,
@@ -312,8 +468,13 @@ function buildPublicRoom(code) {
     speakingOrder,
     turnEndsAt: room.turn_ends_at,
     voteEndsAt: room.vote_ends_at,
-    turnDurationMs: TURN_DURATION_MS,
-    voteDurationMs: VOTE_DURATION_MS,
+    turnDurationMs: room.turn_duration_ms || DEFAULT_TURN_DURATION_MS,
+    voteDurationMs: room.vote_duration_ms || DEFAULT_VOTE_DURATION_MS,
+    turnDurationSeconds: Math.round((room.turn_duration_ms || DEFAULT_TURN_DURATION_MS) / 1000),
+    voteDurationSeconds: Math.round((room.vote_duration_ms || DEFAULT_VOTE_DURATION_MS) / 1000),
+    selectedCategory: room.selected_category,
+    selectedSubcategory: room.selected_subcategory,
+    categoryOptions,
     gameOver: Boolean(room.game_over),
     winner: room.winner,
     messages,
@@ -390,7 +551,8 @@ function scheduleTurnTimer(roomCode) {
   const room = getRoom(roomCode);
   if (!room || room.phase !== "speaking" || room.game_over) return;
 
-  const turnEndsAt = Date.now() + TURN_DURATION_MS;
+  const durationMs = room.turn_duration_ms || DEFAULT_TURN_DURATION_MS;
+  const turnEndsAt = Date.now() + durationMs;
 
   updateRoom(roomCode, {
     turn_ends_at: turnEndsAt,
@@ -401,7 +563,7 @@ function scheduleTurnTimer(roomCode) {
 
   const timeout = setTimeout(() => {
     handleTurnTimeout(roomCode);
-  }, TURN_DURATION_MS);
+  }, durationMs);
 
   roomTurnTimers.set(roomCode, timeout);
 }
@@ -412,7 +574,8 @@ function scheduleVoteTimer(roomCode) {
   const room = getRoom(roomCode);
   if (!room || room.phase !== "voting" || room.game_over) return;
 
-  const voteEndsAt = Date.now() + VOTE_DURATION_MS;
+  const durationMs = room.vote_duration_ms || DEFAULT_VOTE_DURATION_MS;
+  const voteEndsAt = Date.now() + durationMs;
 
   updateRoom(roomCode, {
     turn_ends_at: null,
@@ -423,7 +586,7 @@ function scheduleVoteTimer(roomCode) {
 
   const timeout = setTimeout(() => {
     finishVotingNow(roomCode);
-  }, VOTE_DURATION_MS);
+  }, durationMs);
 
   roomVoteTimers.set(roomCode, timeout);
 }
@@ -455,7 +618,12 @@ function normalizeComposition(playerCount, rawComposition) {
   };
 }
 
-function assignRoles(roomCode, composition) {
+function assignRoles(roomCode, composition, settings = {}) {
+  const room = getRoom(roomCode);
+  if (!room) {
+    throw new Error("Room introuvable");
+  }
+
   const players = shuffle(getPlayersByRoom(roomCode));
   const normalized = normalizeComposition(players.length, composition);
 
@@ -463,8 +631,18 @@ function assignRoles(roomCode, composition) {
     throw new Error("Composition invalide");
   }
 
+  const normalizedSettings = normalizeGameSettings(settings, room);
+  const availablePairs = getWordPairsForSelection(
+    normalizedSettings.category,
+    normalizedSettings.subcategory
+  );
+
+  if (!Array.isArray(availablePairs) || availablePairs.length === 0) {
+    throw new Error("Aucune paire de mots disponible dans cette sous-catégorie");
+  }
+
   const [civilWord, undercoverWord] =
-    wordPairs[Math.floor(Math.random() * wordPairs.length)];
+    availablePairs[Math.floor(Math.random() * availablePairs.length)];
 
   players.forEach((player, index) => {
     let role = "civil";
@@ -497,6 +675,10 @@ function assignRoles(roomCode, composition) {
     messages: JSON.stringify([]),
     turn_ends_at: null,
     vote_ends_at: null,
+    turn_duration_ms: normalizedSettings.turnDurationMs,
+    vote_duration_ms: normalizedSettings.voteDurationMs,
+    selected_category: normalizedSettings.category,
+    selected_subcategory: normalizedSettings.subcategory,
     game_over: 0,
     winner: null
   });
@@ -774,6 +956,9 @@ function removeSocketFromPreviousRoom(socket) {
   handlePlayerDeparture(existingPlayer.id, existingPlayer.room_code);
 }
 
+const roomTurnTimers = new Map();
+const roomVoteTimers = new Map();
+
 io.on("connection", (socket) => {
   socket.on("checkSession", ({ playerToken, roomCode }, callback) => {
     try {
@@ -853,13 +1038,25 @@ io.on("connection", (socket) => {
       const playerId = randomString(16);
       const playerToken = randomString(32);
       const createdAt = nowIso();
+      const defaultSettings = normalizeGameSettings({});
 
       db.prepare(`
         INSERT INTO rooms (
           code, host_player_id, started, phase, round, current_speaker_index,
-          speaking_order, votes, messages, turn_ends_at, vote_ends_at, game_over, winner, created_at, updated_at
-        ) VALUES (?, ?, 0, 'lobby', 0, 0, '[]', '{}', '[]', NULL, NULL, 0, NULL, ?, ?)
-      `).run(code, playerId, createdAt, createdAt);
+          speaking_order, votes, messages, turn_ends_at, vote_ends_at,
+          turn_duration_ms, vote_duration_ms, selected_category, selected_subcategory,
+          game_over, winner, created_at, updated_at
+        ) VALUES (?, ?, 0, 'lobby', 0, 0, '[]', '{}', '[]', NULL, NULL, ?, ?, ?, ?, 0, NULL, ?, ?)
+      `).run(
+        code,
+        playerId,
+        defaultSettings.turnDurationMs,
+        defaultSettings.voteDurationMs,
+        defaultSettings.category,
+        defaultSettings.subcategory,
+        createdAt,
+        createdAt
+      );
 
       db.prepare(`
         INSERT INTO players (
@@ -971,7 +1168,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("startGame", ({ composition } = {}, callback) => {
+  socket.on("startGame", ({ composition, settings } = {}, callback) => {
     const player = requirePlayer(socket, callback);
     if (!player) return;
 
@@ -992,12 +1189,44 @@ io.on("connection", (socket) => {
     }
 
     try {
-      assignRoles(player.room_code, normalized);
+      assignRoles(player.room_code, normalized, settings);
       sendSecrets(player.room_code);
       emitRoom(player.room_code);
       callback({ ok: true });
-    } catch {
-      callback({ ok: false, error: "Impossible de lancer la partie" });
+    } catch (error) {
+      callback({
+        ok: false,
+        error: error?.message || "Impossible de lancer la partie"
+      });
+    }
+  });
+
+  socket.on("restartGame", ({ composition, settings } = {}, callback) => {
+    const player = requirePlayer(socket, callback);
+    if (!player) return;
+
+    const room = getRoom(player.room_code);
+    if (!room) return callback({ ok: false, error: "Room introuvable" });
+    if (!isHost(player, room)) {
+      return callback({ ok: false, error: "Seul l'hôte peut relancer" });
+    }
+
+    const players = getPlayersByRoom(player.room_code);
+    const normalized = normalizeComposition(players.length, composition);
+    if (!normalized) {
+      return callback({ ok: false, error: "Composition invalide" });
+    }
+
+    try {
+      assignRoles(room.code, normalized, settings);
+      sendSecrets(room.code);
+      emitRoom(room.code);
+      callback({ ok: true });
+    } catch (error) {
+      callback({
+        ok: false,
+        error: error?.message || "Impossible de relancer la partie"
+      });
     }
   });
 
@@ -1103,32 +1332,6 @@ io.on("connection", (socket) => {
 
     if (everyoneAliveHasVoted(room.code)) {
       finishVotingNow(room.code);
-    }
-  });
-
-  socket.on("restartGame", ({ composition } = {}, callback) => {
-    const player = requirePlayer(socket, callback);
-    if (!player) return;
-
-    const room = getRoom(player.room_code);
-    if (!room) return callback({ ok: false, error: "Room introuvable" });
-    if (!isHost(player, room)) {
-      return callback({ ok: false, error: "Seul l'hôte peut relancer" });
-    }
-
-    const players = getPlayersByRoom(player.room_code);
-    const normalized = normalizeComposition(players.length, composition);
-    if (!normalized) {
-      return callback({ ok: false, error: "Composition invalide" });
-    }
-
-    try {
-      assignRoles(room.code, normalized);
-      sendSecrets(room.code);
-      emitRoom(room.code);
-      callback({ ok: true });
-    } catch {
-      callback({ ok: false, error: "Impossible de relancer la partie" });
     }
   });
 

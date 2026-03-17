@@ -82,7 +82,7 @@
           </div>
 
           <div class="card hidden compact-card" id="compositionCard">
-            <h2>Composition</h2>
+            <h2>Configuration</h2>
             <p id="compositionHelp"></p>
 
             <div class="form-block">
@@ -93,6 +93,26 @@
             <div class="form-block">
               <label for="mrWhiteCountInput">Mr White</label>
               <input id="mrWhiteCountInput" type="number" min="0" max="1" step="1" value="0" />
+            </div>
+
+            <div class="form-block">
+              <label for="turnDurationInput">Durée d'un tour (15 à 45 s)</label>
+              <input id="turnDurationInput" type="number" min="15" max="45" step="1" value="30" />
+            </div>
+
+            <div class="form-block">
+              <label for="voteDurationInput">Durée du débat / vote (15 à 45 s)</label>
+              <input id="voteDurationInput" type="number" min="15" max="45" step="1" value="30" />
+            </div>
+
+            <div class="form-block">
+              <label for="categorySelect">Catégorie</label>
+              <select id="categorySelect"></select>
+            </div>
+
+            <div class="form-block">
+              <label for="subcategorySelect">Sous-catégorie</label>
+              <select id="subcategorySelect"></select>
             </div>
 
             <p id="compositionSummary"></p>
@@ -148,6 +168,29 @@
                   <button id="sendChatBtn">Envoyer</button>
                 </div>
                 <p id="chatHelp"></p>
+              </div>
+
+              <div class="waiting-box hidden" id="waitingCard">
+                <h2>Salon d'attente</h2>
+                <p id="waitingText">En attente du lancement de la partie par l'hôte…</p>
+                <div class="waiting-meta">
+                  <div class="waiting-meta-item">
+                    <span class="waiting-meta-label">Catégorie</span>
+                    <span id="waitingCategory">--</span>
+                  </div>
+                  <div class="waiting-meta-item">
+                    <span class="waiting-meta-label">Sous-catégorie</span>
+                    <span id="waitingSubcategory">--</span>
+                  </div>
+                  <div class="waiting-meta-item">
+                    <span class="waiting-meta-label">Tour</span>
+                    <span id="waitingTurnDuration">--</span>
+                  </div>
+                  <div class="waiting-meta-item">
+                    <span class="waiting-meta-label">Vote</span>
+                    <span id="waitingVoteDuration">--</span>
+                  </div>
+                </div>
               </div>
 
               <div class="end-box hidden" id="endCard">

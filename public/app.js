@@ -44,12 +44,23 @@ const compositionHelp = document.getElementById("compositionHelp");
 const compositionSummary = document.getElementById("compositionSummary");
 const undercoverCountInput = document.getElementById("undercoverCountInput");
 const mrWhiteCountInput = document.getElementById("mrWhiteCountInput");
+const turnDurationInput = document.getElementById("turnDurationInput");
+const voteDurationInput = document.getElementById("voteDurationInput");
+const categorySelect = document.getElementById("categorySelect");
+const subcategorySelect = document.getElementById("subcategorySelect");
 
 const chatCard = document.getElementById("chatCard");
 const messagesList = document.getElementById("messagesList");
 const chatInput = document.getElementById("chatInput");
 const sendChatBtn = document.getElementById("sendChatBtn");
 const chatHelp = document.getElementById("chatHelp");
+
+const waitingCard = document.getElementById("waitingCard");
+const waitingText = document.getElementById("waitingText");
+const waitingCategory = document.getElementById("waitingCategory");
+const waitingSubcategory = document.getElementById("waitingSubcategory");
+const waitingTurnDuration = document.getElementById("waitingTurnDuration");
+const waitingVoteDuration = document.getElementById("waitingVoteDuration");
 
 const voteCard = document.getElementById("voteCard");
 const voteButtons = document.getElementById("voteButtons");
@@ -66,6 +77,69 @@ const revealList = document.getElementById("revealList");
 
 const timerFill = document.getElementById("timerFill");
 const timerText = document.getElementById("timerText");
+
+let audioCtx = null;
+
+function ensureAudio() {
+  if (!audioCtx) {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (AudioCtx) {
+      audioCtx = new AudioCtx();
+    }
+  }
+  if (audioCtx && audioCtx.state === "suspended") {
+    audioCtx.resume().catch(() => {});
+  }
+}
+
+function playClickSound(type = "default") {
+  ensureAudio();
+  if (!audioCtx) return;
+
+  const now = audioCtx.currentTime;
+  const oscillator = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+
+  oscillator.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+
+  if (type === "soft") {
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(520, now);
+    oscillator.frequency.exponentialRampToValueAtTime(760, now + 0.04);
+  } else if (type === "success") {
+    oscillator.type = "triangle";
+    oscillator.frequency.setValueAtTime(660, now);
+    oscillator.frequency.exponentialRampToValueAtTime(990, now + 0.06);
+  } else {
+    oscillator.type = "triangle";
+    oscillator.frequency.setValueAtTime(420, now);
+    oscillator.frequency.exponentialRampToValueAtTime(620, now + 0.03);
+  }
+
+  gainNode.gain.setValueAtTime(0.0001, now);
+  gainNode.gain.exponentialRampToValueAtTime(0.05, now + 0.01);
+  gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
+
+  oscillator.start(now);
+  oscillator.stop(now + 0.1);
+}
+
+function attachUiSounds() {
+  document.addEventListener("pointerdown", (e) => {
+    const target = e.target;
+    if (!target) return;
+
+    if (target.closest("button")) {
+      playClickSound("default");
+      return;
+    }
+
+    if (target.closest("select") || target.closest("input")) {
+      playClickSound("soft");
+    }
+  }, { passive: true });
+}
 
 function setStatus(message, important = false) {
   statusBanner.textContent = message;
@@ -166,6 +240,7 @@ function resetUI() {
   secretCard.classList.add("hidden");
   if (compositionCard) compositionCard.classList.add("hidden");
   chatCard.classList.add("hidden");
+  waitingCard.classList.add("hidden");
   voteCard.classList.add("hidden");
   resultCard.classList.add("hidden");
   endCard.classList.add("hidden");
@@ -190,7 +265,14 @@ function resetUI() {
   winnerText.textContent = "";
   if (compositionHelp) compositionHelp.textContent = "";
   if (compositionSummary) compositionSummary.textContent = "";
+  if (waitingCategory) waitingCategory.textContent = "--";
+  if (waitingSubcategory) waitingSubcategory.textContent = "--";
+  if (waitingTurnDuration) waitingTurnDuration.textContent = "--";
+  if (waitingVoteDuration) waitingVoteDuration.textContent = "--";
   chatInput.value = "";
+
+  if (categorySelect) categorySelect.innerHTML = "";
+  if (subcategorySelect) subcategorySelect.innerHTML = "";
 
   resetVoteSelection();
   stopTimer();
@@ -321,6 +403,21 @@ function renderChat(room) {
   } else {
     chatHelp.textContent = "Ce n'est pas ton tour. Tu peux lire.";
   }
+}
+
+function renderWaitingRoom(room) {
+  const isHost = room.hostPlayerId === myPlayerId;
+  const shouldShow = !room.started && !room.gameOver && !isHost;
+
+  waitingCard.classList.toggle("hidden", !shouldShow);
+
+  if (!shouldShow) return;
+
+  waitingText.textContent = "En attente du lancement de la partie par l'hôte…";
+  waitingCategory.textContent = room.selectedCategory || "--";
+  waitingSubcategory.textContent = room.selectedSubcategory || "--";
+  waitingTurnDuration.textContent = `${room.turnDurationSeconds || 30} s`;
+  waitingVoteDuration.textContent = `${room.voteDurationSeconds || 30} s`;
 }
 
 function renderVoteButtons(room) {
@@ -506,6 +603,53 @@ function clampCompositionValues(room) {
   };
 }
 
+function clampSeconds(value, fallback = 30) {
+  let n = Number.parseInt(value, 10);
+  if (!Number.isInteger(n)) n = fallback;
+  return Math.max(15, Math.min(45, n));
+}
+
+function populateCategorySelect(room) {
+  if (!categorySelect || !subcategorySelect) return;
+
+  const options = Array.isArray(room.categoryOptions) ? room.categoryOptions : [];
+  const selectedCategory = room.selectedCategory || options[0]?.name || "";
+
+  categorySelect.innerHTML = "";
+  options.forEach((category) => {
+    const option = document.createElement("option");
+    option.value = category.name;
+    option.textContent = category.name;
+    option.selected = category.name === selectedCategory;
+    categorySelect.appendChild(option);
+  });
+
+  populateSubcategorySelect(room, selectedCategory, room.selectedSubcategory);
+}
+
+function populateSubcategorySelect(room, categoryName, preferredSubcategory = null) {
+  if (!subcategorySelect) return;
+
+  const options = Array.isArray(room.categoryOptions) ? room.categoryOptions : [];
+  const category = options.find((item) => item.name === categoryName) || options[0];
+
+  const subcategories = category?.subcategories || [];
+  const selectedSubcategory =
+    preferredSubcategory && subcategories.includes(preferredSubcategory)
+      ? preferredSubcategory
+      : subcategories[0] || "";
+
+  subcategorySelect.innerHTML = "";
+
+  subcategories.forEach((name) => {
+    const option = document.createElement("option");
+    option.value = name;
+    option.textContent = name;
+    option.selected = name === selectedSubcategory;
+    subcategorySelect.appendChild(option);
+  });
+}
+
 function getSelectedComposition(room) {
   const values = clampCompositionValues(room);
   return {
@@ -514,8 +658,39 @@ function getSelectedComposition(room) {
   };
 }
 
+function getSelectedSettings(room) {
+  const turnDurationSeconds = clampSeconds(
+    turnDurationInput?.value,
+    room?.turnDurationSeconds || 30
+  );
+  const voteDurationSeconds = clampSeconds(
+    voteDurationInput?.value,
+    room?.voteDurationSeconds || 30
+  );
+
+  if (turnDurationInput) turnDurationInput.value = String(turnDurationSeconds);
+  if (voteDurationInput) voteDurationInput.value = String(voteDurationSeconds);
+
+  return {
+    turnDurationSeconds,
+    voteDurationSeconds,
+    category: categorySelect?.value || room?.selectedCategory || null,
+    subcategory: subcategorySelect?.value || room?.selectedSubcategory || null
+  };
+}
+
 function renderComposition(room) {
-  if (!compositionCard || !compositionHelp || !compositionSummary || !undercoverCountInput || !mrWhiteCountInput) {
+  if (
+    !compositionCard ||
+    !compositionHelp ||
+    !compositionSummary ||
+    !undercoverCountInput ||
+    !mrWhiteCountInput ||
+    !turnDurationInput ||
+    !voteDurationInput ||
+    !categorySelect ||
+    !subcategorySelect
+  ) {
     return;
   }
 
@@ -531,29 +706,39 @@ function renderComposition(room) {
 
   const playerCount = room.players.length;
 
+  if (turnDurationInput !== document.activeElement) {
+    turnDurationInput.value = String(clampSeconds(turnDurationInput.value, room.turnDurationSeconds || 30));
+  }
+  if (voteDurationInput !== document.activeElement) {
+    voteDurationInput.value = String(clampSeconds(voteDurationInput.value, room.voteDurationSeconds || 30));
+  }
+
+  populateCategorySelect(room);
+
   if (playerCount <= 3) {
     undercoverCountInput.disabled = true;
     mrWhiteCountInput.disabled = true;
     undercoverCountInput.value = "1";
     mrWhiteCountInput.value = "0";
-    compositionHelp.textContent = "À 3 joueurs : composition fixe.";
-    compositionSummary.textContent = "2 civils • 1 undercover";
-    return;
+    compositionHelp.textContent = "À 3 joueurs : composition fixe. L'hôte peut aussi choisir la durée et la catégorie.";
+  } else {
+    undercoverCountInput.disabled = false;
+    mrWhiteCountInput.disabled = false;
+    undercoverCountInput.min = "1";
+    undercoverCountInput.max = String(playerCount - 1);
+    mrWhiteCountInput.min = "0";
+    mrWhiteCountInput.max = "1";
+    compositionHelp.textContent = "L'hôte choisit la composition, les durées et la catégorie.";
   }
 
-  undercoverCountInput.disabled = false;
-  mrWhiteCountInput.disabled = false;
-  undercoverCountInput.min = "1";
-  undercoverCountInput.max = String(playerCount - 1);
-  mrWhiteCountInput.min = "0";
-  mrWhiteCountInput.max = "1";
-
   const values = clampCompositionValues(room);
+  const settings = getSelectedSettings(room);
 
-  compositionHelp.textContent = "À partir de 4 joueurs, l'hôte choisit la composition.";
   compositionSummary.textContent =
     `${values.civilCount} civil(s) • ${values.undercoverCount} undercover(s)` +
-    `${values.mrwhiteCount ? " • 1 Mr White" : ""}`;
+    `${values.mrwhiteCount ? " • 1 Mr White" : ""}` +
+    ` • Tours ${settings.turnDurationSeconds}s • Vote ${settings.voteDurationSeconds}s` +
+    ` • ${settings.category || "--"} / ${settings.subcategory || "--"}`;
 }
 
 function renderRoom(room) {
@@ -583,8 +768,8 @@ function renderRoom(room) {
   }
 
   if (!room.started) {
-    phaseInfo.textContent = "Manche 0";
-    speakerInfo.textContent = "";
+    phaseInfo.textContent = "Salon";
+    speakerInfo.textContent = "La partie n'a pas encore commencé";
   } else {
     phaseInfo.textContent = `Manche ${room.round}`;
 
@@ -602,6 +787,7 @@ function renderRoom(room) {
   renderPlayers(room);
   renderComposition(room);
   renderChat(room);
+  renderWaitingRoom(room);
   renderTimer(room);
   hideGameplayButtons();
 
@@ -667,6 +853,7 @@ createBtn.addEventListener("click", () => {
     saveSession(res.playerId, res.playerToken, res.room.code);
     renderRoom(res.room);
     updateResumeUI(true);
+    playClickSound("success");
     setStatus("Room créée");
   });
 });
@@ -685,6 +872,7 @@ joinBtn.addEventListener("click", () => {
     saveSession(res.playerId, res.playerToken, res.room.code);
     renderRoom(res.room);
     updateResumeUI(true);
+    playClickSound("success");
     setStatus("Room rejointe");
   });
 });
@@ -705,24 +893,29 @@ resumeBtn.addEventListener("click", () => {
     saveSession(res.playerId, res.playerToken, res.room.code);
     renderRoom(res.room);
     updateResumeUI(true);
+    playClickSound("success");
     setStatus("Reconnexion réussie");
   });
 });
 
 startBtn.addEventListener("click", () => {
   const composition = currentRoom ? getSelectedComposition(currentRoom) : null;
+  const settings = currentRoom ? getSelectedSettings(currentRoom) : null;
 
-  socket.emit("startGame", { composition }, (res) => {
+  socket.emit("startGame", { composition, settings }, (res) => {
     if (!res.ok) return setStatus(res.error, true);
+    playClickSound("success");
     setStatus("Partie lancée");
   });
 });
 
 restartBtn.addEventListener("click", () => {
   const composition = currentRoom ? getSelectedComposition(currentRoom) : null;
+  const settings = currentRoom ? getSelectedSettings(currentRoom) : null;
 
-  socket.emit("restartGame", { composition }, (res) => {
+  socket.emit("restartGame", { composition, settings }, (res) => {
     if (!res.ok) return setStatus(res.error, true);
+    playClickSound("success");
     setStatus("Nouvelle partie lancée");
   });
 });
@@ -743,6 +936,7 @@ sendChatBtn.addEventListener("click", () => {
     if (!res.ok) return setStatus(res.error, true);
     chatInput.value = "";
     sendChatBtn.disabled = true;
+    playClickSound("success");
     setStatus("Mot envoyé");
   });
 });
@@ -756,6 +950,7 @@ confirmVoteBtn.addEventListener("click", () => {
     voteAlreadySent = true;
     confirmVoteBtn.disabled = true;
     selectedVoteText.textContent = `Vote confirmé contre ${selectedVoteTargetName}.`;
+    playClickSound("success");
     setStatus("Vote envoyé", true);
   });
 });
@@ -793,6 +988,34 @@ if (mrWhiteCountInput) {
   });
 }
 
+if (turnDurationInput) {
+  turnDurationInput.addEventListener("input", () => {
+    turnDurationInput.value = String(clampSeconds(turnDurationInput.value, 30));
+    if (currentRoom) renderComposition(currentRoom);
+  });
+}
+
+if (voteDurationInput) {
+  voteDurationInput.addEventListener("input", () => {
+    voteDurationInput.value = String(clampSeconds(voteDurationInput.value, 30));
+    if (currentRoom) renderComposition(currentRoom);
+  });
+}
+
+if (categorySelect) {
+  categorySelect.addEventListener("change", () => {
+    if (!currentRoom) return;
+    populateSubcategorySelect(currentRoom, categorySelect.value);
+    renderComposition(currentRoom);
+  });
+}
+
+if (subcategorySelect) {
+  subcategorySelect.addEventListener("change", () => {
+    if (currentRoom) renderComposition(currentRoom);
+  });
+}
+
 socket.on("roomUpdated", (room) => {
   if (room.phase !== "voting") {
     resetVoteSelection();
@@ -804,8 +1027,10 @@ socket.on("gameStarted", ({ word }) => {
   secretCard.classList.remove("hidden");
   resultCard.classList.add("hidden");
   endCard.classList.add("hidden");
+  waitingCard.classList.add("hidden");
   resetVoteSelection();
   wordText.textContent = word || "Tu n'as pas de mot.";
+  playClickSound("success");
   setStatus("La partie commence");
 });
 
@@ -827,5 +1052,6 @@ socket.on("voteResult", (result) => {
   }
 });
 
+attachUiSounds();
 initAds();
 validateStoredSession();

@@ -58,15 +58,11 @@
             </g>
 
             <path d="M58 72 Q70 80 82 72" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="1.5"/>
-
             <path d="M14 62 Q14 30 70 26 Q126 30 126 62 Q126 78 110 78 Q96 72 70 72 Q44 72 30 78 Q14 78 14 62Z"
                   fill="none" stroke="rgba(80,130,255,0.2)" stroke-width="1"/>
 
             <line x1="14" y1="50" x2="6" y2="42" stroke="rgba(224,122,32,0.5)" stroke-width="1.5" stroke-linecap="round"/>
             <line x1="126" y1="50" x2="134" y2="42" stroke="rgba(80,130,255,0.5)" stroke-width="1.5" stroke-linecap="round"/>
-
-            <line x1="48" y1="108" x2="92" y2="108" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
-            <line x1="56" y1="112" x2="84" y2="112" stroke="rgba(255,255,255,0.05)" stroke-width="0.5"/>
           </svg>
         </div>
 
@@ -77,25 +73,6 @@
 
         <div class="sep"></div>
         <div class="tagline">Qui ment parmi vous ?</div>
-
-        <div class="intro-preview">
-          <div class="intro-preview-top">
-            <span class="intro-pill blue">ROOM</span>
-            <span class="intro-pill orange">VOTE</span>
-          </div>
-          <div class="intro-preview-main">
-            <div class="intro-preview-list">
-              <div class="intro-preview-line"></div>
-              <div class="intro-preview-line short"></div>
-              <div class="intro-preview-line"></div>
-            </div>
-            <div class="intro-preview-chat">
-              <div class="intro-preview-bubble"></div>
-              <div class="intro-preview-bubble small"></div>
-              <div class="intro-preview-bubble"></div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   </div>
@@ -119,29 +96,11 @@
       <div id="statusBanner" class="status-banner hidden"></div>
     </div>
 
-    <aside class="ad-rail ad-rail-left" id="leftAds">
-      <div class="ad-slot" data-ad="left-top">
-        <button class="ad-close" data-close-ad="left-top">×</button>
-      </div>
-      <div class="ad-slot" data-ad="left-bottom">
-        <button class="ad-close" data-close-ad="left-bottom">×</button>
-      </div>
-    </aside>
-
-    <aside class="ad-rail ad-rail-right" id="rightAds">
-      <div class="ad-slot" data-ad="right-top">
-        <button class="ad-close" data-close-ad="right-top">×</button>
-      </div>
-      <div class="ad-slot" data-ad="right-bottom">
-        <button class="ad-close" data-close-ad="right-bottom">×</button>
-      </div>
-    </aside>
-
     <main class="page-center">
       <div class="start-screen" id="startWrap">
         <div class="start-card" id="roomSetupCard">
-          <div class="start-grid">
-            <div class="start-left">
+          <div class="start-layout">
+            <section class="start-login-panel">
               <div class="start-content start-content-full">
                 <h2>Se connecter à une salle</h2>
                 <p class="start-subtitle">Crée une room ou rejoins-en une avec un code.</p>
@@ -168,9 +127,9 @@
                   <button id="joinBtn" class="big-btn">Rejoindre</button>
                 </div>
               </div>
-            </div>
+            </section>
 
-            <div class="start-right">
+            <aside class="start-info-panel">
               <div class="home-logo-side">
                 <svg width="180" height="180" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
                   <defs>
@@ -241,7 +200,7 @@
                   <li>Si personne ne donne d’indice pendant toute une manche, la partie s’arrête.</li>
                 </ul>
               </div>
-            </div>
+            </aside>
           </div>
         </div>
       </div>

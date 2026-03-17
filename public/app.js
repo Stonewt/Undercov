@@ -11,6 +11,7 @@ let voteAlreadySent = false;
 let currentTurnKey = null;
 let autoSubmittedTurnKey = null;
 let previousVisiblePlayerIds = [];
+let lastTensionSecondPlayed = null;
 
 const nameInput = document.getElementById("nameInput");
 const roomInput = document.getElementById("roomInput");
@@ -83,6 +84,21 @@ const timerText = document.getElementById("timerText");
 
 let audioCtx = null;
 
+window.addEventListener("load", () => {
+  const intro = document.getElementById("introOverlay");
+  const scene = document.getElementById("introScene");
+
+  if (!intro || !scene) return;
+
+  setTimeout(() => {
+    scene.classList.add("intro-hidden");
+
+    setTimeout(() => {
+      intro.remove();
+    }, 900);
+  }, 2300);
+});
+
 function ensureAudio() {
   if (!audioCtx) {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -141,6 +157,16 @@ function playClickSound(type = "default") {
 
   if (type === "vote") {
     playTone({ type: "square", from: 500, to: 680, duration: 0.07, gain: 0.035 });
+    return;
+  }
+
+  if (type === "tension") {
+    playTone({ type: "square", from: 780, to: 840, duration: 0.06, gain: 0.028 });
+    return;
+  }
+
+  if (type === "reveal") {
+    playTone({ type: "triangle", from: 340, to: 720, duration: 0.16, gain: 0.045 });
     return;
   }
 
@@ -243,6 +269,7 @@ function stopTimer() {
   timerFill.style.width = "0%";
   timerText.textContent = "--";
   timerFill.style.background = "#22c55e";
+  lastTensionSecondPlayed = null;
 }
 
 function resetVoteSelection() {
@@ -258,6 +285,7 @@ function resetUI() {
   currentTurnKey = null;
   autoSubmittedTurnKey = null;
   previousVisiblePlayerIds = [];
+  lastTensionSecondPlayed = null;
 
   lobby.classList.add("hidden");
   secretCard.classList.add("hidden");
@@ -521,6 +549,10 @@ function renderVoteButtons(room) {
 function getMyOutcome(room) {
   if (!room.gameOver || !room.reveal) return null;
 
+  if (room.winner === "aucun") {
+    return "Partie arrêtée";
+  }
+
   const me = room.reveal.find((p) => p.id === myPlayerId);
   if (!me) return null;
 
@@ -540,17 +572,33 @@ function renderEndGame(room) {
 
   const outcome = getMyOutcome(room) || "Fin de partie";
   endTitle.textContent = outcome;
-  winnerText.textContent = `Équipe gagnante : ${room.winner}`;
+  winnerText.textContent =
+    room.winner === "aucun"
+      ? "La partie a été interrompue : aucun indice n'a été donné pendant la manche."
+      : `Équipe gagnante : ${room.winner}`;
 
   revealList.innerHTML = "";
 
-  room.reveal.forEach((player) => {
+  room.reveal.forEach((player, index) => {
     const li = document.createElement("li");
-    li.textContent =
-      `${player.name} : ${player.role}` +
-      `${player.word ? ` | ${player.word}` : ""}`;
+    li.className = "reveal-item";
+    li.style.animationDelay = `${index * 120}ms`;
+
+    const badge = document.createElement("span");
+    badge.className = `reveal-role-badge ${player.role}`;
+    badge.textContent = player.role;
+
+    const text = document.createElement("span");
+    text.className = "reveal-main-text";
+    text.textContent =
+      `${player.name}` + `${player.word ? ` • ${player.word}` : " • aucun mot"}`;
+
+    li.appendChild(badge);
+    li.appendChild(text);
     revealList.appendChild(li);
   });
+
+  playClickSound("reveal");
 }
 
 function renderTimer(room) {
@@ -572,9 +620,10 @@ function renderTimer(room) {
   const tick = () => {
     const remaining = Math.max(0, endAt - Date.now());
     const percent = Math.max(0, Math.min(100, (remaining / total) * 100));
+    const secondsLeft = Math.ceil(remaining / 1000);
 
     timerFill.style.width = `${percent}%`;
-    timerText.textContent = `${Math.ceil(remaining / 1000)} s`;
+    timerText.textContent = `${secondsLeft} s`;
 
     if (remaining <= 7000) {
       timerFill.style.background = "#f59e0b";
@@ -584,6 +633,11 @@ function renderTimer(room) {
 
     if (remaining <= 3000) {
       timerFill.style.background = "#ef4444";
+    }
+
+    if (secondsLeft <= 5 && secondsLeft > 0 && lastTensionSecondPlayed !== secondsLeft) {
+      lastTensionSecondPlayed = secondsLeft;
+      playClickSound("tension");
     }
 
     const isMyTurn =
@@ -838,6 +892,7 @@ function renderRoom(room) {
   if (currentTurnKey !== nextTurnKey) {
     currentTurnKey = nextTurnKey;
     autoSubmittedTurnKey = null;
+    lastTensionSecondPlayed = null;
 
     if (!(room.phase === "speaking" && room.currentSpeakerId === myPlayerId)) {
       chatInput.value = "";

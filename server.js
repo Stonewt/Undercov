@@ -565,6 +565,34 @@ function pushSystemMessage(roomCode, text) {
   });
 }
 
+function roundHasAtLeastOnePlayerMessage(roomCode) {
+  const room = getRoom(roomCode);
+  if (!room) return false;
+
+  const messages = safeJsonParse(room.messages, []);
+  return messages.some((msg) => msg.round === room.round && msg.playerId);
+}
+
+function endGameBecauseNoClue(roomCode) {
+  const room = getRoom(roomCode);
+  if (!room || room.game_over) return;
+
+  clearAllRoomTimers(roomCode);
+
+  pushSystemMessage(
+    roomCode,
+    "Aucun indice n'a été envoyé pendant toute la manche. La partie est arrêtée."
+  );
+
+  updateRoom(roomCode, {
+    game_over: 1,
+    phase: "finished",
+    turn_ends_at: null,
+    vote_ends_at: null,
+    winner: "aucun"
+  });
+}
+
 function scheduleTurnTimer(roomCode) {
   clearTurnTimer(roomCode);
 
@@ -859,6 +887,12 @@ function startVotingPhase(roomCode) {
 
   const room = getRoom(roomCode);
   if (!room) return;
+
+  if (!roundHasAtLeastOnePlayerMessage(roomCode)) {
+    endGameBecauseNoClue(roomCode);
+    emitRoom(roomCode);
+    return;
+  }
 
   updateRoom(roomCode, {
     phase: "voting",

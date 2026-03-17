@@ -7,6 +7,99 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <div id="introOverlay" class="intro-overlay">
+    <div id="introScene" class="intro-scene">
+      <div class="logo-scene">
+        <div class="g1"></div>
+        <div class="g2"></div>
+        <div class="dots"></div>
+
+        <div class="logo-mark">
+          <svg width="140" height="140" viewBox="0 0 140 140" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <radialGradient id="introIrisGrad" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#5a9fff"/>
+                <stop offset="60%" stop-color="#1a4fcc"/>
+                <stop offset="100%" stop-color="#0a1a5c"/>
+              </radialGradient>
+              <radialGradient id="introPupilGrad" cx="40%" cy="40%" r="50%">
+                <stop offset="0%" stop-color="#1a2a60"/>
+                <stop offset="100%" stop-color="#000510"/>
+              </radialGradient>
+              <radialGradient id="introIrisAmber" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#e07a20"/>
+                <stop offset="55%" stop-color="#a04e0a"/>
+                <stop offset="100%" stop-color="#3a1500"/>
+              </radialGradient>
+              <clipPath id="eyeClip">
+                <ellipse cx="70" cy="70" rx="46" ry="28"/>
+              </clipPath>
+            </defs>
+
+            <circle class="pulse" cx="70" cy="70" r="38" fill="none" stroke="rgba(80,130,255,0.3)" stroke-width="1"/>
+            <circle class="pulse2" cx="70" cy="70" r="38" fill="none" stroke="rgba(80,130,255,0.2)" stroke-width="1"/>
+
+            <path d="M14 62 Q14 30 70 26 Q126 30 126 62 Q126 78 110 78 Q96 72 70 72 Q44 72 30 78 Q14 78 14 62Z"
+                  fill="#0d1530" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+
+            <ellipse cx="44" cy="58" rx="18" ry="13" fill="#080b16"/>
+            <ellipse cx="96" cy="58" rx="18" ry="13" fill="#080b16"/>
+
+            <ellipse cx="44" cy="58" rx="14" ry="10" fill="url(#introIrisGrad)"/>
+            <ellipse cx="44" cy="58" rx="7" ry="7" fill="url(#introPupilGrad)"/>
+            <ellipse cx="41" cy="55" rx="2" ry="2" fill="rgba(255,255,255,0.4)"/>
+
+            <ellipse cx="96" cy="58" rx="14" ry="10" fill="url(#introIrisAmber)"/>
+            <ellipse cx="96" cy="58" rx="7" ry="7" fill="url(#introPupilGrad)"/>
+            <ellipse cx="93" cy="55" rx="2" ry="2" fill="rgba(255,255,255,0.35)"/>
+
+            <g clip-path="url(#eyeClip)" transform="translate(52,0)">
+              <rect class="scan-line" x="-4" y="50" width="36" height="1.5" rx="1" fill="rgba(224,122,32,0.9)"/>
+            </g>
+
+            <path d="M58 72 Q70 80 82 72" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="1.5"/>
+
+            <path d="M14 62 Q14 30 70 26 Q126 30 126 62 Q126 78 110 78 Q96 72 70 72 Q44 72 30 78 Q14 78 14 62Z"
+                  fill="none" stroke="rgba(80,130,255,0.2)" stroke-width="1"/>
+
+            <line x1="14" y1="50" x2="6" y2="42" stroke="rgba(224,122,32,0.5)" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="126" y1="50" x2="134" y2="42" stroke="rgba(80,130,255,0.5)" stroke-width="1.5" stroke-linecap="round"/>
+
+            <line x1="48" y1="108" x2="92" y2="108" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
+            <line x1="56" y1="112" x2="84" y2="112" stroke="rgba(255,255,255,0.05)" stroke-width="0.5"/>
+          </svg>
+        </div>
+
+        <div class="wordmark">
+          <span class="word-under">UNDER</span>
+          <span class="word-cover">COVER</span>
+        </div>
+
+        <div class="sep"></div>
+        <div class="tagline">Qui ment parmi vous ?</div>
+
+        <div class="intro-preview">
+          <div class="intro-preview-top">
+            <span class="intro-pill blue">ROOM</span>
+            <span class="intro-pill orange">VOTE</span>
+          </div>
+          <div class="intro-preview-main">
+            <div class="intro-preview-list">
+              <div class="intro-preview-line"></div>
+              <div class="intro-preview-line short"></div>
+              <div class="intro-preview-line"></div>
+            </div>
+            <div class="intro-preview-chat">
+              <div class="intro-preview-bubble"></div>
+              <div class="intro-preview-bubble small"></div>
+              <div class="intro-preview-bubble"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="app-shell">
     <div class="topbar">
       <div class="topbar-side topbar-left">
@@ -48,8 +141,79 @@
       <div class="start-screen" id="startWrap">
         <div class="start-card" id="roomSetupCard">
           <div class="start-content start-content-full">
+            <div class="home-logo">
+              <svg width="180" height="180" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <radialGradient id="bgGlowHome" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="#1a3796" stop-opacity="0.4"/>
+                    <stop offset="100%" stop-color="#080b16" stop-opacity="0"/>
+                  </radialGradient>
+                  <radialGradient id="irisGradHome" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="#5a9fff"/>
+                    <stop offset="60%" stop-color="#1a4fcc"/>
+                    <stop offset="100%" stop-color="#0a1a5c"/>
+                  </radialGradient>
+                  <radialGradient id="pupilGradHome" cx="40%" cy="40%" r="50%">
+                    <stop offset="0%" stop-color="#1a2a60"/>
+                    <stop offset="100%" stop-color="#000510"/>
+                  </radialGradient>
+                  <radialGradient id="irisAmberHome" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="#e07a20"/>
+                    <stop offset="55%" stop-color="#a04e0a"/>
+                    <stop offset="100%" stop-color="#3a1500"/>
+                  </radialGradient>
+                  <radialGradient id="warmGlowHome" cx="60%" cy="70%" r="50%">
+                    <stop offset="0%" stop-color="#c85a0f" stop-opacity="0.25"/>
+                    <stop offset="100%" stop-color="#080b16" stop-opacity="0"/>
+                  </radialGradient>
+                  <pattern id="dotsHome" x="0" y="0" width="30" height="30" patternUnits="userSpaceOnUse">
+                    <circle cx="1" cy="1" r="1" fill="rgba(80,120,220,0.10)"/>
+                  </pattern>
+                </defs>
+
+                <rect width="400" height="400" rx="32" fill="#080b16"/>
+                <ellipse cx="200" cy="160" rx="220" ry="160" fill="url(#bgGlowHome)"/>
+                <ellipse cx="260" cy="300" rx="180" ry="130" fill="url(#warmGlowHome)"/>
+                <rect width="400" height="400" rx="32" fill="url(#dotsHome)"/>
+
+                <circle cx="200" cy="178" r="108" fill="none" stroke="rgba(80,130,255,0.18)" stroke-width="1"/>
+                <circle cx="200" cy="178" r="122" fill="none" stroke="rgba(80,130,255,0.10)" stroke-width="1"/>
+
+                <path d="M84 168 Q84 100 200 90 Q316 100 316 168 Q316 200 292 200 Q264 192 200 192 Q136 192 108 200 Q84 200 84 168Z"
+                      fill="#0d1530" stroke="rgba(80,130,255,0.22)" stroke-width="1.2"/>
+
+                <ellipse cx="148" cy="158" rx="44" ry="32" fill="#080b16"/>
+                <ellipse cx="252" cy="158" rx="44" ry="32" fill="#080b16"/>
+
+                <ellipse cx="148" cy="158" rx="36" ry="26" fill="url(#irisGradHome)"/>
+                <ellipse cx="148" cy="158" rx="18" ry="18" fill="url(#pupilGradHome)"/>
+                <ellipse cx="140" cy="150" rx="5" ry="5" fill="rgba(255,255,255,0.38)"/>
+
+                <ellipse cx="252" cy="158" rx="36" ry="26" fill="url(#irisAmberHome)"/>
+                <ellipse cx="252" cy="158" rx="18" ry="18" fill="url(#pupilGradHome)"/>
+                <ellipse cx="244" cy="150" rx="5" ry="5" fill="rgba(255,255,255,0.32)"/>
+              </svg>
+            </div>
+
             <h2>Se connecter à une salle</h2>
             <p class="start-subtitle">Crée une room ou rejoins-en une avec un code.</p>
+
+            <div class="rules-box">
+              <h3>Règles</h3>
+              <ul>
+                <li>Chaque joueur reçoit un rôle secret.</li>
+                <li>Les civils partagent le même mot.</li>
+                <li>Les undercovers ont un mot proche mais différent.</li>
+                <li>Mr White n’a aucun mot.</li>
+                <li>À tour de rôle, chacun donne un seul mot comme indice.</li>
+                <li>Il est interdit d’écrire exactement son mot secret.</li>
+                <li>À la fin de la manche, tout le monde vote contre un joueur.</li>
+                <li>Les civils gagnent si tous les undercovers et Mr White sont éliminés.</li>
+                <li>Les undercovers gagnent s’ils deviennent au moins aussi nombreux que les civils restants.</li>
+                <li>Mr White gagne s’il ne reste plus qu’un seul autre joueur vivant face à lui.</li>
+                <li>Si personne ne donne d’indice pendant toute une manche, la partie s’arrête automatiquement.</li>
+              </ul>
+            </div>
 
             <div class="form-block hidden" id="resumeBlock">
               <button id="resumeBtn" class="big-btn">Reprendre ma partie</button>
@@ -178,7 +342,7 @@
               </div>
 
               <div class="waiting-box hidden" id="waitingCard">
-                <h2>Salon d'attente</h2>
+                <h2 class="waiting-title">SALON D'ATTENTE</h2>
                 <p id="waitingText">En attente du lancement de la partie par l'hôte…</p>
 
                 <div class="role-dolls-wrap">

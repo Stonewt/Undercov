@@ -75,7 +75,13 @@
 
     <div class="topbar">
       <div class="topbar-side topbar-left">
-        <div id="topRoomInfo" class="top-meta hidden"></div>
+        <button id="topRoomInfo" class="top-meta top-room-clickable hidden" title="Cliquer pour copier le code">
+          <span id="topRoomCode"></span>
+          <svg class="copy-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+        </button>
       </div>
 
       <div class="brand-title">
@@ -117,12 +123,6 @@
       </div>
 
       <div id="statusBanner" class="status-banner hidden"></div>
-      <div id="copyCodeWrap" class="copy-code-wrap hidden">
-        <button id="copyCodeBtn" class="copy-code-btn" title="Copier le code">
-          <span id="copyCodeLabel"></span>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-        </button>
-      </div>
     </div>
 
     <main class="page-center">
@@ -213,12 +213,10 @@
       </div>
 
       <div class="game-layout">
-        <!-- Tabs mobile pour naviguer entre les cards -->
         <div class="mobile-game-tabs" id="mobileGameTabs">
-          <button class="mobile-game-tab active" data-panel="secretCard">Mon mot</button>
+          <button class="mobile-game-tab active" data-panel="chatCard">Chat</button>
           <button class="mobile-game-tab" data-panel="compositionCard">Config</button>
-          <button class="mobile-game-tab" data-panel="voteCard">Vote</button>
-          <button class="mobile-game-tab" data-panel="resultCard">Résultat</button>
+          <button class="mobile-game-tab vote-tab hidden" data-panel="voteCard">🗳 Vote</button>
         </div>
 
         <div class="panel panel-left">
@@ -258,8 +256,11 @@
             <p id="compositionSummary"></p>
           </div>
 
-          <div class="card hidden compact-card" id="voteCard">
-            <h2>Vote</h2>
+          <div class="card hidden compact-card vote-card-active" id="voteCard">
+            <div class="vote-card-header">
+              <div class="vote-pulse-dot"></div>
+              <h2>⚡ Vote en cours</h2>
+            </div>
             <div id="voteButtons"></div>
             <div class="vote-confirm-wrap">
               <p id="selectedVoteText">Aucun joueur sélectionné.</p>
@@ -361,7 +362,6 @@
   <script src="/socket.io/socket.io.js"></script>
   <script src="app.js"></script>
   <script>
-    // Sliders durée
     const turnSlider = document.getElementById('turnDurationInput');
     const voteSlider = document.getElementById('voteDurationInput');
     const turnDisplay = document.getElementById('turnDurationDisplay');
@@ -373,58 +373,53 @@
       voteSlider.addEventListener('input', () => { voteDisplay.textContent = voteSlider.value; });
     }
 
-    // Bouton copier le code
-    const copyCodeBtn = document.getElementById('copyCodeBtn');
-    const copyCodeWrap = document.getElementById('copyCodeWrap');
-    const copyCodeLabel = document.getElementById('copyCodeLabel');
+    const topRoomBtn  = document.getElementById('topRoomInfo');
+    const topRoomCode = document.getElementById('topRoomCode');
 
-    function updateCopyBtn(roomCode) {
-      if (!copyCodeWrap || !copyCodeLabel) return;
+    function updateRoomCodeBtn(roomCode) {
+      if (!topRoomBtn || !topRoomCode) return;
       if (roomCode) {
-        copyCodeLabel.textContent = roomCode;
-        copyCodeWrap.classList.remove('hidden');
+        topRoomCode.textContent = 'Room ' + roomCode;
+        topRoomBtn.classList.remove('hidden');
+        topRoomBtn._code = roomCode;
       } else {
-        copyCodeWrap.classList.add('hidden');
+        topRoomBtn.classList.add('hidden');
+        topRoomBtn._code = null;
       }
     }
 
-    if (copyCodeBtn) {
-      copyCodeBtn.addEventListener('click', () => {
-        const code = copyCodeLabel.textContent;
+    if (topRoomBtn) {
+      topRoomBtn.addEventListener('click', () => {
+        const code = topRoomBtn._code;
         if (!code) return;
-        const confirm = () => {
-          copyCodeBtn.style.background = 'rgba(34,197,94,0.25)';
-          copyCodeBtn.style.borderColor = 'rgba(34,197,94,0.5)';
-          setTimeout(() => { copyCodeBtn.style.background = ''; copyCodeBtn.style.borderColor = ''; }, 1200);
+        const flashOk = () => {
+          topRoomBtn.classList.add('copy-flash');
+          setTimeout(() => topRoomBtn.classList.remove('copy-flash'), 900);
         };
         if (navigator.clipboard) {
-          navigator.clipboard.writeText(code).then(confirm).catch(() => {
+          navigator.clipboard.writeText(code).then(flashOk).catch(() => {
             const el = document.createElement('textarea');
             el.value = code; document.body.appendChild(el); el.select();
-            document.execCommand('copy'); document.body.removeChild(el); confirm();
+            document.execCommand('copy'); document.body.removeChild(el); flashOk();
           });
         } else {
           const el = document.createElement('textarea');
           el.value = code; document.body.appendChild(el); el.select();
-          document.execCommand('copy'); document.body.removeChild(el); confirm();
+          document.execCommand('copy'); document.body.removeChild(el); flashOk();
         }
       });
     }
 
-    // Patch renderRoom + fix catégorie + tabs mobile game
     window.addEventListener('load', () => {
-
-      // Patch renderRoom
       if (typeof renderRoom === 'function') {
         const _orig = renderRoom;
         window.renderRoom = function(room) {
           _orig(room);
-          updateCopyBtn(room ? room.code : null);
+          updateRoomCodeBtn(room ? room.code : null);
           updateMobileGameTabs(room);
         };
       }
 
-      // Fix catégorie — écoute robuste
       const catSelect = document.getElementById('categorySelect');
       const subSelect = document.getElementById('subcategorySelect');
       if (catSelect && subSelect) {
@@ -447,37 +442,46 @@
         });
       }
 
-      // Tabs mobile game
       const tabBtns = document.querySelectorAll('.mobile-game-tab');
       tabBtns.forEach(btn => {
         btn.addEventListener('click', () => {
           const panelId = btn.getAttribute('data-panel');
           tabBtns.forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
-          const card = document.getElementById(panelId);
-          if (card && card.parentElement) {
-            card.parentElement.scrollTo({ left: card.offsetLeft - 8, behavior: 'smooth' });
+          const panel = document.querySelector('.panel-left');
+          const card  = document.getElementById(panelId);
+          if (card && panel && window.innerWidth <= 820) {
+            panel.scrollTo({ left: card.offsetLeft - 8, behavior: 'smooth' });
           }
         });
       });
     });
 
     function updateMobileGameTabs(room) {
+      if (window.innerWidth > 820) return;
       const tabs = document.getElementById('mobileGameTabs');
       if (!tabs) return;
-      if (!room || !room.started) {
-        tabs.style.display = 'none';
-        return;
-      }
+      if (!room || !room.started) { tabs.style.display = 'none'; return; }
       tabs.style.display = '';
-
-      const voteTab = tabs.querySelector('[data-panel="voteCard"]');
-      const resultTab = tabs.querySelector('[data-panel="resultCard"]');
-      const configTab = tabs.querySelector('[data-panel="compositionCard"]');
-
-      if (voteTab) voteTab.style.display = room.phase === 'voting' ? '' : 'none';
-      if (resultTab) resultTab.style.display = '';
-      if (configTab) configTab.style.display = room.gameOver ? '' : 'none';
+      const voteTab = tabs.querySelector('.vote-tab');
+      const isVoting = room.phase === 'voting' && !room.gameOver;
+      if (voteTab) voteTab.classList.toggle('hidden', !isVoting);
+      if (isVoting) {
+        const tabBtns = tabs.querySelectorAll('.mobile-game-tab');
+        tabBtns.forEach(b => b.classList.remove('active'));
+        if (voteTab) voteTab.classList.add('active');
+        const panel    = document.querySelector('.panel-left');
+        const voteCard = document.getElementById('voteCard');
+        if (voteCard && panel) {
+          setTimeout(() => panel.scrollTo({ left: voteCard.offsetLeft - 8, behavior: 'smooth' }), 80);
+        }
+      }
+      if (room.gameOver) {
+        const chatTab = tabs.querySelector('[data-panel="chatCard"]');
+        const tabBtns = tabs.querySelectorAll('.mobile-game-tab');
+        tabBtns.forEach(b => b.classList.remove('active'));
+        if (chatTab) chatTab.classList.add('active');
+      }
     }
   </script>
 </body>

@@ -1,6 +1,8 @@
 const socket = io();
 
 let currentRoom = null;
+window.currentRoom = null;
+
 let myPlayerId = localStorage.getItem("playerId") || null;
 let myPlayerToken = localStorage.getItem("playerToken") || null;
 let myRoomCode = localStorage.getItem("roomCode") || null;
@@ -12,6 +14,7 @@ let currentTurnKey = null;
 let autoSubmittedTurnKey = null;
 let previousVisiblePlayerIds = [];
 let lastTensionSecondPlayed = null;
+let mobileGameActivePanel = "chatCard";
 
 const nameInput = document.getElementById("nameInput");
 const roomInput = document.getElementById("roomInput");
@@ -71,9 +74,6 @@ const voteButtons = document.getElementById("voteButtons");
 const selectedVoteText = document.getElementById("selectedVoteText");
 const confirmVoteBtn = document.getElementById("confirmVoteBtn");
 
-const resultCard = document.getElementById("resultCard");
-const resultText = document.getElementById("resultText");
-
 const endCard = document.getElementById("endCard");
 const endTitle = document.getElementById("endTitle");
 const winnerText = document.getElementById("winnerText");
@@ -84,7 +84,6 @@ const timerText = document.getElementById("timerText");
 
 let audioCtx = null;
 
-// Mobile tabs functionality
 function initMobileTabs() {
   const mobileTabs = document.getElementById("mobileTabs");
   const tabButtons = document.querySelectorAll(".mobile-tab-btn");
@@ -271,6 +270,52 @@ function setStatus(message, important = false) {
   }, important ? 2200 : 1600);
 }
 
+function copyText(text, onSuccess) {
+  if (!text) return;
+
+  const done = () => {
+    if (typeof onSuccess === "function") onSuccess();
+  };
+
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => {
+      const el = document.createElement("textarea");
+      el.value = text;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+      done();
+    });
+    return;
+  }
+
+  const el = document.createElement("textarea");
+  el.value = text;
+  document.body.appendChild(el);
+  el.select();
+  document.execCommand("copy");
+  document.body.removeChild(el);
+  done();
+}
+
+function initTopRoomCopy() {
+  if (!topRoomInfo) return;
+
+  topRoomInfo.style.cursor = "pointer";
+  topRoomInfo.title = "Cliquer pour copier le code";
+
+  topRoomInfo.addEventListener("click", () => {
+    if (!currentRoom?.code) return;
+
+    copyText(currentRoom.code, () => {
+      topRoomInfo.classList.add("copied");
+      setStatus(`Code ${currentRoom.code} copié`);
+      setTimeout(() => topRoomInfo.classList.remove("copied"), 1200);
+    });
+  });
+}
+
 function saveSession(playerId, playerToken, roomCode) {
   myPlayerId = playerId;
   myPlayerToken = playerToken;
@@ -352,10 +397,12 @@ function resetVoteSelection() {
 
 function resetUI() {
   currentRoom = null;
+  window.currentRoom = null;
   currentTurnKey = null;
   autoSubmittedTurnKey = null;
   previousVisiblePlayerIds = [];
   lastTensionSecondPlayed = null;
+  mobileGameActivePanel = "chatCard";
 
   lobby.classList.add("hidden");
   secretCard.classList.add("hidden");
@@ -363,7 +410,6 @@ function resetUI() {
   chatCard.classList.add("hidden");
   waitingCard.classList.add("hidden");
   voteCard.classList.add("hidden");
-  resultCard.classList.add("hidden");
   endCard.classList.add("hidden");
   leaveWrap.classList.add("hidden");
   startWrap.classList.remove("hidden");
@@ -373,6 +419,7 @@ function resetUI() {
   topHostInfo.classList.add("hidden");
   topRoomInfo.textContent = "";
   topHostInfo.textContent = "";
+  topRoomInfo.classList.remove("clickable-room", "copied");
 
   playersList.innerHTML = "";
   messagesList.innerHTML = "";
@@ -384,7 +431,6 @@ function resetUI() {
   phaseInfo.textContent = "";
   speakerInfo.textContent = "";
   wordText.textContent = "";
-  resultText.textContent = "";
   winnerText.textContent = "";
   if (compositionHelp) compositionHelp.textContent = "";
   if (compositionSummary) compositionSummary.textContent = "";
@@ -402,6 +448,7 @@ function resetUI() {
 
   resetVoteSelection();
   stopTimer();
+  updateMobileGamePanels();
   validateStoredSession();
 }
 
@@ -805,7 +852,12 @@ function populateCategorySelect(room) {
   if (!categorySelect || !subcategorySelect) return;
 
   const options = Array.isArray(room.categoryOptions) ? room.categoryOptions : [];
-  const selectedCategory = room.selectedCategory || options[0]?.name || "";
+  const currentValue = categorySelect.value;
+  const selectedCategory =
+    options.find(opt => opt.name === currentValue)?.name ||
+    room.selectedCategory ||
+    options[0]?.name ||
+    "";
 
   categorySelect.innerHTML = "";
   options.forEach((category) => {
@@ -816,7 +868,7 @@ function populateCategorySelect(room) {
     categorySelect.appendChild(option);
   });
 
-  populateSubcategorySelect(room, selectedCategory, room.selectedSubcategory);
+  populateSubcategorySelect(room, selectedCategory, subcategorySelect.value || room.selectedSubcategory);
 }
 
 function populateSubcategorySelect(room, categoryName, preferredSubcategory = null) {
@@ -829,7 +881,9 @@ function populateSubcategorySelect(room, categoryName, preferredSubcategory = nu
   const selectedSubcategory =
     preferredSubcategory && subcategories.includes(preferredSubcategory)
       ? preferredSubcategory
-      : subcategories[0] || "";
+      : room.selectedSubcategory && subcategories.includes(room.selectedSubcategory)
+        ? room.selectedSubcategory
+        : subcategories[0] || "";
 
   subcategorySelect.innerHTML = "";
 
@@ -933,6 +987,8 @@ function renderComposition(room) {
     ` • ${settings.category || "--"} / ${settings.subcategory || "--"}`;
 }
 
+window.renderComposition = renderComposition;
+
 function handlePresenceSounds(room) {
   const currentIds = (room.players || []).map((p) => p.id);
   if (!previousVisiblePlayerIds.length) {
@@ -952,10 +1008,65 @@ function handlePresenceSounds(room) {
   previousVisiblePlayerIds = currentIds;
 }
 
+function updateMobileGamePanels() {
+  const isMobile = window.innerWidth <= 820;
+  const tabs = document.getElementById("mobileGameTabs");
+  if (!tabs) return;
+
+  const panelIds = ["chatCard", "compositionCard", "voteCard"];
+  const phasePanel =
+    currentRoom?.phase === "voting" ? "voteCard" :
+    currentRoom?.phase === "speaking" ? "chatCard" :
+    "compositionCard";
+
+  if (!mobileGameActivePanel || !panelIds.includes(mobileGameActivePanel)) {
+    mobileGameActivePanel = phasePanel;
+  }
+
+  if (!isMobile) {
+    panelIds.forEach((id) => {
+      const panel = document.getElementById(id);
+      if (panel) panel.classList.remove("mobile-hidden-panel");
+    });
+    return;
+  }
+
+  panelIds.forEach((id) => {
+    const panel = document.getElementById(id);
+    if (!panel) return;
+    panel.classList.toggle("mobile-hidden-panel", id !== mobileGameActivePanel);
+  });
+
+  tabs.querySelectorAll(".mobile-game-tab").forEach((btn) => {
+    const isActive = btn.getAttribute("data-panel") === mobileGameActivePanel;
+    btn.classList.toggle("active", isActive);
+  });
+}
+
+function initMobileGameTabs() {
+  const tabs = document.getElementById("mobileGameTabs");
+  if (!tabs) return;
+
+  tabs.querySelectorAll(".mobile-game-tab").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      mobileGameActivePanel = btn.getAttribute("data-panel");
+      updateMobileGamePanels();
+    });
+  });
+
+  window.addEventListener("resize", updateMobileGamePanels);
+}
+
+window.setMobileGameActivePanel = (panelId) => {
+  mobileGameActivePanel = panelId;
+  updateMobileGamePanels();
+};
+
 function renderRoom(room) {
   handlePresenceSounds(room);
 
   currentRoom = room;
+  window.currentRoom = room;
   myRoomCode = room.code;
   localStorage.setItem("roomCode", room.code);
 
@@ -966,6 +1077,7 @@ function renderRoom(room) {
   const host = room.players.find((p) => p.id === room.hostPlayerId);
 
   topRoomInfo.textContent = `Room ${room.code}`;
+  topRoomInfo.classList.add("clickable-room");
   topHostInfo.textContent = host ? `Hôte : ${host.name}` : "Pas d'hôte";
   topRoomInfo.classList.remove("hidden");
   topHostInfo.classList.remove("hidden");
@@ -1012,7 +1124,17 @@ function renderRoom(room) {
 
   renderVoteButtons(room);
   renderEndGame(room);
+
+  if (room.phase === "voting") {
+    mobileGameActivePanel = "voteCard";
+  } else if (room.phase === "speaking") {
+    mobileGameActivePanel = "chatCard";
+  }
+
+  updateMobileGamePanels();
 }
+
+window.renderRoom = renderRoom;
 
 function closeAd(adId) {
   const ad = document.querySelector(`[data-ad="${adId}"]`);
@@ -1240,7 +1362,6 @@ socket.on("roomUpdated", (room) => {
 
 socket.on("gameStarted", ({ word }) => {
   secretCard.classList.remove("hidden");
-  resultCard.classList.add("hidden");
   endCard.classList.add("hidden");
   waitingCard.classList.add("hidden");
   resetVoteSelection();
@@ -1255,15 +1376,12 @@ socket.on("sessionResumed", ({ word }) => {
 });
 
 socket.on("voteResult", (result) => {
-  resultCard.classList.remove("hidden");
   resetVoteSelection();
 
   if (result.tie) {
-    resultText.textContent = "Égalité : personne n'est éliminé.";
+    setStatus("Égalité : personne n'est éliminé.", true);
   } else {
-    resultText.textContent =
-      `${result.eliminated.name} est éliminé.` +
-      ` Son rôle était ${result.eliminated.role}.`;
+    setStatus(`${result.eliminated.name} est éliminé (${result.eliminated.role}).`, true);
   }
 
   playClickSound("vote");
@@ -1271,4 +1389,6 @@ socket.on("voteResult", (result) => {
 
 attachUiSounds();
 initAds();
+initTopRoomCopy();
+initMobileGameTabs();
 validateStoredSession();

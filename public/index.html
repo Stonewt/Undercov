@@ -75,6 +75,7 @@
 
     <div class="topbar">
       <div class="topbar-side topbar-left">
+        <!-- Code room = bouton cliquable pour copier -->
         <button id="topRoomInfo" class="top-meta top-room-clickable hidden" title="Cliquer pour copier le code">
           <span id="topRoomCode"></span>
           <svg class="copy-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -214,8 +215,14 @@
 
       <div class="game-layout">
 
-        <!-- Tabs mobile : 4 onglets fixes -->
-        <div class="mobile-game-tabs" id="mobileGameTabs">
+        <!-- Tabs mobile lobby (avant partie) -->
+        <div class="mobile-game-tabs hidden" id="mobileGameTabsLobby">
+          <button class="mobile-game-tab active" data-tab="joueurs">Joueurs</button>
+          <button class="mobile-game-tab" data-tab="config">⚙ Config</button>
+        </div>
+
+        <!-- Tabs mobile en jeu -->
+        <div class="mobile-game-tabs hidden" id="mobileGameTabs">
           <button class="mobile-game-tab" data-tab="mot">🔤 Ton mot</button>
           <button class="mobile-game-tab active" data-tab="chat">Chat</button>
           <button class="mobile-game-tab" data-tab="compo">Joueurs</button>
@@ -224,7 +231,52 @@
 
         <div class="panel panel-left">
 
-          <!-- PANEL MOT (mobile uniquement) -->
+          <!-- PANEL LOBBY JOUEURS (mobile, avant partie) -->
+          <div class="mobile-panel hidden" id="mobilePanelLobbyJoueurs">
+            <div class="card compact-card">
+              <h3 style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;opacity:.6;margin:0 0 12px;">Joueurs connectés</h3>
+              <ul id="playersListLobbyMobile" class="players-list-mobile"></ul>
+            </div>
+          </div>
+
+          <!-- PANEL LOBBY CONFIG (mobile, avant partie, hôte uniquement) -->
+          <div class="mobile-panel hidden" id="mobilePanelLobbyConfig">
+            <div class="card compact-card" id="compositionCardMobile">
+              <h2>Configuration</h2>
+              <p id="compositionHelpMobile"></p>
+              <div class="form-block">
+                <label for="undercoverCountInputM">Undercovers</label>
+                <input id="undercoverCountInputM" type="number" min="1" step="1" value="1" />
+              </div>
+              <div class="form-block">
+                <label for="mrWhiteCountInputM">Mr White</label>
+                <input id="mrWhiteCountInputM" type="number" min="0" max="1" step="1" value="0" />
+              </div>
+              <div class="form-block">
+                <label for="turnDurationInputM">Durée du tour : <span id="turnDurationDisplayM">30</span> s</label>
+                <input id="turnDurationInputM" type="range" min="15" max="45" step="1" value="30" class="duration-slider" />
+              </div>
+              <div class="form-block">
+                <label for="voteDurationInputM">Durée du vote : <span id="voteDurationDisplayM">30</span> s</label>
+                <input id="voteDurationInputM" type="range" min="15" max="45" step="1" value="30" class="duration-slider" />
+              </div>
+              <div class="form-block">
+                <label for="categorySelectM">Catégorie</label>
+                <select id="categorySelectM"></select>
+              </div>
+              <div class="form-block">
+                <label for="subcategorySelectM">Sous-catégorie</label>
+                <select id="subcategorySelectM"></select>
+              </div>
+              <p id="compositionSummaryM" style="font-size:13px;color:#fdba74;font-weight:600;margin-top:8px;"></p>
+              <div style="margin-top:14px;">
+                <button id="startBtnMobile" class="hidden big-btn">Lancer la partie</button>
+                <button id="restartBtnMobile" class="hidden big-btn" style="margin-top:8px;">Rejouer</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- PANEL MOT (mobile, en jeu) -->
           <div class="mobile-panel hidden" id="mobilePanelMot">
             <div class="card compact-card" id="secretCard">
               <h2>Ton mot</h2>
@@ -277,6 +329,7 @@
           <div class="desktop-only-cards">
             <div class="card hidden compact-card" id="secretCardDesktop">
               <h2>Ton mot</h2>
+              <!-- wordText est partagé, on ne le duplique pas -->
             </div>
 
             <div class="card hidden compact-card" id="compositionCard">
@@ -416,93 +469,181 @@
   <script src="/socket.io/socket.io.js"></script>
   <script src="app.js"></script>
   <script>
+    // ── Sliders durée desktop ──
     const turnSlider = document.getElementById('turnDurationInput');
     const voteSlider = document.getElementById('voteDurationInput');
     const turnDisplay = document.getElementById('turnDurationDisplay');
     const voteDisplay = document.getElementById('voteDurationDisplay');
-    if (turnSlider && turnDisplay) {
-      turnSlider.addEventListener('input', () => { turnDisplay.textContent = turnSlider.value; });
-    }
-    if (voteSlider && voteDisplay) {
-      voteSlider.addEventListener('input', () => { voteDisplay.textContent = voteSlider.value; });
+    if (turnSlider && turnDisplay) turnSlider.addEventListener('input', () => { turnDisplay.textContent = turnSlider.value; });
+    if (voteSlider && voteDisplay) voteSlider.addEventListener('input', () => { voteDisplay.textContent = voteSlider.value; });
+
+    // ── Sliders durée mobile ──
+    const turnSliderM   = document.getElementById('turnDurationInputM');
+    const voteSliderM   = document.getElementById('voteDurationInputM');
+    const turnDisplayM  = document.getElementById('turnDurationDisplayM');
+    const voteDisplayM  = document.getElementById('voteDurationDisplayM');
+    if (turnSliderM && turnDisplayM) turnSliderM.addEventListener('input', () => { turnDisplayM.textContent = turnSliderM.value; syncDesktopFromMobile(); });
+    if (voteSliderM && voteDisplayM) voteSliderM.addEventListener('input', () => { voteDisplayM.textContent = voteSliderM.value; syncDesktopFromMobile(); });
+
+    // Sync mobile inputs → desktop inputs (pour que app.js lise les bonnes valeurs)
+    function syncDesktopFromMobile() {
+      const fields = [
+        ['undercoverCountInputM', 'undercoverCountInput'],
+        ['mrWhiteCountInputM',    'mrWhiteCountInput'],
+        ['turnDurationInputM',    'turnDurationInput'],
+        ['voteDurationInputM',    'voteDurationInput'],
+        ['categorySelectM',       'categorySelect'],
+        ['subcategorySelectM',    'subcategorySelect'],
+      ];
+      fields.forEach(([mId, dId]) => {
+        const m = document.getElementById(mId);
+        const d = document.getElementById(dId);
+        if (m && d) d.value = m.value;
+      });
+      if (turnDisplay) turnDisplay.textContent = document.getElementById('turnDurationInput')?.value || '30';
+      if (voteDisplay) voteDisplay.textContent = document.getElementById('voteDurationInput')?.value || '30';
     }
 
+    // Sync desktop → mobile (pour afficher les valeurs actuelles dans le panel mobile)
+    function syncMobileFromDesktop() {
+      const fields = [
+        ['undercoverCountInput', 'undercoverCountInputM'],
+        ['mrWhiteCountInput',    'mrWhiteCountInputM'],
+        ['turnDurationInput',    'turnDurationInputM'],
+        ['voteDurationInput',    'voteDurationInputM'],
+        ['categorySelect',       'categorySelectM'],
+        ['subcategorySelect',    'subcategorySelectM'],
+      ];
+      fields.forEach(([dId, mId]) => {
+        const d = document.getElementById(dId);
+        const m = document.getElementById(mId);
+        if (d && m) m.value = d.value;
+      });
+      if (turnDisplayM) turnDisplayM.textContent = document.getElementById('turnDurationInputM')?.value || '30';
+      if (voteDisplayM) voteDisplayM.textContent = document.getElementById('voteDurationInputM')?.value || '30';
+    }
+
+    // Sync les options des selects catégorie/sous-catégorie vers mobile
+    function syncCategoryOptionsToMobile(room) {
+      const catM = document.getElementById('categorySelectM');
+      const subM = document.getElementById('subcategorySelectM');
+      const catD = document.getElementById('categorySelect');
+      const subD = document.getElementById('subcategorySelect');
+      if (!catM || !subM || !catD || !subD) return;
+
+      // Copie les options
+      catM.innerHTML = catD.innerHTML;
+      subM.innerHTML = subD.innerHTML;
+      catM.value = catD.value;
+      subM.value = subD.value;
+
+      // Résumé mobile
+      const summaryM = document.getElementById('compositionSummaryM');
+      const summaryD = document.getElementById('compositionSummary');
+      if (summaryM && summaryD) summaryM.textContent = summaryD.textContent;
+
+      // Help mobile
+      const helpM = document.getElementById('compositionHelpMobile');
+      const helpD = document.getElementById('compositionHelp');
+      if (helpM && helpD) helpM.textContent = helpD.textContent;
+
+      // Sync valeurs numériques
+      syncMobileFromDesktop();
+    }
+
+    // Changement de catégorie sur mobile → répercuter sur desktop
+    document.getElementById('categorySelectM')?.addEventListener('change', () => {
+      const catD = document.getElementById('categorySelect');
+      const catM = document.getElementById('categorySelectM');
+      if (catD && catM) {
+        catD.value = catM.value;
+        catD.dispatchEvent(new Event('change'));
+        setTimeout(() => {
+          const subD = document.getElementById('subcategorySelect');
+          const subM = document.getElementById('subcategorySelectM');
+          if (subD && subM) { subM.innerHTML = subD.innerHTML; subM.value = subD.value; }
+        }, 50);
+      }
+    });
+    document.getElementById('subcategorySelectM')?.addEventListener('change', () => {
+      const subD = document.getElementById('subcategorySelect');
+      const subM = document.getElementById('subcategorySelectM');
+      if (subD && subM) subD.value = subM.value;
+      syncDesktopFromMobile();
+    });
+    ['undercoverCountInputM','mrWhiteCountInputM'].forEach(id => {
+      document.getElementById(id)?.addEventListener('input', syncDesktopFromMobile);
+    });
+
+    // ── Code room : clic = copie ──
     const topRoomBtn  = document.getElementById('topRoomInfo');
     const topRoomCode = document.getElementById('topRoomCode');
-
     function updateRoomCodeBtn(roomCode) {
       if (!topRoomBtn || !topRoomCode) return;
-      if (roomCode) {
-        topRoomCode.textContent = 'Room ' + roomCode;
-        topRoomBtn.classList.remove('hidden');
-        topRoomBtn._code = roomCode;
-      } else {
-        topRoomBtn.classList.add('hidden');
-        topRoomBtn._code = null;
-      }
+      if (roomCode) { topRoomCode.textContent = 'Room ' + roomCode; topRoomBtn.classList.remove('hidden'); topRoomBtn._code = roomCode; }
+      else { topRoomBtn.classList.add('hidden'); topRoomBtn._code = null; }
     }
-
     if (topRoomBtn) {
       topRoomBtn.addEventListener('click', () => {
-        const code = topRoomBtn._code;
-        if (!code) return;
-        const flashOk = () => {
-          topRoomBtn.classList.add('copy-flash');
-          setTimeout(() => topRoomBtn.classList.remove('copy-flash'), 900);
-        };
-        if (navigator.clipboard) {
-          navigator.clipboard.writeText(code).then(flashOk).catch(() => {
-            const el = document.createElement('textarea');
-            el.value = code; document.body.appendChild(el); el.select();
-            document.execCommand('copy'); document.body.removeChild(el); flashOk();
-          });
-        } else {
-          const el = document.createElement('textarea');
-          el.value = code; document.body.appendChild(el); el.select();
-          document.execCommand('copy'); document.body.removeChild(el); flashOk();
-        }
+        const code = topRoomBtn._code; if (!code) return;
+        const flashOk = () => { topRoomBtn.classList.add('copy-flash'); setTimeout(() => topRoomBtn.classList.remove('copy-flash'), 900); };
+        if (navigator.clipboard) { navigator.clipboard.writeText(code).then(flashOk).catch(() => { const el = document.createElement('textarea'); el.value = code; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); flashOk(); }); }
+        else { const el = document.createElement('textarea'); el.value = code; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); flashOk(); }
       });
     }
 
-    let _activeTab = 'chat';
-
+    // ── Utilitaires ──
+    let _activeTab     = 'chat';
+    let _activeLobbyTab = 'joueurs';
     function isMobile() { return window.innerWidth <= 820; }
 
+    // ── Onglets EN JEU ──
     function showMobileTab(tabName) {
       if (!isMobile()) return;
       _activeTab = tabName;
-
-      document.querySelectorAll('.mobile-game-tab').forEach(b => {
-        b.classList.toggle('active', b.getAttribute('data-tab') === tabName);
-      });
-
-      document.querySelectorAll('.mobile-panel').forEach(p => p.classList.add('hidden'));
-
-      const map = {
-        'mot':   'mobilePanelMot',
-        'chat':  'mobilePanelChat',
-        'compo': 'mobilePanelCompo',
-        'vote':  'mobilePanelVote',
-      };
-      const panelId = map[tabName];
-      if (panelId) document.getElementById(panelId)?.classList.remove('hidden');
-
-      if (tabName === 'compo' && window.currentRoom) {
-        syncMobilePlayersList(window.currentRoom);
-        syncMobileRoleDolls(window.currentRoom);
-      }
+      document.querySelectorAll('#mobileGameTabs .mobile-game-tab').forEach(b => b.classList.toggle('active', b.getAttribute('data-tab') === tabName));
+      ['mobilePanelMot','mobilePanelChat','mobilePanelCompo','mobilePanelVote'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
+      const map = { 'mot':'mobilePanelMot', 'chat':'mobilePanelChat', 'compo':'mobilePanelCompo', 'vote':'mobilePanelVote' };
+      if (map[tabName]) document.getElementById(map[tabName])?.classList.remove('hidden');
+      if (tabName === 'compo' && window.currentRoom) { syncMobilePlayersList(window.currentRoom); syncMobileRoleDolls(window.currentRoom); }
     }
 
+    // ── Onglets LOBBY ──
+    function showLobbyTab(tabName) {
+      if (!isMobile()) return;
+      _activeLobbyTab = tabName;
+      document.querySelectorAll('#mobileGameTabsLobby .mobile-game-tab').forEach(b => b.classList.toggle('active', b.getAttribute('data-tab') === tabName));
+      ['mobilePanelLobbyJoueurs','mobilePanelLobbyConfig'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
+      const map = { 'joueurs':'mobilePanelLobbyJoueurs', 'config':'mobilePanelLobbyConfig' };
+      if (map[tabName]) document.getElementById(map[tabName])?.classList.remove('hidden');
+    }
+
+    // ── Sync liste joueurs lobby mobile ──
+    function syncLobbyPlayersList(room) {
+      const ul = document.getElementById('playersListLobbyMobile');
+      if (!ul || !room) return;
+      ul.innerHTML = '';
+      (room.players || []).forEach(p => {
+        const li = document.createElement('li');
+        li.className = 'players-list-mobile-item';
+        let label = p.name;
+        if (p.id === window.myPlayerId) label += ' (toi)';
+        if (p.id === room.hostPlayerId) label += ' 👑';
+        li.textContent = label;
+        ul.appendChild(li);
+      });
+    }
+
+    // ── Sync liste joueurs en jeu mobile ──
     function syncMobilePlayersList(room) {
       const ul = document.getElementById('playersListMobile');
       if (!ul || !room) return;
       ul.innerHTML = '';
-      const players = room.players || [];
-      players.forEach(p => {
+      (room.players || []).forEach(p => {
         const li = document.createElement('li');
         li.className = 'players-list-mobile-item' + (p.eliminated ? ' player-dead' : '') + (p.id === room.currentSpeakerId && room.phase === 'speaking' ? ' player-current' : '');
         let label = p.name;
-        if (p.id === (window.myPlayerId)) label += ' (toi)';
+        if (p.id === window.myPlayerId) label += ' (toi)';
         if (p.id === room.hostPlayerId) label += ' 👑';
         if (p.eliminated) label += ' · éliminé';
         li.textContent = label;
@@ -514,11 +655,11 @@
       const container = document.getElementById('roleDollsMobile');
       if (!container || !room) return;
       container.innerHTML = '';
-      const composition = room.roleComposition || {};
+      const c = room.roleComposition || {};
       const dolls = [];
-      for (let i = 0; i < (composition.civil || 0); i++) dolls.push('civil');
-      for (let i = 0; i < (composition.undercover || 0); i++) dolls.push('undercover');
-      for (let i = 0; i < (composition.mrwhite || 0); i++) dolls.push('mrwhite');
+      for (let i = 0; i < (c.civil || 0); i++) dolls.push('civil');
+      for (let i = 0; i < (c.undercover || 0); i++) dolls.push('undercover');
+      for (let i = 0; i < (c.mrwhite || 0); i++) dolls.push('mrwhite');
       dolls.forEach(role => {
         const d = document.createElement('div');
         d.className = 'role-doll ' + role;
@@ -527,26 +668,76 @@
       });
     }
 
+    // ── Boutons lancer/rejouer mobile → délèguent au desktop ──
+    document.getElementById('startBtnMobile')?.addEventListener('click', () => {
+      syncDesktopFromMobile();
+      document.getElementById('startBtn')?.click();
+    });
+    document.getElementById('restartBtnMobile')?.addEventListener('click', () => {
+      syncDesktopFromMobile();
+      document.getElementById('restartBtn')?.click();
+    });
+
+    // ── updateMobileGameTabs : appelé à chaque renderRoom ──
     function updateMobileGameTabs(room) {
       if (!isMobile()) return;
 
-      const tabs = document.getElementById('mobileGameTabs');
-      if (!tabs) return;
+      const lobbyTabs  = document.getElementById('mobileGameTabsLobby');
+      const gameTabs   = document.getElementById('mobileGameTabs');
+      if (!lobbyTabs || !gameTabs) return;
 
-      if (!room || !room.started) {
-        tabs.style.display = 'none';
+      const isHost   = room && room.hostPlayerId === window.myPlayerId;
+      const started  = room && room.started;
+      const gameOver = room && room.gameOver;
+
+      if (!room) {
+        lobbyTabs.style.display = 'none';
+        gameTabs.style.display  = 'none';
         document.querySelectorAll('.mobile-panel').forEach(p => p.classList.add('hidden'));
         return;
       }
 
-      tabs.style.display = '';
+      if (!started || gameOver) {
+        // LOBBY
+        lobbyTabs.style.display = '';
+        gameTabs.style.display  = 'none';
 
-      const isVoting = room.phase === 'voting' && !room.gameOver;
+        // Cacher l'onglet Config si pas hôte
+        const configTab = lobbyTabs.querySelector('[data-tab="config"]');
+        if (configTab) configTab.style.display = isHost ? '' : 'none';
 
-      const voteTabBtn = tabs.querySelector('.vote-tab');
-      if (voteTabBtn) {
-        voteTabBtn.classList.toggle('vote-tab-active-phase', isVoting);
+        // Sync options catégorie vers mobile
+        syncCategoryOptionsToMobile(room);
+
+        // Boutons lancer/rejouer mobiles
+        const startBtnM   = document.getElementById('startBtnMobile');
+        const restartBtnM = document.getElementById('restartBtnMobile');
+        const startBtnD   = document.getElementById('startBtn');
+        const restartBtnD = document.getElementById('restartBtn');
+        if (startBtnM)   startBtnM.classList.toggle('hidden',   !isHost || started);
+        if (restartBtnM) restartBtnM.classList.toggle('hidden', !isHost || !gameOver);
+        if (startBtnD)   startBtnD.classList.add('hidden');
+        if (restartBtnD) restartBtnD.classList.add('hidden');
+
+        // Sync liste joueurs lobby
+        syncLobbyPlayersList(room);
+
+        // Afficher le bon panel lobby
+        if (_activeLobbyTab === 'config' && !isHost) {
+          showLobbyTab('joueurs');
+        } else {
+          showLobbyTab(_activeLobbyTab);
+        }
+        return;
       }
+
+      // EN JEU
+      lobbyTabs.style.display = 'none';
+      gameTabs.style.display  = '';
+
+      const isVoting = room.phase === 'voting';
+      const voteTabBtn = gameTabs.querySelector('.vote-tab');
+      if (voteTabBtn) voteTabBtn.classList.toggle('vote-tab-active-phase', isVoting);
 
       const voteCard     = document.getElementById('voteCard');
       const voteNotReady = document.getElementById('voteNotReadyCard');
@@ -555,24 +746,17 @@
         voteNotReady.classList.toggle('hidden', isVoting);
       }
 
-      if (isVoting && _activeTab !== 'vote') {
-        showMobileTab('vote');
-      }
-
-      if (room.gameOver && _activeTab === 'vote') {
-        showMobileTab('chat');
-      }
-
-      if (_activeTab === 'compo') {
-        syncMobilePlayersList(room);
-        syncMobileRoleDolls(room);
-      }
+      if (isVoting && _activeTab !== 'vote') showMobileTab('vote');
+      if (gameOver && _activeTab === 'vote') showMobileTab('chat');
+      if (_activeTab === 'compo') { syncMobilePlayersList(room); syncMobileRoleDolls(room); }
 
       showMobileTab(_activeTab);
     }
 
+    // ── Init au chargement ──
     window.addEventListener('load', () => {
 
+      // Patch renderRoom
       if (typeof renderRoom === 'function') {
         const _orig = renderRoom;
         window.renderRoom = function(room) {
@@ -582,6 +766,7 @@
         };
       }
 
+      // Fix catégorie desktop
       const catSelect = document.getElementById('categorySelect');
       const subSelect = document.getElementById('subcategorySelect');
       if (catSelect && subSelect) {
@@ -597,26 +782,34 @@
               if (name === prevVal || i === 0) opt.selected = (name === prevVal || i === 0);
               subSelect.appendChild(opt);
             });
-            if (typeof renderComposition === 'function' && window.currentRoom) {
-              renderComposition(window.currentRoom);
-            }
+            if (typeof renderComposition === 'function' && window.currentRoom) renderComposition(window.currentRoom);
+            // Répercuter sur mobile
+            const catM = document.getElementById('categorySelectM');
+            const subM = document.getElementById('subcategorySelectM');
+            if (catM) catM.value = catSelect.value;
+            if (subM) { subM.innerHTML = subSelect.innerHTML; subM.value = subSelect.value; }
           }
         });
       }
 
-      document.querySelectorAll('.mobile-game-tab').forEach(btn => {
-        btn.addEventListener('click', () => {
-          showMobileTab(btn.getAttribute('data-tab'));
-        });
+      // Clics onglets en jeu
+      document.querySelectorAll('#mobileGameTabs .mobile-game-tab').forEach(btn => {
+        btn.addEventListener('click', () => showMobileTab(btn.getAttribute('data-tab')));
       });
 
-      const _origSocket = window.socket;
-      if (_origSocket) {
-        _origSocket.on && _origSocket.on('gameStarted', () => {
+      // Clics onglets lobby
+      document.querySelectorAll('#mobileGameTabsLobby .mobile-game-tab').forEach(btn => {
+        btn.addEventListener('click', () => showLobbyTab(btn.getAttribute('data-tab')));
+      });
+
+      // Quand la partie démarre → aller sur "Ton mot"
+      if (window.socket) {
+        window.socket.on('gameStarted', () => {
           if (isMobile()) setTimeout(() => showMobileTab('mot'), 100);
         });
       }
     });
   </script>
+
 </body>
 </html>

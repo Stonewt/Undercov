@@ -514,25 +514,25 @@ body::after {
 }
 
 .start-subtitle {
-  margin: 0 0 24px;
+  margin: 0 0 1.4vw;
   text-align: center;
-  font-size: 16px;
+  font-size: 1.1vw;
   opacity: 0.70;
 }
 
 .rules-card h3 {
-  margin-bottom: 16px;
+  margin-bottom: 1vw;
   color: #fdba74;
-  font-size: 26px;
+  font-size: 1.7vw;
   font-weight: 700;
 }
 
 .rules-card ul {
   margin: 0;
-  padding-left: 18px;
+  padding-left: 1.2vw;
   display: grid;
-  gap: 10px;
-  font-size: 14.5px;
+  gap: 0.7vw;
+  font-size: 1.05vw;
   line-height: 1.55;
   opacity: 0.88;
 }
@@ -545,21 +545,21 @@ body::after {
   color: rgba(224,122,32,0.7);
 }
 
-.form-block { margin-bottom: 18px; }
+.form-block { margin-bottom: 1.1vw; }
 
 .form-block label {
   display: block;
-  margin-bottom: 8px;
-  font-size: 14px;
+  margin-bottom: 0.5vw;
+  font-size: 1vw;
   opacity: 0.85;
   font-weight: 500;
 }
 
 .separator {
   text-align: center;
-  margin: 18px 0;
+  margin: 1vw 0;
   opacity: 0.55;
-  font-size: 14px;
+  font-size: 1vw;
   position: relative;
 }
 
@@ -1527,9 +1527,10 @@ button:disabled {
     height: 100%;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 0;
     margin: 0;
-    padding: 8px;
+    padding: 0;
+    overflow: hidden;
   }
 
   .panel-left {
@@ -1539,26 +1540,29 @@ button:disabled {
     gap: 8px;
     overflow-x: auto;
     overflow-y: hidden;
-    padding-bottom: 2px;
+    padding: 8px 8px 4px;
     scrollbar-width: none;
-    min-height: 0;
     flex-shrink: 0;
+    min-height: 0;
   }
 
   .panel-left::-webkit-scrollbar { display: none; }
 
   .panel-left .card {
-    min-width: 240px;
-    max-width: 240px;
+    min-width: 75vw;
+    max-width: 75vw;
     flex: 0 0 auto;
-    padding: 12px;
+    padding: 14px;
     border-radius: 16px;
+    overflow-y: auto;
   }
 
   .panel-center {
     order: 2;
     flex: 1 1 auto;
     min-height: 0;
+    padding: 4px 8px 8px;
+    overflow: hidden;
   }
 
   .room-card {
@@ -1566,38 +1570,48 @@ button:disabled {
     min-height: 0;
     padding: 10px;
     border-radius: 18px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
 
-  .timer-wrap { margin-bottom: 8px; }
-  .timer-bar { height: 5px; }
-  .timer-label, .timer-text { font-size: 12px; }
+  .timer-wrap { margin-bottom: 6px; flex-shrink: 0; }
+  .timer-bar { height: 4px; }
+  .timer-label, .timer-text { font-size: 11px; }
 
   .room-content {
     grid-template-columns: 1fr;
-    gap: 8px;
+    gap: 6px;
     overflow: hidden;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
   }
 
   .players-box,
   .chat-box,
   .end-box,
   .waiting-box {
-    border-radius: 14px;
+    border-radius: 12px;
     padding: 10px;
   }
 
   .players-box {
     flex: 0 0 auto;
-    max-height: 140px;
+    max-height: 130px;
+    overflow-y: auto;
   }
 
-  .players-box h3 { margin-bottom: 7px; font-size: 11px; }
-  .players-box ul { gap: 6px; }
-  .players-box li { padding: 7px 9px; font-size: 13px; }
+  .players-box h3 { margin-bottom: 6px; font-size: 11px; }
+  .players-box ul { gap: 5px; }
+  .players-box li { padding: 6px 8px; font-size: 12px; }
   .players-box li .player-sub { font-size: 11px; }
 
   .chat-box, .waiting-box, .end-box {
     flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
     min-height: 0;
   }
 

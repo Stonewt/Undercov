@@ -689,8 +689,8 @@ function assignRoles(roomCode, composition, settings = {}) {
     throw new Error("Aucune paire de mots disponible dans cette sous-catégorie");
   }
 
-  const [civilWord, undercoverWord] =
-    availablePairs[Math.floor(Math.random() * availablePairs.length)];
+  const pair = availablePairs[Math.floor(Math.random() * availablePairs.length)];
+  const [civilWord, undercoverWord] = Math.random() < 0.5 ? pair : [pair[1], pair[0]];
 
   players.forEach((player, index) => {
     let role = "civil";

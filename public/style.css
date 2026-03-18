@@ -275,7 +275,6 @@ body::after {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  align-items: stretch;
   position: relative;
   z-index: 1;
 }
@@ -302,8 +301,8 @@ body::after {
 }
 
 .brand-logo-svg {
-  width: 36px;
-  height: 36px;
+  width: 48px;
+  height: 48px;
   flex-shrink: 0;
 }
 
@@ -366,42 +365,29 @@ body::after {
 
 .page-center {
   flex: 1 1 auto;
-  display: flex;
-  align-items: stretch;
-  justify-content: stretch;
   position: relative;
   z-index: 10;
   width: 100%;
-  padding: 0 32px 40px;
+  padding: 32px 32px 48px;
 }
 
 /* ===== LANDING / ACCUEIL ===== */
 .start-screen {
   width: 100%;
-  flex: 1;
-  display: flex;
-  align-items: flex-start;
-  justify-content: stretch;
-  padding: 40px 0;
+  display: block;
 }
 
 .landing-stack {
   width: 100%;
-  flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: stretch;
   gap: 28px;
+  max-width: 1600px;
 }
 
 /* Logo caché sur desktop */
 .landing-header {
   display: none;
-}
-
-/* Cards connexion + règles */
-.landing-cards {
-  width: 100%;
 }
 
 /* Mobile tabs */
@@ -450,14 +436,13 @@ body::after {
   50% { transform: translateY(-10px); }
 }
 
-/* Cards centrees */
+/* Cards */
 .landing-cards {
   width: 100%;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 24px;
   align-items: stretch;
-  flex: 1;
 }
 
 .login-card,

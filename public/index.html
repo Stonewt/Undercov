@@ -11,22 +11,17 @@
 </head>
 <body>
 
-  <!-- Grain overlay for depth -->
   <div class="grain-overlay" aria-hidden="true"></div>
-
-  <!-- Floating background orbs -->
   <div class="bg-orb bg-orb-1" aria-hidden="true"></div>
   <div class="bg-orb bg-orb-2" aria-hidden="true"></div>
   <div class="bg-orb bg-orb-3" aria-hidden="true"></div>
 
-  <!-- Intro splash -->
   <div id="introOverlay" class="intro-overlay">
     <div id="introScene" class="intro-scene">
       <div class="logo-scene">
         <div class="g1"></div>
         <div class="g2"></div>
         <div class="dots"></div>
-
         <div class="logo-mark">
           <svg width="140" height="140" viewBox="0 0 140 140" xmlns="http://www.w3.org/2000/svg">
             <defs>
@@ -48,49 +43,36 @@
                 <ellipse cx="70" cy="70" rx="46" ry="28"/>
               </clipPath>
             </defs>
-
             <circle class="pulse" cx="70" cy="70" r="38" fill="none" stroke="rgba(80,130,255,0.3)" stroke-width="1"/>
             <circle class="pulse2" cx="70" cy="70" r="38" fill="none" stroke="rgba(80,130,255,0.2)" stroke-width="1"/>
-
-            <path d="M14 62 Q14 30 70 26 Q126 30 126 62 Q126 78 110 78 Q96 72 70 72 Q44 72 30 78 Q14 78 14 62Z"
-                  fill="#0d1530" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
-
+            <path d="M14 62 Q14 30 70 26 Q126 30 126 62 Q126 78 110 78 Q96 72 70 72 Q44 72 30 78 Q14 78 14 62Z" fill="#0d1530" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
             <ellipse cx="44" cy="58" rx="18" ry="13" fill="#080b16"/>
             <ellipse cx="96" cy="58" rx="18" ry="13" fill="#080b16"/>
-
             <ellipse cx="44" cy="58" rx="14" ry="10" fill="url(#introIrisGrad)"/>
             <ellipse cx="44" cy="58" rx="7" ry="7" fill="url(#introPupilGrad)"/>
             <ellipse cx="41" cy="55" rx="2" ry="2" fill="rgba(255,255,255,0.4)"/>
-
             <ellipse cx="96" cy="58" rx="14" ry="10" fill="url(#introIrisAmber)"/>
             <ellipse cx="96" cy="58" rx="7" ry="7" fill="url(#introPupilGrad)"/>
             <ellipse cx="93" cy="55" rx="2" ry="2" fill="rgba(255,255,255,0.35)"/>
-
             <g clip-path="url(#eyeClip)" transform="translate(52,0)">
               <rect class="scan-line" x="-4" y="50" width="36" height="1.5" rx="1" fill="rgba(224,122,32,0.9)"/>
             </g>
-
             <path d="M58 72 Q70 80 82 72" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="1.5"/>
-            <path d="M14 62 Q14 30 70 26 Q126 30 126 62 Q126 78 110 78 Q96 72 70 72 Q44 72 30 78 Q14 78 14 62Z"
-                  fill="none" stroke="rgba(80,130,255,0.2)" stroke-width="1"/>
+            <path d="M14 62 Q14 30 70 26 Q126 30 126 62 Q126 78 110 78 Q96 72 70 72 Q44 72 30 78 Q14 78 14 62Z" fill="none" stroke="rgba(80,130,255,0.2)" stroke-width="1"/>
           </svg>
         </div>
-
         <div class="wordmark">
           <span class="word-under">UNDER</span>
           <span class="word-cover">COVER</span>
         </div>
-
         <div class="sep"></div>
         <div class="tagline">Qui ment parmi vous ?</div>
       </div>
     </div>
   </div>
 
-  <!-- App -->
   <div class="app-shell">
 
-    <!-- Topbar -->
     <div class="topbar">
       <div class="topbar-side topbar-left">
         <div id="topRoomInfo" class="top-meta hidden"></div>
@@ -137,22 +119,15 @@
       <div id="statusBanner" class="status-banner hidden"></div>
     </div>
 
-    <!-- Main content -->
     <main class="page-center">
 
-      <!-- ===== LANDING ===== -->
       <div class="start-screen" id="startWrap">
         <div class="landing-stack">
 
-          <!-- Logo mobile uniquement -->
           <div class="landing-header">
             <div class="logo-free">
-              <svg width="220" height="220" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+              <svg width="120" height="120" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
                 <defs>
-                  <radialGradient id="bgGlowHome" cx="50%" cy="50%" r="50%">
-                    <stop offset="0%" stop-color="#1a3796" stop-opacity="0.4"/>
-                    <stop offset="100%" stop-color="#080b16" stop-opacity="0"/>
-                  </radialGradient>
                   <radialGradient id="irisGradHome" cx="50%" cy="50%" r="50%">
                     <stop offset="0%" stop-color="#5a9fff"/>
                     <stop offset="60%" stop-color="#1a4fcc"/>
@@ -167,33 +142,13 @@
                     <stop offset="55%" stop-color="#a04e0a"/>
                     <stop offset="100%" stop-color="#3a1500"/>
                   </radialGradient>
-                  <radialGradient id="warmGlowHome" cx="60%" cy="70%" r="50%">
-                    <stop offset="0%" stop-color="#c85a0f" stop-opacity="0.25"/>
-                    <stop offset="100%" stop-color="#080b16" stop-opacity="0"/>
-                  </radialGradient>
-                  <pattern id="dotsHome" x="0" y="0" width="30" height="30" patternUnits="userSpaceOnUse">
-                    <circle cx="1" cy="1" r="1" fill="rgba(80,120,220,0.10)"/>
-                  </pattern>
                 </defs>
-
-                <rect width="400" height="400" rx="32" fill="none"/>
-                <ellipse cx="200" cy="160" rx="220" ry="160" fill="url(#bgGlowHome)"/>
-                <ellipse cx="260" cy="300" rx="180" ry="130" fill="url(#warmGlowHome)"/>
-                <rect width="400" height="400" rx="32" fill="url(#dotsHome)" opacity="0.55"/>
-
-                <circle cx="200" cy="178" r="108" fill="none" stroke="rgba(80,130,255,0.18)" stroke-width="1"/>
-                <circle cx="200" cy="178" r="122" fill="none" stroke="rgba(80,130,255,0.10)" stroke-width="1"/>
-
-                <path d="M84 168 Q84 100 200 90 Q316 100 316 168 Q316 200 292 200 Q264 192 200 192 Q136 192 108 200 Q84 200 84 168Z"
-                      fill="#0d1530" stroke="rgba(80,130,255,0.22)" stroke-width="1.2"/>
-
+                <path d="M84 168 Q84 100 200 90 Q316 100 316 168 Q316 200 292 200 Q264 192 200 192 Q136 192 108 200 Q84 200 84 168Z" fill="#0d1530" stroke="rgba(80,130,255,0.22)" stroke-width="1.2"/>
                 <ellipse cx="148" cy="158" rx="44" ry="32" fill="#080b16"/>
                 <ellipse cx="252" cy="158" rx="44" ry="32" fill="#080b16"/>
-
                 <ellipse cx="148" cy="158" rx="36" ry="26" fill="url(#irisGradHome)"/>
                 <ellipse cx="148" cy="158" rx="18" ry="18" fill="url(#pupilGradHome)"/>
                 <ellipse cx="140" cy="150" rx="5" ry="5" fill="rgba(255,255,255,0.38)"/>
-
                 <ellipse cx="252" cy="158" rx="36" ry="26" fill="url(#irisAmberHome)"/>
                 <ellipse cx="252" cy="158" rx="18" ry="18" fill="url(#pupilGradHome)"/>
                 <ellipse cx="244" cy="150" rx="5" ry="5" fill="rgba(255,255,255,0.32)"/>
@@ -201,7 +156,6 @@
             </div>
           </div>
 
-          <!-- Cards connexion + règles -->
           <div class="landing-cards">
             <section class="login-card" id="roomSetupCard">
               <div class="start-content start-content-full">
@@ -211,20 +165,16 @@
                 <div class="form-block hidden" id="resumeBlock">
                   <button id="resumeBtn" class="big-btn">Reprendre ma partie</button>
                 </div>
-
                 <div class="separator hidden" id="resumeSeparator">ou</div>
 
                 <div class="form-block">
                   <label for="nameInput">Pseudo</label>
                   <input id="nameInput" maxlength="20" placeholder="Ton pseudo" autocomplete="off" />
                 </div>
-
                 <div class="form-block">
                   <button id="createBtn" class="big-btn">Créer une room</button>
                 </div>
-
                 <div class="separator">ou</div>
-
                 <div class="join-row">
                   <input id="roomInput" placeholder="Code room" maxlength="8" autocomplete="off" style="text-transform:uppercase" />
                   <button id="joinBtn" class="big-btn">Rejoindre</button>
@@ -250,7 +200,6 @@
             </section>
           </div>
 
-          <!-- Mobile tabs -->
           <div class="mobile-tabs hidden" id="mobileTabs">
             <button class="mobile-tab-btn active" data-tab="login">Connexion</button>
             <button class="mobile-tab-btn" data-tab="rules">Règles</button>
@@ -259,55 +208,44 @@
         </div>
       </div>
 
-      <!-- ===== GAME ===== -->
       <div class="game-layout">
         <div class="panel panel-left">
 
-          <!-- Ton mot -->
           <div class="card hidden compact-card" id="secretCard">
             <h2>Ton mot</h2>
             <p id="wordText"></p>
           </div>
 
-          <!-- Config (hôte) -->
           <div class="card hidden compact-card" id="compositionCard">
             <h2>Configuration</h2>
             <p id="compositionHelp"></p>
-
             <div class="form-block">
               <label for="undercoverCountInput">Undercovers</label>
               <input id="undercoverCountInput" type="number" min="1" step="1" value="1" />
             </div>
-
             <div class="form-block">
               <label for="mrWhiteCountInput">Mr White</label>
               <input id="mrWhiteCountInput" type="number" min="0" max="1" step="1" value="0" />
             </div>
-
             <div class="form-block">
               <label for="turnDurationInput">Durée tour (15–45 s)</label>
               <input id="turnDurationInput" type="number" min="15" max="45" step="1" value="30" />
             </div>
-
             <div class="form-block">
               <label for="voteDurationInput">Durée vote (15–45 s)</label>
               <input id="voteDurationInput" type="number" min="15" max="45" step="1" value="30" />
             </div>
-
             <div class="form-block">
               <label for="categorySelect">Catégorie</label>
               <select id="categorySelect"></select>
             </div>
-
             <div class="form-block">
               <label for="subcategorySelect">Sous-catégorie</label>
               <select id="subcategorySelect"></select>
             </div>
-
             <p id="compositionSummary"></p>
           </div>
 
-          <!-- Vote -->
           <div class="card hidden compact-card" id="voteCard">
             <h2>Vote</h2>
             <div id="voteButtons"></div>
@@ -317,7 +255,6 @@
             </div>
           </div>
 
-          <!-- Résultat vote -->
           <div class="card hidden compact-card" id="resultCard">
             <h2>Résultat</h2>
             <p id="resultText"></p>
@@ -325,11 +262,9 @@
 
         </div>
 
-        <!-- Panel centre — la room -->
         <div class="panel panel-center">
           <div class="card room-card hidden" id="lobby">
 
-            <!-- Timer -->
             <div class="timer-wrap">
               <div class="timer-header-line">
                 <div class="timer-label">Temps restant</div>
@@ -342,24 +277,20 @@
 
             <div class="room-content">
 
-              <!-- Joueurs -->
               <div class="players-box">
                 <h3>Joueurs</h3>
                 <ul id="playersList"></ul>
               </div>
 
-              <!-- Chat en jeu -->
               <div class="chat-box hidden" id="chatCard">
                 <div class="chat-top-infos">
                   <p id="phaseInfo" class="phase-line"></p>
                   <p id="speakerInfo" class="speaker-line"></p>
                 </div>
-
                 <div class="role-dolls-wrap">
                   <div class="role-dolls-title">Composition</div>
                   <div id="roleDolls" class="role-dolls"></div>
                 </div>
-
                 <h3 style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;opacity:.6;margin:0 0 8px;">Chat de la manche</h3>
                 <div id="messagesList" class="messages"></div>
                 <div class="row">
@@ -369,16 +300,13 @@
                 <p id="chatHelp"></p>
               </div>
 
-              <!-- Salle d'attente (non-hôte) -->
               <div class="waiting-box hidden" id="waitingCard">
                 <h2 class="waiting-title">Salon d'attente</h2>
                 <p id="waitingText">En attente du lancement par l'hôte…</p>
-
                 <div class="role-dolls-wrap">
                   <div class="role-dolls-title">Composition</div>
                   <div id="waitingRoleDolls" class="role-dolls"></div>
                 </div>
-
                 <div class="waiting-meta">
                   <div class="waiting-meta-item">
                     <span class="waiting-meta-label">Catégorie</span>
@@ -399,7 +327,6 @@
                 </div>
               </div>
 
-              <!-- Fin de partie -->
               <div class="end-box hidden" id="endCard">
                 <h2 id="endTitle">Fin de partie</h2>
                 <p id="winnerText"></p>
@@ -408,7 +335,6 @@
 
             </div>
 
-            <!-- Actions bas -->
             <div class="room-actions room-actions-bottom">
               <button id="startBtn" class="hidden">Lancer la partie</button>
               <button id="restartBtn" class="hidden">Rejouer</button>

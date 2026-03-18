@@ -1522,51 +1522,59 @@ button:disabled {
   }
 
   /* ── Game mobile ── */
+
+  /* Le game-layout prend tout l'espace restant sous la topbar */
   .game-layout {
     width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
-    gap: 0;
     margin: 0;
     padding: 0;
     overflow: hidden;
   }
 
+  /* Panel gauche = bande horizontale scrollable en haut */
   .panel-left {
     order: 1;
+    flex: 0 0 auto;
     display: flex;
     flex-direction: row;
     gap: 8px;
     overflow-x: auto;
     overflow-y: hidden;
-    padding: 8px 8px 4px;
+    padding: 8px;
     scrollbar-width: none;
-    flex-shrink: 0;
-    min-height: 0;
+    -webkit-overflow-scrolling: touch;
   }
 
   .panel-left::-webkit-scrollbar { display: none; }
 
+  /* Chaque card du panel gauche = 80vw de large, hauteur auto, scrollable verticalement */
   .panel-left .card {
-    min-width: 75vw;
-    max-width: 75vw;
+    min-width: 80vw;
+    max-width: 80vw;
     flex: 0 0 auto;
     padding: 14px;
     border-radius: 16px;
     overflow-y: auto;
+    max-height: 45vh;
+    -webkit-overflow-scrolling: touch;
   }
 
+  /* Panel centre = prend tout le reste de la hauteur */
   .panel-center {
     order: 2;
     flex: 1 1 auto;
     min-height: 0;
-    padding: 4px 8px 8px;
+    padding: 0 8px 8px;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
   }
 
   .room-card {
-    height: 100%;
+    flex: 1 1 auto;
     min-height: 0;
     padding: 10px;
     border-radius: 18px;
@@ -1582,11 +1590,11 @@ button:disabled {
   .room-content {
     grid-template-columns: 1fr;
     gap: 6px;
-    overflow: hidden;
     flex: 1 1 auto;
     min-height: 0;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
   }
 
   .players-box,
@@ -1599,7 +1607,7 @@ button:disabled {
 
   .players-box {
     flex: 0 0 auto;
-    max-height: 130px;
+    max-height: 120px;
     overflow-y: auto;
   }
 
@@ -1612,7 +1620,6 @@ button:disabled {
     flex: 1 1 auto;
     min-height: 0;
     overflow: hidden;
-    min-height: 0;
   }
 
   .messages { padding: 8px; margin-bottom: 6px; }

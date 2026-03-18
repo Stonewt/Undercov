@@ -117,6 +117,12 @@
       </div>
 
       <div id="statusBanner" class="status-banner hidden"></div>
+      <div id="copyCodeWrap" class="copy-code-wrap hidden">
+        <button id="copyCodeBtn" class="copy-code-btn" title="Copier le code">
+          <span id="copyCodeLabel"></span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+      </div>
     </div>
 
     <main class="page-center">
@@ -161,12 +167,10 @@
               <div class="start-content start-content-full">
                 <h2>Se connecter à une salle</h2>
                 <p class="start-subtitle">Crée une room ou rejoins-en une avec un code.</p>
-
                 <div class="form-block hidden" id="resumeBlock">
                   <button id="resumeBtn" class="big-btn">Reprendre ma partie</button>
                 </div>
                 <div class="separator hidden" id="resumeSeparator">ou</div>
-
                 <div class="form-block">
                   <label for="nameInput">Pseudo</label>
                   <input id="nameInput" maxlength="20" placeholder="Ton pseudo" autocomplete="off" />
@@ -349,21 +353,86 @@
   <script src="/socket.io/socket.io.js"></script>
   <script src="app.js"></script>
   <script>
+    // Sliders durée
     const turnSlider = document.getElementById('turnDurationInput');
     const voteSlider = document.getElementById('voteDurationInput');
     const turnDisplay = document.getElementById('turnDurationDisplay');
     const voteDisplay = document.getElementById('voteDurationDisplay');
-
     if (turnSlider && turnDisplay) {
-      turnSlider.addEventListener('input', () => {
-        turnDisplay.textContent = turnSlider.value;
-      });
+      turnSlider.addEventListener('input', () => { turnDisplay.textContent = turnSlider.value; });
     }
     if (voteSlider && voteDisplay) {
-      voteSlider.addEventListener('input', () => {
-        voteDisplay.textContent = voteSlider.value;
+      voteSlider.addEventListener('input', () => { voteDisplay.textContent = voteSlider.value; });
+    }
+
+    // Bouton copier le code
+    const copyCodeBtn = document.getElementById('copyCodeBtn');
+    const copyCodeWrap = document.getElementById('copyCodeWrap');
+    const copyCodeLabel = document.getElementById('copyCodeLabel');
+
+    function updateCopyBtn(roomCode) {
+      if (!copyCodeWrap || !copyCodeLabel) return;
+      if (roomCode) {
+        copyCodeLabel.textContent = roomCode;
+        copyCodeWrap.classList.remove('hidden');
+      } else {
+        copyCodeWrap.classList.add('hidden');
+      }
+    }
+
+    if (copyCodeBtn) {
+      copyCodeBtn.addEventListener('click', () => {
+        const code = copyCodeLabel.textContent;
+        if (!code) return;
+        const confirm = () => {
+          copyCodeBtn.style.background = 'rgba(34,197,94,0.25)';
+          copyCodeBtn.style.borderColor = 'rgba(34,197,94,0.5)';
+          setTimeout(() => { copyCodeBtn.style.background = ''; copyCodeBtn.style.borderColor = ''; }, 1200);
+        };
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(code).then(confirm).catch(() => {
+            const el = document.createElement('textarea');
+            el.value = code; document.body.appendChild(el); el.select();
+            document.execCommand('copy'); document.body.removeChild(el); confirm();
+          });
+        } else {
+          const el = document.createElement('textarea');
+          el.value = code; document.body.appendChild(el); el.select();
+          document.execCommand('copy'); document.body.removeChild(el); confirm();
+        }
       });
     }
+
+    // Patch renderRoom + fix catégorie
+    window.addEventListener('load', () => {
+      if (typeof renderRoom === 'function') {
+        const _orig = renderRoom;
+        window.renderRoom = function(room) {
+          _orig(room);
+          updateCopyBtn(room ? room.code : null);
+        };
+      }
+
+      const catSelect = document.getElementById('categorySelect');
+      const subSelect = document.getElementById('subcategorySelect');
+      if (catSelect && subSelect) {
+        catSelect.addEventListener('change', () => {
+          if (!window.currentRoom) return;
+          const opts = window.currentRoom.categoryOptions || [];
+          const cat = opts.find(c => c.name === catSelect.value);
+          if (cat) {
+            subSelect.innerHTML = '';
+            cat.subcategories.forEach((name, i) => {
+              const opt = document.createElement('option');
+              opt.value = name; opt.textContent = name;
+              if (i === 0) opt.selected = true;
+              subSelect.appendChild(opt);
+            });
+            if (typeof renderComposition === 'function') renderComposition(window.currentRoom);
+          }
+        });
+      }
+    });
   </script>
 </body>
 </html>

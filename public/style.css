@@ -617,6 +617,46 @@ body::after {
 }
 
 
+
+/* ===== COPY CODE BTN ===== */
+.copy-code-wrap {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 58px;
+  z-index: 30;
+}
+
+.copy-code-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.85);
+  cursor: pointer;
+  box-shadow: none;
+  backdrop-filter: blur(8px);
+  transition: background 0.15s ease;
+  letter-spacing: 1px;
+}
+
+.copy-code-btn::after { display: none; }
+
+.copy-code-btn:hover {
+  background: rgba(255,255,255,0.13);
+  filter: none;
+}
+
+.copy-code-btn:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
 /* ===== SLIDERS ===== */
 .duration-slider {
   -webkit-appearance: none;
@@ -1329,14 +1369,14 @@ button:disabled {
 #wordText {
   margin: 8px 0 0;
   font-family: 'Syne', sans-serif;
-  font-size: 34px;
+  font-size: 1.6vw;
   font-weight: 800;
   line-height: 1.2;
   letter-spacing: 0.5px;
   color: #ffffff;
   text-align: center;
-  padding: 18px 14px;
-  border-radius: 16px;
+  padding: 1vh 1vw;
+  border-radius: 1vw;
   background: rgba(255,255,255,0.05);
   border: 1px solid rgba(255,255,255,0.08);
   text-shadow: 0 0 30px rgba(255,255,255,0.15);
@@ -1712,7 +1752,15 @@ button:disabled {
   .chat-box, .waiting-box, .end-box {
     flex: 1 1 auto;
     min-height: 0;
-    overflow: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .messages {
+    flex: 1 1 auto;
+    min-height: 80px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .messages { padding: 8px; margin-bottom: 6px; }

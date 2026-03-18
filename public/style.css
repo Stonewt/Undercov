@@ -247,6 +247,22 @@ body::after {
 .pulse { animation: pulse-ring 2.4s ease-out infinite; }
 .pulse2 { animation: pulse-ring 2.4s ease-out 1.2s infinite; }
 
+/* Intro scene max size on small screens */
+@media (max-width: 600px) {
+  .logo-scene {
+    min-height: 420px;
+    padding: 40px 24px 32px;
+  }
+  .wordmark {
+    font-size: 38px;
+    letter-spacing: 4px;
+  }
+  .logo-mark svg {
+    width: 100px;
+    height: 100px;
+  }
+}
+
 @keyframes scan {
   0%, 100% { transform: translateY(-14px); opacity: 0.7; }
   50% { transform: translateY(14px); opacity: 1; }
@@ -281,7 +297,14 @@ body::after {
 .brand-title {
   display: flex;
   align-items: center;
+  gap: 14px;
   justify-self: center;
+}
+
+.brand-logo-svg {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
 }
 
 .brand-logo {
@@ -356,15 +379,13 @@ body::after {
 .start-screen {
   width: 100%;
   display: flex;
-  align-items: center;
   justify-content: center;
   padding: 32px 0 40px;
 }
 
 .landing-stack {
   width: 100%;
-  max-width: 1060px;
-  margin: 0 auto;
+  max-width: 960px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -383,6 +404,7 @@ body::after {
 /* Cards connexion + règles — SOUS le logo */
 .landing-cards {
   order: 2;
+  width: 100%;
 }
 
 /* Mobile tabs */
@@ -434,12 +456,10 @@ body::after {
 /* Cards centrees */
 .landing-cards {
   width: 100%;
-  max-width: 1060px;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 24px;
   align-items: stretch;
-  margin: 0 auto;
 }
 
 .login-card,
@@ -1329,9 +1349,19 @@ button:disabled {
   }
 
   .brand-logo {
-    font-size: 22px;
+    font-size: 20px;
     letter-spacing: 3px;
     text-align: center;
+  }
+
+  .brand-logo-svg {
+    width: 28px;
+    height: 28px;
+  }
+
+  /* Show logo in landing header on mobile */
+  .landing-header {
+    display: flex;
   }
 
   .topbar-left, .topbar-right { justify-content: center; }

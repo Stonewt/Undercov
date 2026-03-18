@@ -5,6 +5,10 @@
 
 html {
   scroll-behavior: smooth;
+  touch-action: manipulation;
+  -moz-text-size-adjust: none;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
 }
 
 html, body {
@@ -381,8 +385,7 @@ body::after {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 28px;
-  max-width: 1600px;
+  gap: 1.8vw;
 }
 
 /* Logo caché partout */
@@ -447,11 +450,11 @@ body::after {
 
 .login-card,
 .rules-card {
-  min-height: clamp(320px, 40vh, 600px);
+  min-height: 42vh;
   background: rgba(15,22,42,0.85);
   border: 1px solid rgba(255,255,255,0.08);
-  border-radius: clamp(16px, 1.5vw, 28px);
-  padding: clamp(20px, 2.5vw, 44px) clamp(18px, 2.2vw, 40px);
+  border-radius: 1.4vw;
+  padding: 2.4vw 2.2vw;
   box-shadow:
     0 20px 50px rgba(0,0,0,0.38),
     inset 0 1px 0 rgba(255,255,255,0.06),
@@ -503,7 +506,7 @@ body::after {
 
 .start-content h2 {
   margin-bottom: 0.5vw;
-  font-size: clamp(20px, 2.4vw, 42px);
+  font-size: 2.2vw;
   font-weight: 800;
   letter-spacing: 0.5px;
 }
@@ -1038,9 +1041,9 @@ body::after {
 /* ===== FORM ELEMENTS ===== */
 input, button, select {
   border: none;
-  border-radius: 14px;
-  padding: 13px 15px;
-  font-size: 15px;
+  border-radius: 0.9vw;
+  padding: 0.85vw 1vw;
+  font-size: 1vw;
   font-family: 'DM Sans', sans-serif;
 }
 

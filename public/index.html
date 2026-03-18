@@ -2,11 +2,24 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Undercover</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+
+  <!-- Grain overlay for depth -->
+  <div class="grain-overlay" aria-hidden="true"></div>
+
+  <!-- Floating background orbs -->
+  <div class="bg-orb bg-orb-1" aria-hidden="true"></div>
+  <div class="bg-orb bg-orb-2" aria-hidden="true"></div>
+  <div class="bg-orb bg-orb-3" aria-hidden="true"></div>
+
+  <!-- Intro splash -->
   <div id="introOverlay" class="intro-overlay">
     <div id="introScene" class="intro-scene">
       <div class="logo-scene">
@@ -74,7 +87,10 @@
     </div>
   </div>
 
+  <!-- App -->
   <div class="app-shell">
+
+    <!-- Topbar -->
     <div class="topbar">
       <div class="topbar-side topbar-left">
         <div id="topRoomInfo" class="top-meta hidden"></div>
@@ -96,27 +112,14 @@
       <div id="statusBanner" class="status-banner hidden"></div>
     </div>
 
-    <aside class="ad-rail ad-rail-left hidden" id="leftAds">
-      <div class="ad-slot" data-ad="left-top">
-        <button class="ad-close" data-close-ad="left-top">×</button>
-      </div>
-      <div class="ad-slot" data-ad="left-bottom">
-        <button class="ad-close" data-close-ad="left-bottom">×</button>
-      </div>
-    </aside>
-
-    <aside class="ad-rail ad-rail-right hidden" id="rightAds">
-      <div class="ad-slot" data-ad="right-top">
-        <button class="ad-close" data-close-ad="right-top">×</button>
-      </div>
-      <div class="ad-slot" data-ad="right-bottom">
-        <button class="ad-close" data-close-ad="right-bottom">×</button>
-      </div>
-    </aside>
-
+    <!-- Main content -->
     <main class="page-center">
+
+      <!-- ===== LANDING ===== -->
       <div class="start-screen" id="startWrap">
         <div class="landing-stack">
+
+          <!-- Logo flottant — SOUS le titre (order:2) -->
           <div class="landing-header">
             <div class="logo-free">
               <svg width="220" height="220" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
@@ -173,6 +176,7 @@
             </div>
           </div>
 
+          <!-- Cards connexion + règles -->
           <div class="landing-cards">
             <section class="login-card" id="roomSetupCard">
               <div class="start-content start-content-full">
@@ -187,7 +191,7 @@
 
                 <div class="form-block">
                   <label for="nameInput">Pseudo</label>
-                  <input id="nameInput" maxlength="20" placeholder="Ton pseudo" />
+                  <input id="nameInput" maxlength="20" placeholder="Ton pseudo" autocomplete="off" />
                 </div>
 
                 <div class="form-block">
@@ -197,50 +201,56 @@
                 <div class="separator">ou</div>
 
                 <div class="join-row">
-                  <input id="roomInput" placeholder="Code room" />
+                  <input id="roomInput" placeholder="Code room" maxlength="8" autocomplete="off" style="text-transform:uppercase" />
                   <button id="joinBtn" class="big-btn">Rejoindre</button>
                 </div>
               </div>
             </section>
 
             <section class="rules-card" id="rulesCard">
-              <h3>Règles</h3>
+              <h3>Règles du jeu</h3>
               <ul>
                 <li>Chaque joueur reçoit un rôle secret.</li>
                 <li>Les civils partagent le même mot.</li>
                 <li>Les undercovers ont un mot proche mais différent.</li>
-                <li>Mr White n’a aucun mot.</li>
+                <li>Mr White n'a aucun mot.</li>
                 <li>À tour de rôle, chacun donne un seul mot comme indice.</li>
                 <li>Tu ne peux pas écrire exactement ton mot secret.</li>
                 <li>Ensuite, tout le monde vote contre un joueur.</li>
                 <li>Les civils gagnent si tous les intrus sont éliminés.</li>
-                <li>Les undercovers gagnent s’ils deviennent au moins aussi nombreux que les civils.</li>
-                <li>Mr White gagne s’il ne reste plus qu’un seul autre joueur vivant face à lui.</li>
-                <li>Si personne ne donne d’indice pendant toute une manche, la partie s’arrête.</li>
+                <li>Les undercovers gagnent s'ils deviennent au moins aussi nombreux que les civils.</li>
+                <li>Mr White gagne s'il ne reste plus qu'un seul autre joueur vivant face à lui.</li>
+                <li>Si personne ne donne d'indice pendant toute une manche, la partie s'arrête.</li>
               </ul>
             </section>
           </div>
 
+          <!-- Mobile tabs -->
           <div class="mobile-tabs hidden" id="mobileTabs">
             <button class="mobile-tab-btn active" data-tab="login">Connexion</button>
             <button class="mobile-tab-btn" data-tab="rules">Règles</button>
           </div>
+
         </div>
       </div>
 
+      <!-- ===== GAME ===== -->
       <div class="game-layout">
         <div class="panel panel-left">
+
+          <!-- Ton mot -->
           <div class="card hidden compact-card" id="secretCard">
             <h2>Ton mot</h2>
             <p id="wordText"></p>
           </div>
 
+          <!-- Config (hôte) -->
           <div class="card hidden compact-card" id="compositionCard">
             <h2>Configuration</h2>
             <p id="compositionHelp"></p>
 
             <div class="form-block">
-              <label for="undercoverCountInput">Nombre d'undercover</label>
+              <label for="undercoverCountInput">Undercovers</label>
               <input id="undercoverCountInput" type="number" min="1" step="1" value="1" />
             </div>
 
@@ -250,12 +260,12 @@
             </div>
 
             <div class="form-block">
-              <label for="turnDurationInput">Durée d'un tour (15 à 45 s)</label>
+              <label for="turnDurationInput">Durée tour (15–45 s)</label>
               <input id="turnDurationInput" type="number" min="15" max="45" step="1" value="30" />
             </div>
 
             <div class="form-block">
-              <label for="voteDurationInput">Durée du débat / vote (15 à 45 s)</label>
+              <label for="voteDurationInput">Durée vote (15–45 s)</label>
               <input id="voteDurationInput" type="number" min="15" max="45" step="1" value="30" />
             </div>
 
@@ -272,6 +282,7 @@
             <p id="compositionSummary"></p>
           </div>
 
+          <!-- Vote -->
           <div class="card hidden compact-card" id="voteCard">
             <h2>Vote</h2>
             <div id="voteButtons"></div>
@@ -281,14 +292,19 @@
             </div>
           </div>
 
+          <!-- Résultat vote -->
           <div class="card hidden compact-card" id="resultCard">
             <h2>Résultat</h2>
             <p id="resultText"></p>
           </div>
+
         </div>
 
+        <!-- Panel centre — la room -->
         <div class="panel panel-center">
           <div class="card room-card hidden" id="lobby">
+
+            <!-- Timer -->
             <div class="timer-wrap">
               <div class="timer-header-line">
                 <div class="timer-label">Temps restant</div>
@@ -300,11 +316,14 @@
             </div>
 
             <div class="room-content">
+
+              <!-- Joueurs -->
               <div class="players-box">
                 <h3>Joueurs</h3>
                 <ul id="playersList"></ul>
               </div>
 
+              <!-- Chat en jeu -->
               <div class="chat-box hidden" id="chatCard">
                 <div class="chat-top-infos">
                   <p id="phaseInfo" class="phase-line"></p>
@@ -312,25 +331,26 @@
                 </div>
 
                 <div class="role-dolls-wrap">
-                  <div class="role-dolls-title">Composition visuelle</div>
+                  <div class="role-dolls-title">Composition</div>
                   <div id="roleDolls" class="role-dolls"></div>
                 </div>
 
-                <h3>Chat de la manche</h3>
+                <h3 style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;opacity:.6;margin:0 0 8px;">Chat de la manche</h3>
                 <div id="messagesList" class="messages"></div>
                 <div class="row">
-                  <input id="chatInput" maxlength="24" placeholder="Entre un mot" />
+                  <input id="chatInput" maxlength="24" placeholder="Entre un mot" autocomplete="off" />
                   <button id="sendChatBtn">Envoyer</button>
                 </div>
                 <p id="chatHelp"></p>
               </div>
 
+              <!-- Salle d'attente (non-hôte) -->
               <div class="waiting-box hidden" id="waitingCard">
-                <h2 class="waiting-title">SALON D'ATTENTE</h2>
-                <p id="waitingText">En attente du lancement de la partie par l'hôte…</p>
+                <h2 class="waiting-title">Salon d'attente</h2>
+                <p id="waitingText">En attente du lancement par l'hôte…</p>
 
                 <div class="role-dolls-wrap">
-                  <div class="role-dolls-title">Composition visuelle</div>
+                  <div class="role-dolls-title">Composition</div>
                   <div id="waitingRoleDolls" class="role-dolls"></div>
                 </div>
 
@@ -354,20 +374,24 @@
                 </div>
               </div>
 
+              <!-- Fin de partie -->
               <div class="end-box hidden" id="endCard">
                 <h2 id="endTitle">Fin de partie</h2>
                 <p id="winnerText"></p>
                 <ul id="revealList"></ul>
               </div>
+
             </div>
 
+            <!-- Actions bas -->
             <div class="room-actions room-actions-bottom">
-              <button id="startBtn" class="hidden">Lancer</button>
+              <button id="startBtn" class="hidden">Lancer la partie</button>
               <button id="restartBtn" class="hidden">Rejouer</button>
             </div>
           </div>
         </div>
       </div>
+
     </main>
   </div>
 

@@ -329,7 +329,6 @@
           <div class="desktop-only-cards">
             <div class="card hidden compact-card" id="secretCardDesktop">
               <h2>Ton mot</h2>
-              <!-- wordText est partagé, on ne le duplique pas -->
             </div>
 
             <div class="card hidden compact-card" id="compositionCard">
@@ -588,7 +587,7 @@
         const li = document.createElement('li'); li.className = 'players-list-mobile-item';
         let t = p.name;
         if (p.id === window.myPlayerId) t += ' (toi)';
-        if (p.id === room.hostPlayerId) t += ' (hote)';
+        if (p.id === room.hostPlayerId) t += ' 👑';
         li.textContent = t; ul.appendChild(li);
       });
     }
@@ -601,8 +600,8 @@
         li.className = 'players-list-mobile-item' + (p.eliminated ? ' player-dead' : '') + (p.id === room.currentSpeakerId && room.phase === 'speaking' ? ' player-current' : '');
         let t = p.name;
         if (p.id === window.myPlayerId) t += ' (toi)';
-        if (p.id === room.hostPlayerId) t += ' (hote)';
-        if (p.eliminated) t += ' elimine';
+        if (p.id === room.hostPlayerId) t += ' 👑';
+        if (p.eliminated) t += ' · éliminé';
         li.textContent = t; ul.appendChild(li);
       });
     }
@@ -623,7 +622,6 @@
     document.getElementById('startBtnMobile')?.addEventListener('click', () => { pushMobileToDesktop(); document.getElementById('startBtn')?.click(); });
     document.getElementById('restartBtnMobile')?.addEventListener('click', () => { pushMobileToDesktop(); document.getElementById('restartBtn')?.click(); });
 
-    // Fonction principale appelee a chaque update de room
     function updateMobileUI(room) {
       if (!isMobile()) return;
       updateRoomCodeBtn(room ? room.code : null);
@@ -635,7 +633,6 @@
       const isVoting = room.phase === 'voting' && !gameOver;
 
       if (!started || gameOver) {
-        // LOBBY
         pushDesktopToMobile();
         syncLobbyPlayers(room);
         const cfgTab = document.querySelector('#mobileGameTabsLobby [data-tab="config"]');
@@ -649,7 +646,6 @@
         if (_activeLobbyTab === 'config' && !isHost) _activeLobbyTab = 'joueurs';
         showLobbyTab(_activeLobbyTab);
       } else {
-        // EN JEU
         const voteTabBtn = document.querySelector('#mobileGameTabs .vote-tab');
         if (voteTabBtn) voteTabBtn.classList.toggle('vote-tab-active-phase', isVoting);
         const voteCard = document.getElementById('voteCard');
@@ -667,7 +663,6 @@
     window.addEventListener('load', () => {
       hideAllPanels();
 
-      // Fix categorie desktop
       const catSelect = document.getElementById('categorySelect');
       const subSelect = document.getElementById('subcategorySelect');
       if (catSelect && subSelect) {
@@ -688,19 +683,16 @@
         });
       }
 
-      // Clics onglets
       document.querySelectorAll('#mobileGameTabsLobby .mobile-game-tab').forEach(btn =>
         btn.addEventListener('click', () => showLobbyTab(btn.getAttribute('data-tab'))));
       document.querySelectorAll('#mobileGameTabs .mobile-game-tab').forEach(btn =>
         btn.addEventListener('click', () => showGameTab(btn.getAttribute('data-tab'))));
 
-      // Socket events - app.js a deja attache ses listeners, on ajoute les notres apres
       if (window.socket) {
         window.socket.on('roomUpdated', (room) => updateMobileUI(room));
         window.socket.on('gameStarted', () => { if (isMobile()) setTimeout(() => showGameTab('mot'), 150); });
       }
 
-      // Patch renderRoom pour les callbacks createRoom/joinRoom/resumeSession
       const origRR = window.renderRoom;
       if (typeof origRR === 'function') {
         window.renderRoom = function(room) { origRR(room); updateMobileUI(room); };

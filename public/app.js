@@ -1,9 +1,11 @@
 const socket = io();
+window.socket = socket;
 
 let currentRoom = null;
 window.currentRoom = null;
 
 let myPlayerId = localStorage.getItem("playerId") || null;
+window.myPlayerId = myPlayerId;
 let myPlayerToken = localStorage.getItem("playerToken") || null;
 let myRoomCode = localStorage.getItem("roomCode") || null;
 let timerInterval = null;
@@ -318,6 +320,7 @@ function initTopRoomCopy() {
 
 function saveSession(playerId, playerToken, roomCode) {
   myPlayerId = playerId;
+  window.myPlayerId = playerId;
   myPlayerToken = playerToken;
   myRoomCode = roomCode || myRoomCode;
 
@@ -491,7 +494,7 @@ function renderPlayers(room) {
 
     let mainLabel = player.name;
     if (player.id === myPlayerId) mainLabel += " (toi)";
-    if (player.id === room.hostPlayerId) mainLabel += " 👑";
+    if (player.id === room.hostPlayerId) mainLabel += " \uD83D\uDC51";
     nameLine.textContent = mainLabel;
     li.appendChild(nameLine);
 
@@ -617,7 +620,7 @@ function renderWaitingRoom(room) {
   if (!shouldShow) return;
 
   renderRoleDolls(room);
-  waitingText.textContent = "En attente du lancement de la partie par l'hôte…";
+  waitingText.textContent = "En attente du lancement de la partie par l'hôte\u2026";
   waitingCategory.textContent = room.selectedCategory || "--";
   waitingSubcategory.textContent = room.selectedSubcategory || "--";
   waitingTurnDuration.textContent = `${room.turnDurationSeconds || 30} s`;
@@ -1013,11 +1016,14 @@ function updateMobileGamePanels() {
   const tabs = document.getElementById("mobileGameTabs");
   if (!tabs) return;
 
-  const panelIds = ["chatCard", "compositionCard", "voteCard"];
+  const panelIds = ["secretCard", "chatCard", "compositionCard", "voteCard"];
+
   const phasePanel =
+    currentRoom?.gameOver ? "chatCard" :
     currentRoom?.phase === "voting" ? "voteCard" :
     currentRoom?.phase === "speaking" ? "chatCard" :
-    "compositionCard";
+    currentRoom && !currentRoom.started && currentRoom.hostPlayerId === myPlayerId ? "compositionCard" :
+    "chatCard";
 
   if (!mobileGameActivePanel || !panelIds.includes(mobileGameActivePanel)) {
     mobileGameActivePanel = phasePanel;
@@ -1041,6 +1047,33 @@ function updateMobileGamePanels() {
     const isActive = btn.getAttribute("data-panel") === mobileGameActivePanel;
     btn.classList.toggle("active", isActive);
   });
+
+  // Message "pas encore le moment" dans l'onglet vote
+  const voteNotReady = document.getElementById("voteNotReadyCard");
+  if (voteNotReady) {
+    const isVoting = currentRoom?.phase === "voting" && !currentRoom?.gameOver;
+    voteNotReady.style.display = (mobileGameActivePanel === "voteCard" && !isVoting) ? "" : "none";
+  }
+
+  // Onglet composition : visible seulement pour l'hote avant la partie
+  const configTab = tabs.querySelector('[data-panel="compositionCard"]');
+  if (configTab) {
+    const showConfig = currentRoom && !currentRoom.started && !currentRoom.gameOver && currentRoom.hostPlayerId === myPlayerId;
+    configTab.style.display = showConfig ? "" : "none";
+  }
+
+  // Onglet mot secret : visible seulement si la partie est lancée
+  const motTab = tabs.querySelector('[data-panel="secretCard"]');
+  if (motTab) {
+    motTab.style.display = (currentRoom?.started && !currentRoom?.gameOver) ? "" : "none";
+  }
+
+  // Style onglet vote en phase de vote
+  const voteTab = tabs.querySelector('[data-panel="voteCard"]');
+  if (voteTab) {
+    const isVoting = currentRoom?.phase === "voting" && !currentRoom?.gameOver;
+    voteTab.classList.toggle("vote-tab-active-phase", isVoting);
+  }
 }
 
 function initMobileGameTabs() {
@@ -1125,9 +1158,14 @@ function renderRoom(room) {
   renderVoteButtons(room);
   renderEndGame(room);
 
-  if (room.phase === "voting") {
+  // Auto-switch onglet mobile selon la phase
+  if (room.phase === "voting" && !room.gameOver) {
     mobileGameActivePanel = "voteCard";
   } else if (room.phase === "speaking") {
+    mobileGameActivePanel = "chatCard";
+  } else if (!room.started && isHost) {
+    mobileGameActivePanel = "compositionCard";
+  } else if (!room.started && !isHost) {
     mobileGameActivePanel = "chatCard";
   }
 
@@ -1368,6 +1406,8 @@ socket.on("gameStarted", ({ word }) => {
   wordText.textContent = word || "Tu n'as pas de mot.";
   playClickSound("success");
   setStatus("La partie commence");
+  mobileGameActivePanel = "secretCard";
+  updateMobileGamePanels();
 });
 
 socket.on("sessionResumed", ({ word }) => {

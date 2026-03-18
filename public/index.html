@@ -598,27 +598,49 @@
     function isMobile() { return window.innerWidth <= 820; }
 
     // ── Onglets EN JEU ──
+    // ── IDs de tous les panels mobiles ──
+    const ALL_PANELS = [
+      'mobilePanelLobbyJoueurs','mobilePanelLobbyConfig',
+      'mobilePanelMot','mobilePanelChat','mobilePanelCompo','mobilePanelVote'
+    ];
+
+    function hideAllPanels() {
+      ALL_PANELS.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+    }
+
+    function showPanel(id) {
+      hideAllPanels();
+      const el = document.getElementById(id);
+      if (el) el.style.display = '';
+    }
+
+    let _activeTab      = 'chat';
+    let _activeLobbyTab = 'joueurs';
+    function isMobile() { return window.innerWidth <= 820; }
+
+    // ── Affiche un onglet EN JEU ──
     function showMobileTab(tabName) {
       if (!isMobile()) return;
       _activeTab = tabName;
-      document.querySelectorAll('#mobileGameTabs .mobile-game-tab').forEach(b => b.classList.toggle('active', b.getAttribute('data-tab') === tabName));
-      ['mobilePanelMot','mobilePanelChat','mobilePanelCompo','mobilePanelVote'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
-      const map = { 'mot':'mobilePanelMot', 'chat':'mobilePanelChat', 'compo':'mobilePanelCompo', 'vote':'mobilePanelVote' };
-      if (map[tabName]) document.getElementById(map[tabName])?.classList.remove('hidden');
+      document.querySelectorAll('#mobileGameTabs .mobile-game-tab').forEach(b =>
+        b.classList.toggle('active', b.getAttribute('data-tab') === tabName));
+      const map = { mot:'mobilePanelMot', chat:'mobilePanelChat', compo:'mobilePanelCompo', vote:'mobilePanelVote' };
+      if (map[tabName]) showPanel(map[tabName]);
       if (tabName === 'compo' && window.currentRoom) { syncMobilePlayersList(window.currentRoom); syncMobileRoleDolls(window.currentRoom); }
     }
 
-    // ── Onglets LOBBY ──
+    // ── Affiche un onglet LOBBY ──
     function showLobbyTab(tabName) {
       if (!isMobile()) return;
       _activeLobbyTab = tabName;
-      document.querySelectorAll('#mobileGameTabsLobby .mobile-game-tab').forEach(b => b.classList.toggle('active', b.getAttribute('data-tab') === tabName));
-      ['mobilePanelLobbyJoueurs','mobilePanelLobbyConfig'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
-      const map = { 'joueurs':'mobilePanelLobbyJoueurs', 'config':'mobilePanelLobbyConfig' };
-      if (map[tabName]) document.getElementById(map[tabName])?.classList.remove('hidden');
+      document.querySelectorAll('#mobileGameTabsLobby .mobile-game-tab').forEach(b =>
+        b.classList.toggle('active', b.getAttribute('data-tab') === tabName));
+      const map = { joueurs:'mobilePanelLobbyJoueurs', config:'mobilePanelLobbyConfig' };
+      if (map[tabName]) showPanel(map[tabName]);
+      if (tabName === 'joueurs' && window.currentRoom) syncLobbyPlayersList(window.currentRoom);
     }
 
-    // ── Sync liste joueurs lobby mobile ──
+    // ── Listes joueurs ──
     function syncLobbyPlayersList(room) {
       const ul = document.getElementById('playersListLobbyMobile');
       if (!ul || !room) return;
@@ -634,14 +656,15 @@
       });
     }
 
-    // ── Sync liste joueurs en jeu mobile ──
     function syncMobilePlayersList(room) {
       const ul = document.getElementById('playersListMobile');
       if (!ul || !room) return;
       ul.innerHTML = '';
       (room.players || []).forEach(p => {
         const li = document.createElement('li');
-        li.className = 'players-list-mobile-item' + (p.eliminated ? ' player-dead' : '') + (p.id === room.currentSpeakerId && room.phase === 'speaking' ? ' player-current' : '');
+        li.className = 'players-list-mobile-item'
+          + (p.eliminated ? ' player-dead' : '')
+          + (p.id === room.currentSpeakerId && room.phase === 'speaking' ? ' player-current' : '');
         let label = p.name;
         if (p.id === window.myPlayerId) label += ' (toi)';
         if (p.id === room.hostPlayerId) label += ' 👑';
@@ -656,19 +679,17 @@
       if (!container || !room) return;
       container.innerHTML = '';
       const c = room.roleComposition || {};
-      const dolls = [];
-      for (let i = 0; i < (c.civil || 0); i++) dolls.push('civil');
-      for (let i = 0; i < (c.undercover || 0); i++) dolls.push('undercover');
-      for (let i = 0; i < (c.mrwhite || 0); i++) dolls.push('mrwhite');
-      dolls.forEach(role => {
-        const d = document.createElement('div');
-        d.className = 'role-doll ' + role;
-        d.innerHTML = '<div class="role-doll-head"></div><div class="role-doll-body"></div>';
-        container.appendChild(d);
+      ['civil','undercover','mrwhite'].forEach(role => {
+        for (let i = 0; i < (c[role] || 0); i++) {
+          const d = document.createElement('div');
+          d.className = 'role-doll ' + role;
+          d.innerHTML = '<div class="role-doll-head"></div><div class="role-doll-body"></div>';
+          container.appendChild(d);
+        }
       });
     }
 
-    // ── Boutons lancer/rejouer mobile → délèguent au desktop ──
+    // ── Boutons mobile → délèguent au desktop ──
     document.getElementById('startBtnMobile')?.addEventListener('click', () => {
       syncDesktopFromMobile();
       document.getElementById('startBtn')?.click();
@@ -678,79 +699,97 @@
       document.getElementById('restartBtn')?.click();
     });
 
-    // ── updateMobileGameTabs : appelé à chaque renderRoom ──
+    // ── Mise à jour principale appelée à chaque renderRoom ──
     function updateMobileGameTabs(room) {
       if (!isMobile()) return;
 
-      const lobbyTabs  = document.getElementById('mobileGameTabsLobby');
-      const gameTabs   = document.getElementById('mobileGameTabs');
+      const lobbyTabs = document.getElementById('mobileGameTabsLobby');
+      const gameTabs  = document.getElementById('mobileGameTabs');
       if (!lobbyTabs || !gameTabs) return;
 
-      const isHost   = room && room.hostPlayerId === window.myPlayerId;
-      const started  = room && room.started;
-      const gameOver = room && room.gameOver;
-
+      // Pas de room = écran d'accueil
       if (!room) {
         lobbyTabs.style.display = 'none';
         gameTabs.style.display  = 'none';
-        document.querySelectorAll('.mobile-panel').forEach(p => p.classList.add('hidden'));
+        hideAllPanels();
         return;
       }
 
-      if (!started || gameOver) {
-        // LOBBY
+      const isHost   = room.hostPlayerId === window.myPlayerId;
+      const started  = !!room.started;
+      const gameOver = !!room.gameOver;
+      const isVoting = room.phase === 'voting' && !gameOver;
+
+      if (!started) {
+        // ── LOBBY (avant partie) ──
         lobbyTabs.style.display = '';
         gameTabs.style.display  = 'none';
 
-        // Cacher l'onglet Config si pas hôte
+        // Config visible seulement pour l'hôte
         const configTab = lobbyTabs.querySelector('[data-tab="config"]');
         if (configTab) configTab.style.display = isHost ? '' : 'none';
 
-        // Sync options catégorie vers mobile
-        syncCategoryOptionsToMobile(room);
-
-        // Boutons lancer/rejouer mobiles
+        // Boutons
         const startBtnM   = document.getElementById('startBtnMobile');
         const restartBtnM = document.getElementById('restartBtnMobile');
-        const startBtnD   = document.getElementById('startBtn');
-        const restartBtnD = document.getElementById('restartBtn');
-        if (startBtnM)   startBtnM.classList.toggle('hidden',   !isHost || started);
-        if (restartBtnM) restartBtnM.classList.toggle('hidden', !isHost || !gameOver);
-        if (startBtnD)   startBtnD.classList.add('hidden');
-        if (restartBtnD) restartBtnD.classList.add('hidden');
+        if (startBtnM)   startBtnM.classList.toggle('hidden', !isHost);
+        if (restartBtnM) restartBtnM.classList.add('hidden');
+        // Cacher les boutons desktop (sur mobile on les gère nous-mêmes)
+        document.getElementById('startBtn')?.classList.add('hidden');
+        document.getElementById('restartBtn')?.classList.add('hidden');
 
-        // Sync liste joueurs lobby
+        // Sync config vers mobile
+        syncCategoryOptionsToMobile(room);
         syncLobbyPlayersList(room);
 
-        // Afficher le bon panel lobby
-        if (_activeLobbyTab === 'config' && !isHost) {
-          showLobbyTab('joueurs');
-        } else {
-          showLobbyTab(_activeLobbyTab);
+        // Si non-hôte était sur config → revenir sur joueurs
+        if (_activeLobbyTab === 'config' && !isHost) _activeLobbyTab = 'joueurs';
+        showLobbyTab(_activeLobbyTab);
+
+      } else if (gameOver) {
+        // ── FIN DE PARTIE : afficher les onglets lobby avec rejouer ──
+        lobbyTabs.style.display = '';
+        gameTabs.style.display  = 'none';
+
+        const configTab = lobbyTabs.querySelector('[data-tab="config"]');
+        if (configTab) configTab.style.display = isHost ? '' : 'none';
+
+        const startBtnM   = document.getElementById('startBtnMobile');
+        const restartBtnM = document.getElementById('restartBtnMobile');
+        if (startBtnM)   startBtnM.classList.add('hidden');
+        if (restartBtnM) restartBtnM.classList.toggle('hidden', !isHost);
+        document.getElementById('startBtn')?.classList.add('hidden');
+        document.getElementById('restartBtn')?.classList.add('hidden');
+
+        syncCategoryOptionsToMobile(room);
+        syncLobbyPlayersList(room);
+        if (_activeLobbyTab === 'config' && !isHost) _activeLobbyTab = 'joueurs';
+        showLobbyTab(_activeLobbyTab);
+
+      } else {
+        // ── EN JEU ──
+        lobbyTabs.style.display = 'none';
+        gameTabs.style.display  = '';
+
+        // Style onglet vote
+        const voteTabBtn = gameTabs.querySelector('.vote-tab');
+        if (voteTabBtn) voteTabBtn.classList.toggle('vote-tab-active-phase', isVoting);
+
+        // Contenu du panel vote
+        const voteCard     = document.getElementById('voteCard');
+        const voteNotReady = document.getElementById('voteNotReadyCard');
+        if (voteCard && voteNotReady) {
+          voteCard.style.display     = isVoting ? '' : 'none';
+          voteNotReady.style.display = isVoting ? 'none' : '';
         }
-        return;
+
+        // Auto-switch vers vote
+        if (isVoting && _activeTab !== 'vote') showMobileTab('vote');
+        else {
+          if (_activeTab === 'compo') { syncMobilePlayersList(room); syncMobileRoleDolls(room); }
+          showMobileTab(_activeTab);
+        }
       }
-
-      // EN JEU
-      lobbyTabs.style.display = 'none';
-      gameTabs.style.display  = '';
-
-      const isVoting = room.phase === 'voting';
-      const voteTabBtn = gameTabs.querySelector('.vote-tab');
-      if (voteTabBtn) voteTabBtn.classList.toggle('vote-tab-active-phase', isVoting);
-
-      const voteCard     = document.getElementById('voteCard');
-      const voteNotReady = document.getElementById('voteNotReadyCard');
-      if (voteCard && voteNotReady) {
-        voteCard.classList.toggle('hidden', !isVoting);
-        voteNotReady.classList.toggle('hidden', isVoting);
-      }
-
-      if (isVoting && _activeTab !== 'vote') showMobileTab('vote');
-      if (gameOver && _activeTab === 'vote') showMobileTab('chat');
-      if (_activeTab === 'compo') { syncMobilePlayersList(room); syncMobileRoleDolls(room); }
-
-      showMobileTab(_activeTab);
     }
 
     // ── Init au chargement ──
@@ -779,11 +818,10 @@
             cat.subcategories.forEach((name, i) => {
               const opt = document.createElement('option');
               opt.value = name; opt.textContent = name;
-              if (name === prevVal || i === 0) opt.selected = (name === prevVal || i === 0);
+              if (name === prevVal || i === 0) opt.selected = true;
               subSelect.appendChild(opt);
             });
             if (typeof renderComposition === 'function' && window.currentRoom) renderComposition(window.currentRoom);
-            // Répercuter sur mobile
             const catM = document.getElementById('categorySelectM');
             const subM = document.getElementById('subcategorySelectM');
             if (catM) catM.value = catSelect.value;

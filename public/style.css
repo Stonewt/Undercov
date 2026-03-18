@@ -2063,6 +2063,12 @@ button:disabled {
   }
 }
 
+/* Cache les éléments du panel centre sur mobile (gérés par les onglets) */
+@media (max-width: 820px) {
+  .hide-on-mobile { display: none !important; }
+  .room-card .timer-wrap { display: none !important; }
+}
+
 /* ===== NOISE GRAIN OVERLAY ===== */
 .grain-overlay {
   position: fixed;

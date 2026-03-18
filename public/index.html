@@ -218,7 +218,7 @@
         <!-- Barre d'onglets mobile lobby -->
         <div id="mobileTabsLobby" style="display:none;flex-shrink:0;flex-direction:row;gap:6px;padding:6px 8px;background:rgba(5,9,20,0.80);border-bottom:1px solid rgba(255,255,255,0.06);">
           <button class="mobile-game-tab active" onclick="mobileShowLobby('joueurs')">Joueurs</button>
-          <button class="mobile-game-tab" id="mobileConfigTabBtn" onclick="mobileShowLobby('config')" style="display:none">⚙ Config</button>
+          <button class="mobile-game-tab" id="mobileConfigTabBtn" onclick="mobileShowLobby('config')" style="display:none">⚙ Configuration</button>
         </div>
 
         <!-- Barre d'onglets mobile en jeu -->
@@ -361,12 +361,6 @@
             </div>
 
             <div class="room-content">
-
-              <div class="players-box">
-                <h3>Joueurs</h3>
-                <ul id="playersList"></ul>
-              </div>
-
               <div class="chat-box hidden" id="chatCard">
                 <div class="chat-top-infos">
                   <p id="phaseInfo" class="phase-line"></p>

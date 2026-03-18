@@ -213,64 +213,118 @@
       </div>
 
       <div class="game-layout">
+
+        <!-- Tabs mobile : 4 onglets fixes -->
         <div class="mobile-game-tabs" id="mobileGameTabs">
-          <button class="mobile-game-tab active" data-panel="chatCard">Chat</button>
-          <button class="mobile-game-tab" data-panel="compositionCard">Config</button>
-          <button class="mobile-game-tab vote-tab hidden" data-panel="voteCard">🗳 Vote</button>
+          <button class="mobile-game-tab" data-tab="mot">🔤 Ton mot</button>
+          <button class="mobile-game-tab active" data-tab="chat">Chat</button>
+          <button class="mobile-game-tab" data-tab="compo">Joueurs</button>
+          <button class="mobile-game-tab vote-tab" data-tab="vote">🗳 Vote</button>
         </div>
 
         <div class="panel panel-left">
 
-          <div class="card hidden compact-card" id="secretCard">
-            <h2>Ton mot</h2>
-            <p id="wordText"></p>
-          </div>
-
-          <div class="card hidden compact-card" id="compositionCard">
-            <h2>Configuration</h2>
-            <p id="compositionHelp"></p>
-            <div class="form-block">
-              <label for="undercoverCountInput">Undercovers</label>
-              <input id="undercoverCountInput" type="number" min="1" step="1" value="1" />
-            </div>
-            <div class="form-block">
-              <label for="mrWhiteCountInput">Mr White</label>
-              <input id="mrWhiteCountInput" type="number" min="0" max="1" step="1" value="0" />
-            </div>
-            <div class="form-block">
-              <label for="turnDurationInput">Durée du tour : <span id="turnDurationDisplay">30</span> s</label>
-              <input id="turnDurationInput" type="range" min="15" max="45" step="1" value="30" class="duration-slider" />
-            </div>
-            <div class="form-block">
-              <label for="voteDurationInput">Durée du vote : <span id="voteDurationDisplay">30</span> s</label>
-              <input id="voteDurationInput" type="range" min="15" max="45" step="1" value="30" class="duration-slider" />
-            </div>
-            <div class="form-block">
-              <label for="categorySelect">Catégorie</label>
-              <select id="categorySelect"></select>
-            </div>
-            <div class="form-block">
-              <label for="subcategorySelect">Sous-catégorie</label>
-              <select id="subcategorySelect"></select>
-            </div>
-            <p id="compositionSummary"></p>
-          </div>
-
-          <div class="card hidden compact-card vote-card-active" id="voteCard">
-            <div class="vote-card-header">
-              <div class="vote-pulse-dot"></div>
-              <h2>⚡ Vote en cours</h2>
-            </div>
-            <div id="voteButtons"></div>
-            <div class="vote-confirm-wrap">
-              <p id="selectedVoteText">Aucun joueur sélectionné.</p>
-              <button id="confirmVoteBtn" disabled>Confirmer mon vote</button>
+          <!-- PANEL MOT (mobile uniquement) -->
+          <div class="mobile-panel hidden" id="mobilePanelMot">
+            <div class="card compact-card" id="secretCard">
+              <h2>Ton mot</h2>
+              <p id="wordText"></p>
             </div>
           </div>
 
-          <div class="card hidden compact-card" id="resultCard">
-            <h2>Résultat</h2>
-            <p id="resultText"></p>
+          <!-- PANEL CHAT (mobile uniquement) -->
+          <div class="mobile-panel hidden" id="mobilePanelChat">
+            <!-- le chatCard du centre sera dupliqué ici via JS -->
+          </div>
+
+          <!-- PANEL JOUEURS + COMPOSITION (mobile uniquement) -->
+          <div class="mobile-panel hidden" id="mobilePanelCompo">
+            <div class="card compact-card">
+              <h3 style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;opacity:.6;margin:0 0 12px;">Joueurs</h3>
+              <ul id="playersListMobile" class="players-list-mobile"></ul>
+              <div class="role-dolls-wrap" style="margin-top:14px;">
+                <div class="role-dolls-title">Composition</div>
+                <div id="roleDollsMobile" class="role-dolls"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PANEL VOTE (mobile uniquement) -->
+          <div class="mobile-panel hidden" id="mobilePanelVote">
+            <!-- Message hors phase vote -->
+            <div class="card compact-card vote-not-ready-card" id="voteNotReadyCard">
+              <div class="vote-not-ready-inner">
+                <div class="vote-not-ready-icon">🗳</div>
+                <p class="vote-not-ready-title">Pas encore le moment</p>
+                <p class="vote-not-ready-sub">Le vote s'ouvrira une fois que tous les joueurs auront donné leur indice.</p>
+              </div>
+            </div>
+            <!-- Vraie carte vote -->
+            <div class="card compact-card vote-card-active hidden" id="voteCard">
+              <div class="vote-card-header">
+                <div class="vote-pulse-dot"></div>
+                <h2>⚡ Vote en cours</h2>
+              </div>
+              <div id="voteButtons"></div>
+              <div class="vote-confirm-wrap">
+                <p id="selectedVoteText">Aucun joueur sélectionné.</p>
+                <button id="confirmVoteBtn" disabled>Confirmer mon vote</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cards desktop (panel gauche classique, cachées sur mobile) -->
+          <div class="desktop-only-cards">
+            <div class="card hidden compact-card" id="secretCardDesktop">
+              <h2>Ton mot</h2>
+            </div>
+
+            <div class="card hidden compact-card" id="compositionCard">
+              <h2>Configuration</h2>
+              <p id="compositionHelp"></p>
+              <div class="form-block">
+                <label for="undercoverCountInput">Undercovers</label>
+                <input id="undercoverCountInput" type="number" min="1" step="1" value="1" />
+              </div>
+              <div class="form-block">
+                <label for="mrWhiteCountInput">Mr White</label>
+                <input id="mrWhiteCountInput" type="number" min="0" max="1" step="1" value="0" />
+              </div>
+              <div class="form-block">
+                <label for="turnDurationInput">Durée du tour : <span id="turnDurationDisplay">30</span> s</label>
+                <input id="turnDurationInput" type="range" min="15" max="45" step="1" value="30" class="duration-slider" />
+              </div>
+              <div class="form-block">
+                <label for="voteDurationInput">Durée du vote : <span id="voteDurationDisplay">30</span> s</label>
+                <input id="voteDurationInput" type="range" min="15" max="45" step="1" value="30" class="duration-slider" />
+              </div>
+              <div class="form-block">
+                <label for="categorySelect">Catégorie</label>
+                <select id="categorySelect"></select>
+              </div>
+              <div class="form-block">
+                <label for="subcategorySelect">Sous-catégorie</label>
+                <select id="subcategorySelect"></select>
+              </div>
+              <p id="compositionSummary"></p>
+            </div>
+
+            <div class="card hidden compact-card vote-card-active" id="voteCardDesktop">
+              <div class="vote-card-header">
+                <div class="vote-pulse-dot"></div>
+                <h2>⚡ Vote en cours</h2>
+              </div>
+              <div id="voteButtonsDesktop"></div>
+              <div class="vote-confirm-wrap">
+                <p id="selectedVoteTextDesktop">Aucun joueur sélectionné.</p>
+                <button id="confirmVoteBtnDesktop" disabled>Confirmer mon vote</button>
+              </div>
+            </div>
+
+            <div class="card hidden compact-card" id="resultCard">
+              <h2>Résultat</h2>
+              <p id="resultText"></p>
+            </div>
           </div>
 
         </div>
@@ -410,7 +464,115 @@
       });
     }
 
+    let _activeTab = 'chat';
+
+    function isMobile() { return window.innerWidth <= 820; }
+
+    function showMobileTab(tabName) {
+      if (!isMobile()) return;
+      _activeTab = tabName;
+
+      document.querySelectorAll('.mobile-game-tab').forEach(b => {
+        b.classList.toggle('active', b.getAttribute('data-tab') === tabName);
+      });
+
+      document.querySelectorAll('.mobile-panel').forEach(p => p.classList.add('hidden'));
+
+      const map = {
+        'mot':   'mobilePanelMot',
+        'chat':  'mobilePanelChat',
+        'compo': 'mobilePanelCompo',
+        'vote':  'mobilePanelVote',
+      };
+      const panelId = map[tabName];
+      if (panelId) document.getElementById(panelId)?.classList.remove('hidden');
+
+      if (tabName === 'compo' && window.currentRoom) {
+        syncMobilePlayersList(window.currentRoom);
+        syncMobileRoleDolls(window.currentRoom);
+      }
+    }
+
+    function syncMobilePlayersList(room) {
+      const ul = document.getElementById('playersListMobile');
+      if (!ul || !room) return;
+      ul.innerHTML = '';
+      const players = room.players || [];
+      players.forEach(p => {
+        const li = document.createElement('li');
+        li.className = 'players-list-mobile-item' + (p.eliminated ? ' player-dead' : '') + (p.id === room.currentSpeakerId && room.phase === 'speaking' ? ' player-current' : '');
+        let label = p.name;
+        if (p.id === (window.myPlayerId)) label += ' (toi)';
+        if (p.id === room.hostPlayerId) label += ' 👑';
+        if (p.eliminated) label += ' · éliminé';
+        li.textContent = label;
+        ul.appendChild(li);
+      });
+    }
+
+    function syncMobileRoleDolls(room) {
+      const container = document.getElementById('roleDollsMobile');
+      if (!container || !room) return;
+      container.innerHTML = '';
+      const composition = room.roleComposition || {};
+      const dolls = [];
+      for (let i = 0; i < (composition.civil || 0); i++) dolls.push('civil');
+      for (let i = 0; i < (composition.undercover || 0); i++) dolls.push('undercover');
+      for (let i = 0; i < (composition.mrwhite || 0); i++) dolls.push('mrwhite');
+      dolls.forEach(role => {
+        const d = document.createElement('div');
+        d.className = 'role-doll ' + role;
+        d.innerHTML = '<div class="role-doll-head"></div><div class="role-doll-body"></div>';
+        container.appendChild(d);
+      });
+    }
+
+    function updateMobileGameTabs(room) {
+      if (!isMobile()) return;
+
+      const tabs = document.getElementById('mobileGameTabs');
+      if (!tabs) return;
+
+      if (!room || !room.started) {
+        tabs.style.display = 'none';
+        document.querySelectorAll('.mobile-panel').forEach(p => p.classList.add('hidden'));
+        return;
+      }
+
+      tabs.style.display = '';
+
+      const isVoting = room.phase === 'voting' && !room.gameOver;
+
+      const voteTabBtn = tabs.querySelector('.vote-tab');
+      if (voteTabBtn) {
+        voteTabBtn.classList.toggle('vote-tab-active-phase', isVoting);
+      }
+
+      const voteCard     = document.getElementById('voteCard');
+      const voteNotReady = document.getElementById('voteNotReadyCard');
+      if (voteCard && voteNotReady) {
+        voteCard.classList.toggle('hidden', !isVoting);
+        voteNotReady.classList.toggle('hidden', isVoting);
+      }
+
+      if (isVoting && _activeTab !== 'vote') {
+        showMobileTab('vote');
+      }
+
+      if (room.gameOver && _activeTab === 'vote') {
+        showMobileTab('chat');
+      }
+
+      if (_activeTab === 'compo') {
+        syncMobilePlayersList(room);
+        syncMobileRoleDolls(room);
+      }
+
+      showMobileTab(_activeTab);
+    }
+
     window.addEventListener('load', () => {
+
       if (typeof renderRoom === 'function') {
         const _orig = renderRoom;
         window.renderRoom = function(room) {
@@ -442,47 +604,19 @@
         });
       }
 
-      const tabBtns = document.querySelectorAll('.mobile-game-tab');
-      tabBtns.forEach(btn => {
+      document.querySelectorAll('.mobile-game-tab').forEach(btn => {
         btn.addEventListener('click', () => {
-          const panelId = btn.getAttribute('data-panel');
-          tabBtns.forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          const panel = document.querySelector('.panel-left');
-          const card  = document.getElementById(panelId);
-          if (card && panel && window.innerWidth <= 820) {
-            panel.scrollTo({ left: card.offsetLeft - 8, behavior: 'smooth' });
-          }
+          showMobileTab(btn.getAttribute('data-tab'));
         });
       });
-    });
 
-    function updateMobileGameTabs(room) {
-      if (window.innerWidth > 820) return;
-      const tabs = document.getElementById('mobileGameTabs');
-      if (!tabs) return;
-      if (!room || !room.started) { tabs.style.display = 'none'; return; }
-      tabs.style.display = '';
-      const voteTab = tabs.querySelector('.vote-tab');
-      const isVoting = room.phase === 'voting' && !room.gameOver;
-      if (voteTab) voteTab.classList.toggle('hidden', !isVoting);
-      if (isVoting) {
-        const tabBtns = tabs.querySelectorAll('.mobile-game-tab');
-        tabBtns.forEach(b => b.classList.remove('active'));
-        if (voteTab) voteTab.classList.add('active');
-        const panel    = document.querySelector('.panel-left');
-        const voteCard = document.getElementById('voteCard');
-        if (voteCard && panel) {
-          setTimeout(() => panel.scrollTo({ left: voteCard.offsetLeft - 8, behavior: 'smooth' }), 80);
-        }
+      const _origSocket = window.socket;
+      if (_origSocket) {
+        _origSocket.on && _origSocket.on('gameStarted', () => {
+          if (isMobile()) setTimeout(() => showMobileTab('mot'), 100);
+        });
       }
-      if (room.gameOver) {
-        const chatTab = tabs.querySelector('[data-panel="chatCard"]');
-        const tabBtns = tabs.querySelectorAll('.mobile-game-tab');
-        tabBtns.forEach(b => b.classList.remove('active'));
-        if (chatTab) chatTab.classList.add('active');
-      }
-    }
+    });
   </script>
 </body>
 </html>

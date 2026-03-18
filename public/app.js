@@ -1226,6 +1226,7 @@ createBtn.addEventListener("click", () => {
 
     saveSession(res.playerId, res.playerToken, res.room.code);
     renderRoom(res.room);
+    if (typeof window.updateMobileUI === "function") window.updateMobileUI(res.room);
     updateResumeUI(true);
     playClickSound("success");
     setStatus("Room créée");
@@ -1245,6 +1246,7 @@ joinBtn.addEventListener("click", () => {
 
     saveSession(res.playerId, res.playerToken, res.room.code);
     renderRoom(res.room);
+    if (typeof window.updateMobileUI === "function") window.updateMobileUI(res.room);
     updateResumeUI(true);
     playClickSound("join");
     setStatus("Room rejointe");
@@ -1266,6 +1268,7 @@ resumeBtn.addEventListener("click", () => {
 
     saveSession(res.playerId, res.playerToken, res.room.code);
     renderRoom(res.room);
+    if (typeof window.updateMobileUI === "function") window.updateMobileUI(res.room);
     updateResumeUI(true);
     playClickSound("join");
     setStatus("Reconnexion réussie");
@@ -1396,6 +1399,7 @@ socket.on("roomUpdated", (room) => {
     resetVoteSelection();
   }
   renderRoom(room);
+  if (typeof window.updateMobileUI === "function") window.updateMobileUI(room);
 });
 
 socket.on("gameStarted", ({ word }) => {

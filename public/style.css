@@ -287,10 +287,10 @@ body::after {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  min-height: 60px;
-  margin-bottom: 10px;
+  min-height: 4vw;
+  margin-bottom: 0.5vw;
   width: 100%;
-  padding: 16px 24px 0;
+  padding: 1vw 2vw 0;
 }
 
 .brand-title {
@@ -301,17 +301,17 @@ body::after {
 }
 
 .brand-logo-svg {
-  width: 48px;
-  height: 48px;
+  width: clamp(28px, 3vw, 56px);
+  height: clamp(28px, 3vw, 56px);
   flex-shrink: 0;
 }
 
 .brand-logo {
   margin: 0;
   font-family: 'Syne', sans-serif;
-  font-size: 32px;
+  font-size: clamp(18px, 2.2vw, 40px);
   font-weight: 800;
-  letter-spacing: 4px;
+  letter-spacing: 0.25vw;
   line-height: 1;
   text-transform: uppercase;
 }
@@ -368,7 +368,7 @@ body::after {
   position: relative;
   z-index: 10;
   width: 100%;
-  padding: 32px 32px 48px;
+  padding: 2vw 2vw 3vw;
 }
 
 /* ===== LANDING / ACCUEIL ===== */
@@ -385,9 +385,9 @@ body::after {
   max-width: 1600px;
 }
 
-/* Logo caché sur desktop */
+/* Logo caché partout */
 .landing-header {
-  display: none;
+  display: none !important;
 }
 
 /* Mobile tabs */
@@ -441,17 +441,17 @@ body::after {
   width: 100%;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 24px;
+  gap: clamp(12px, 1.5vw, 28px);
   align-items: stretch;
 }
 
 .login-card,
 .rules-card {
-  min-height: 420px;
+  min-height: clamp(320px, 40vh, 600px);
   background: rgba(15,22,42,0.85);
   border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 26px;
-  padding: 36px 32px;
+  border-radius: clamp(16px, 1.5vw, 28px);
+  padding: clamp(20px, 2.5vw, 44px) clamp(18px, 2.2vw, 40px);
   box-shadow:
     0 20px 50px rgba(0,0,0,0.38),
     inset 0 1px 0 rgba(255,255,255,0.06),
@@ -502,8 +502,8 @@ body::after {
 }
 
 .start-content h2 {
-  margin-bottom: 8px;
-  font-size: 34px;
+  margin-bottom: 0.5vw;
+  font-size: clamp(20px, 2.4vw, 42px);
   font-weight: 800;
   letter-spacing: 0.5px;
 }
@@ -1342,9 +1342,9 @@ button:disabled {
     height: 28px;
   }
 
-  /* Show logo in landing header on mobile */
+  /* Logo caché sur mobile aussi */
   .landing-header {
-    display: flex;
+    display: none !important;
   }
 
   .topbar-left, .topbar-right { justify-content: center; }

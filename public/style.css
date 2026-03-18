@@ -1552,8 +1552,8 @@ button:disabled {
 
   /* Chaque card du panel gauche = 80vw de large, hauteur auto, scrollable verticalement */
   .panel-left .card {
-    min-width: 80vw;
-    max-width: 80vw;
+    min-width: calc(100vw - 16px);
+    max-width: calc(100vw - 16px);
     flex: 0 0 auto;
     padding: 14px;
     border-radius: 16px;

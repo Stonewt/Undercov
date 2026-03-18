@@ -372,38 +372,32 @@ body::after {
   position: relative;
   z-index: 10;
   width: 100%;
-  padding: 0 24px 40px;
+  padding: 0 32px 40px;
 }
 
 /* ===== LANDING / ACCUEIL ===== */
 .start-screen {
   width: 100%;
   display: flex;
-  justify-content: center;
-  padding: 32px 0 40px;
+  justify-content: stretch;
+  padding: 40px 0;
 }
 
 .landing-stack {
   width: 100%;
-  max-width: 960px;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: 28px;
 }
 
-/* Logo centré EN PREMIER */
+/* Logo caché sur desktop — visible seulement mobile */
 .landing-header {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  order: 1;
+  display: none;
 }
 
-/* Cards connexion + règles — SOUS le logo */
+/* Cards connexion + règles */
 .landing-cards {
-  order: 2;
   width: 100%;
 }
 
@@ -460,6 +454,7 @@ body::after {
   grid-template-columns: 1fr 1fr;
   gap: 24px;
   align-items: stretch;
+  flex: 1;
 }
 
 .login-card,

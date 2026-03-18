@@ -624,39 +624,70 @@ body::after {
   width: 100%;
   height: 6px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.15);
   outline: none;
   padding: 0;
+  margin: 10px 0;
   cursor: pointer;
-  accent-color: #3b82f6;
+  display: block;
+  vertical-align: middle;
+  box-sizing: border-box;
+}
+
+.duration-slider::-webkit-slider-container {
+  height: 6px;
+}
+
+.duration-slider::-webkit-slider-runnable-track {
+  -webkit-appearance: none;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.15);
 }
 
 .duration-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: linear-gradient(180deg, #3b82f6, #2563eb);
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(37,99,235,0.45);
-  border: 2px solid rgba(255,255,255,0.20);
+  box-shadow: 0 2px 10px rgba(37,99,235,0.50);
+  border: 2px solid rgba(255,255,255,0.25);
+  margin-top: -9px;
+}
+
+.duration-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.15);
+  border: none;
 }
 
 .duration-slider::-moz-range-thumb {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: linear-gradient(180deg, #3b82f6, #2563eb);
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(37,99,235,0.45);
-  border: 2px solid rgba(255,255,255,0.20);
+  box-shadow: 0 2px 10px rgba(37,99,235,0.50);
+  border: 2px solid rgba(255,255,255,0.25);
 }
 
-.duration-slider::-webkit-slider-runnable-track {
+.duration-slider::-ms-track {
   height: 6px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.12);
+  background: transparent;
+  border-color: transparent;
+  color: transparent;
+}
+
+.duration-slider::-ms-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #3b82f6, #2563eb);
 }
 
 /* ===== GAME LAYOUT ===== */
@@ -1550,10 +1581,17 @@ button:disabled {
   .form-block { margin-bottom: 14px; }
   .form-block label { margin-bottom: 7px; font-size: 14px; }
 
-  input, select {
+  input:not([type="range"]), select {
     padding: 14px 15px;
-    font-size: 16px; /* prevent zoom on iOS */
+    font-size: 16px;
     border-radius: 14px;
+  }
+
+  input[type="range"] {
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
+    height: auto;
   }
 
   button {

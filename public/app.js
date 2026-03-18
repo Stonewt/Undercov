@@ -91,17 +91,52 @@ function initMobileTabs() {
   const loginCard = document.getElementById("roomSetupCard");
   const rulesCard = document.getElementById("rulesCard");
 
-  if (!mobileTabs) return;
+  if (!mobileTabs || !loginCard || !rulesCard) return;
 
-  tabButtons.forEach(button => {
+  const applyMobileTabsLayout = () => {
+    const isMobile = window.innerWidth <= 820;
+
+    if (isMobile) {
+      mobileTabs.classList.remove("hidden");
+
+      const activeBtn =
+        mobileTabs.querySelector(".mobile-tab-btn.active") ||
+        mobileTabs.querySelector('[data-tab="login"]');
+
+      tabButtons.forEach((btn) => btn.classList.remove("active"));
+
+      if (activeBtn) {
+        activeBtn.classList.add("active");
+        const tabName = activeBtn.getAttribute("data-tab");
+
+        if (tabName === "rules") {
+          loginCard.classList.add("hidden-tab");
+          rulesCard.classList.add("active");
+        } else {
+          loginCard.classList.remove("hidden-tab");
+          rulesCard.classList.remove("active");
+        }
+      } else {
+        loginCard.classList.remove("hidden-tab");
+        rulesCard.classList.remove("active");
+      }
+    } else {
+      mobileTabs.classList.add("hidden");
+      loginCard.classList.remove("hidden-tab");
+      rulesCard.classList.remove("active");
+      tabButtons.forEach((btn) => btn.classList.remove("active"));
+      const loginBtn = mobileTabs.querySelector('[data-tab="login"]');
+      if (loginBtn) loginBtn.classList.add("active");
+    }
+  };
+
+  tabButtons.forEach((button) => {
     button.addEventListener("click", () => {
       const tabName = button.getAttribute("data-tab");
-      
-      // Update active button
-      tabButtons.forEach(btn => btn.classList.remove("active"));
+
+      tabButtons.forEach((btn) => btn.classList.remove("active"));
       button.classList.add("active");
-      
-      // Update visible card
+
       if (tabName === "login") {
         loginCard.classList.remove("hidden-tab");
         rulesCard.classList.remove("active");
@@ -111,13 +146,19 @@ function initMobileTabs() {
       }
     });
   });
+
+  applyMobileTabsLayout();
+  window.addEventListener("resize", applyMobileTabsLayout);
 }
 
 window.addEventListener("load", () => {
   const intro = document.getElementById("introOverlay");
   const scene = document.getElementById("introScene");
 
-  if (!intro || !scene) return;
+  if (!intro || !scene) {
+    initMobileTabs();
+    return;
+  }
 
   setTimeout(() => {
     scene.classList.add("intro-hidden");
@@ -361,7 +402,7 @@ function resetUI() {
 
   resetVoteSelection();
   stopTimer();
-  updateResumeUI(false);
+  validateStoredSession();
 }
 
 function hideGameplayButtons() {

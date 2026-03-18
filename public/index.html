@@ -663,9 +663,6 @@
         const rbM = document.getElementById('restartBtnMobile');
         if (sbM) sbM.style.display = (isHost && !started) ? 'block' : 'none';
         if (rbM) rbM.style.display = (isHost && gameOver)  ? 'block' : 'none';
-        // Cacher boutons desktop
-        document.getElementById('startBtn')?.classList.add('hidden');
-        document.getElementById('restartBtn')?.classList.add('hidden');
 
         syncLobbyPlayers(room);
         if (isHost) populateMobileConfig(room);

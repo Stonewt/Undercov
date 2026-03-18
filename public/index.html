@@ -215,82 +215,81 @@
 
       <div class="game-layout">
 
-        <!-- Tabs mobile lobby (avant partie) -->
-        <div class="mobile-game-tabs hidden" id="mobileGameTabsLobby">
-          <button class="mobile-game-tab active" data-tab="joueurs">Joueurs</button>
-          <button class="mobile-game-tab" data-tab="config">⚙ Config</button>
+        <!-- Barre d'onglets mobile lobby -->
+        <div id="mobileTabsLobby" style="display:none;flex-shrink:0;flex-direction:row;gap:6px;padding:6px 8px;background:rgba(5,9,20,0.80);border-bottom:1px solid rgba(255,255,255,0.06);">
+          <button class="mobile-game-tab active" onclick="mobileShowLobby('joueurs')">Joueurs</button>
+          <button class="mobile-game-tab" id="mobileConfigTabBtn" onclick="mobileShowLobby('config')" style="display:none">⚙ Config</button>
         </div>
 
-        <!-- Tabs mobile en jeu -->
-        <div class="mobile-game-tabs hidden" id="mobileGameTabs">
-          <button class="mobile-game-tab" data-tab="mot">🔤 Ton mot</button>
-          <button class="mobile-game-tab active" data-tab="chat">Chat</button>
-          <button class="mobile-game-tab" data-tab="compo">Joueurs</button>
-          <button class="mobile-game-tab vote-tab" data-tab="vote">🗳 Vote</button>
+        <!-- Barre d'onglets mobile en jeu -->
+        <div id="mobileTabsGame" style="display:none;flex-shrink:0;flex-direction:row;gap:6px;padding:6px 8px;background:rgba(5,9,20,0.80);border-bottom:1px solid rgba(255,255,255,0.06);">
+          <button class="mobile-game-tab" onclick="mobileShowGame('mot')">🔤 Mot</button>
+          <button class="mobile-game-tab active" onclick="mobileShowGame('chat')">Chat</button>
+          <button class="mobile-game-tab" onclick="mobileShowGame('compo')">Joueurs</button>
+          <button class="mobile-game-tab vote-tab" onclick="mobileShowGame('vote')">🗳 Vote</button>
         </div>
 
         <div class="panel panel-left">
 
-          <!-- PANEL LOBBY JOUEURS (mobile, avant partie) -->
-          <div class="mobile-panel hidden" id="mobilePanelLobbyJoueurs">
+          <!-- PANEL LOBBY JOUEURS -->
+          <div id="mpJoueurs" style="display:none;width:100%;height:100%;overflow-y:auto;padding:8px;">
             <div class="card compact-card">
               <h3 style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;opacity:.6;margin:0 0 12px;">Joueurs connectés</h3>
               <ul id="playersListLobbyMobile" class="players-list-mobile"></ul>
             </div>
           </div>
 
-          <!-- PANEL LOBBY CONFIG (mobile, avant partie, hôte uniquement) -->
-          <div class="mobile-panel hidden" id="mobilePanelLobbyConfig">
-            <div class="card compact-card" id="compositionCardMobile">
+          <!-- PANEL LOBBY CONFIG -->
+          <div id="mpConfig" style="display:none;width:100%;height:100%;overflow-y:auto;padding:8px;">
+            <div class="card compact-card">
               <h2>Configuration</h2>
-              <p id="compositionHelpMobile"></p>
+              <p id="compositionHelpMobile" style="font-size:13px;opacity:.65;margin-bottom:12px;"></p>
               <div class="form-block">
                 <label for="undercoverCountInputM">Undercovers</label>
-                <input id="undercoverCountInputM" type="number" min="1" step="1" value="1" />
+                <input id="undercoverCountInputM" type="number" min="1" step="1" value="1" oninput="pushMobileToDesktop()" />
               </div>
               <div class="form-block">
                 <label for="mrWhiteCountInputM">Mr White</label>
-                <input id="mrWhiteCountInputM" type="number" min="0" max="1" step="1" value="0" />
+                <input id="mrWhiteCountInputM" type="number" min="0" max="1" step="1" value="0" oninput="pushMobileToDesktop()" />
               </div>
               <div class="form-block">
-                <label for="turnDurationInputM">Durée du tour : <span id="turnDurationDisplayM">30</span> s</label>
-                <input id="turnDurationInputM" type="range" min="15" max="45" step="1" value="30" class="duration-slider" />
+                <label>Durée du tour : <span id="turnDurationDisplayM">30</span> s</label>
+                <input id="turnDurationInputM" type="range" min="15" max="45" step="1" value="30" class="duration-slider" oninput="document.getElementById('turnDurationDisplayM').textContent=this.value;pushMobileToDesktop();" />
               </div>
               <div class="form-block">
-                <label for="voteDurationInputM">Durée du vote : <span id="voteDurationDisplayM">30</span> s</label>
-                <input id="voteDurationInputM" type="range" min="15" max="45" step="1" value="30" class="duration-slider" />
+                <label>Durée du vote : <span id="voteDurationDisplayM">30</span> s</label>
+                <input id="voteDurationInputM" type="range" min="15" max="45" step="1" value="30" class="duration-slider" oninput="document.getElementById('voteDurationDisplayM').textContent=this.value;pushMobileToDesktop();" />
               </div>
               <div class="form-block">
-                <label for="categorySelectM">Catégorie</label>
-                <select id="categorySelectM"></select>
+                <label>Catégorie</label>
+                <select id="categorySelectM" onchange="onMobileCatChange()"></select>
               </div>
               <div class="form-block">
-                <label for="subcategorySelectM">Sous-catégorie</label>
-                <select id="subcategorySelectM"></select>
+                <label>Sous-catégorie</label>
+                <select id="subcategorySelectM" onchange="pushMobileToDesktop()"></select>
               </div>
               <p id="compositionSummaryM" style="font-size:13px;color:#fdba74;font-weight:600;margin-top:8px;"></p>
-              <div style="margin-top:14px;">
-                <button id="startBtnMobile" class="hidden big-btn">Lancer la partie</button>
-                <button id="restartBtnMobile" class="hidden big-btn" style="margin-top:8px;">Rejouer</button>
+              <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px;">
+                <button id="startBtnMobile" style="display:none" class="big-btn" onclick="pushMobileToDesktop();document.getElementById('startBtn').click()">Lancer la partie</button>
+                <button id="restartBtnMobile" style="display:none" class="big-btn" onclick="pushMobileToDesktop();document.getElementById('restartBtn').click()">Rejouer</button>
               </div>
             </div>
           </div>
 
-          <!-- PANEL MOT (mobile, en jeu) -->
-          <div class="mobile-panel hidden" id="mobilePanelMot">
+          <!-- PANEL MOT SECRET -->
+          <div id="mpMot" style="display:none;width:100%;height:100%;overflow-y:auto;padding:8px;">
             <div class="card compact-card" id="secretCard">
               <h2>Ton mot</h2>
               <p id="wordText"></p>
             </div>
           </div>
 
-          <!-- PANEL CHAT (mobile uniquement) -->
-          <div class="mobile-panel hidden" id="mobilePanelChat">
-            <!-- le chatCard du centre sera dupliqué ici via JS -->
+          <!-- PANEL CHAT -->
+          <div id="mpChat" style="display:none;width:100%;height:100%;overflow-y:auto;padding:8px;">
           </div>
 
-          <!-- PANEL JOUEURS + COMPOSITION (mobile uniquement) -->
-          <div class="mobile-panel hidden" id="mobilePanelCompo">
+          <!-- PANEL JOUEURS EN JEU -->
+          <div id="mpCompo" style="display:none;width:100%;height:100%;overflow-y:auto;padding:8px;">
             <div class="card compact-card">
               <h3 style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;opacity:.6;margin:0 0 12px;">Joueurs</h3>
               <ul id="playersListMobile" class="players-list-mobile"></ul>
@@ -301,18 +300,16 @@
             </div>
           </div>
 
-          <!-- PANEL VOTE (mobile uniquement) -->
-          <div class="mobile-panel hidden" id="mobilePanelVote">
-            <!-- Message hors phase vote -->
-            <div class="card compact-card vote-not-ready-card" id="voteNotReadyCard">
+          <!-- PANEL VOTE -->
+          <div id="mpVote" style="display:none;width:100%;height:100%;overflow-y:auto;padding:8px;">
+            <div id="voteNotReadyCard" class="card compact-card vote-not-ready-card">
               <div class="vote-not-ready-inner">
                 <div class="vote-not-ready-icon">🗳</div>
                 <p class="vote-not-ready-title">Pas encore le moment</p>
                 <p class="vote-not-ready-sub">Le vote s'ouvrira une fois que tous les joueurs auront donné leur indice.</p>
               </div>
             </div>
-            <!-- Vraie carte vote -->
-            <div class="card compact-card vote-card-active hidden" id="voteCard">
+            <div id="voteCard" class="card compact-card vote-card-active" style="display:none">
               <div class="vote-card-header">
                 <div class="vote-pulse-dot"></div>
                 <h2>⚡ Vote en cours</h2>
@@ -325,61 +322,30 @@
             </div>
           </div>
 
-          <!-- Cards desktop (panel gauche classique, cachées sur mobile) -->
+          <!-- Cards desktop uniquement -->
           <div class="desktop-only-cards">
-            <div class="card hidden compact-card" id="secretCardDesktop">
-              <h2>Ton mot</h2>
-            </div>
-
+            <div class="card hidden compact-card" id="secretCardDesktop"><h2>Ton mot</h2></div>
             <div class="card hidden compact-card" id="compositionCard">
               <h2>Configuration</h2>
               <p id="compositionHelp"></p>
-              <div class="form-block">
-                <label for="undercoverCountInput">Undercovers</label>
-                <input id="undercoverCountInput" type="number" min="1" step="1" value="1" />
-              </div>
-              <div class="form-block">
-                <label for="mrWhiteCountInput">Mr White</label>
-                <input id="mrWhiteCountInput" type="number" min="0" max="1" step="1" value="0" />
-              </div>
-              <div class="form-block">
-                <label for="turnDurationInput">Durée du tour : <span id="turnDurationDisplay">30</span> s</label>
-                <input id="turnDurationInput" type="range" min="15" max="45" step="1" value="30" class="duration-slider" />
-              </div>
-              <div class="form-block">
-                <label for="voteDurationInput">Durée du vote : <span id="voteDurationDisplay">30</span> s</label>
-                <input id="voteDurationInput" type="range" min="15" max="45" step="1" value="30" class="duration-slider" />
-              </div>
-              <div class="form-block">
-                <label for="categorySelect">Catégorie</label>
-                <select id="categorySelect"></select>
-              </div>
-              <div class="form-block">
-                <label for="subcategorySelect">Sous-catégorie</label>
-                <select id="subcategorySelect"></select>
-              </div>
+              <div class="form-block"><label>Undercovers</label><input id="undercoverCountInput" type="number" min="1" step="1" value="1" /></div>
+              <div class="form-block"><label>Mr White</label><input id="mrWhiteCountInput" type="number" min="0" max="1" step="1" value="0" /></div>
+              <div class="form-block"><label>Durée du tour : <span id="turnDurationDisplay">30</span> s</label><input id="turnDurationInput" type="range" min="15" max="45" step="1" value="30" class="duration-slider" /></div>
+              <div class="form-block"><label>Durée du vote : <span id="voteDurationDisplay">30</span> s</label><input id="voteDurationInput" type="range" min="15" max="45" step="1" value="30" class="duration-slider" /></div>
+              <div class="form-block"><label>Catégorie</label><select id="categorySelect"></select></div>
+              <div class="form-block"><label>Sous-catégorie</label><select id="subcategorySelect"></select></div>
               <p id="compositionSummary"></p>
             </div>
-
             <div class="card hidden compact-card vote-card-active" id="voteCardDesktop">
-              <div class="vote-card-header">
-                <div class="vote-pulse-dot"></div>
-                <h2>⚡ Vote en cours</h2>
-              </div>
+              <div class="vote-card-header"><div class="vote-pulse-dot"></div><h2>⚡ Vote en cours</h2></div>
               <div id="voteButtonsDesktop"></div>
               <div class="vote-confirm-wrap">
                 <p id="selectedVoteTextDesktop">Aucun joueur sélectionné.</p>
                 <button id="confirmVoteBtnDesktop" disabled>Confirmer mon vote</button>
               </div>
             </div>
-
-            <div class="card hidden compact-card" id="resultCard">
-              <h2>Résultat</h2>
-              <p id="resultText"></p>
-            </div>
+            <div class="card hidden compact-card" id="resultCard"><h2>Résultat</h2><p id="resultText"></p></div>
           </div>
-
-        </div>
 
         <div class="panel panel-center">
           <div class="card room-card hidden" id="lobby">
@@ -467,201 +433,96 @@
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="app.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
   <script>
-    // Sliders desktop
-    const turnSlider  = document.getElementById('turnDurationInput');
-    const voteSlider  = document.getElementById('voteDurationInput');
-    const turnDisplay = document.getElementById('turnDurationDisplay');
-    const voteDisplay = document.getElementById('voteDurationDisplay');
-    if (turnSlider  && turnDisplay)  turnSlider.addEventListener('input',  () => { turnDisplay.textContent  = turnSlider.value; });
-    if (voteSlider  && voteDisplay)  voteSlider.addEventListener('input',  () => { voteDisplay.textContent  = voteSlider.value; });
+    // ── Sliders desktop ──
+    ['turnDurationInput','voteDurationInput'].forEach(id => {
+      const el = document.getElementById(id);
+      const disp = document.getElementById(id.replace('Input','Display'));
+      if (el && disp) el.addEventListener('input', () => disp.textContent = el.value);
+    });
 
-    // Sliders mobile
-    const turnSliderM  = document.getElementById('turnDurationInputM');
-    const voteSliderM  = document.getElementById('voteDurationInputM');
-    const turnDisplayM = document.getElementById('turnDurationDisplayM');
-    const voteDisplayM = document.getElementById('voteDurationDisplayM');
-    if (turnSliderM && turnDisplayM) turnSliderM.addEventListener('input', () => { turnDisplayM.textContent = turnSliderM.value; pushMobileToDesktop(); });
-    if (voteSliderM && voteDisplayM) voteSliderM.addEventListener('input', () => { voteDisplayM.textContent = voteSliderM.value; pushMobileToDesktop(); });
-
-    // Copie mobile inputs -> desktop (app.js lit les IDs desktop)
+    // ── Copie inputs mobile → desktop (app.js lit les IDs desktop) ──
     function pushMobileToDesktop() {
-      [['undercoverCountInputM','undercoverCountInput'],['mrWhiteCountInputM','mrWhiteCountInput'],
-       ['turnDurationInputM','turnDurationInput'],['voteDurationInputM','voteDurationInput'],
-       ['categorySelectM','categorySelect'],['subcategorySelectM','subcategorySelect']
-      ].forEach(([m,d]) => { const em = document.getElementById(m), ed = document.getElementById(d); if (em && ed) ed.value = em.value; });
-    }
-
-    // Remplit le panel config mobile directement depuis les données room
-    function populateMobileConfig(room) {
-      if (!room) return;
-      const isHost = room.hostPlayerId === window.myPlayerId;
-      if (!isHost) return;
-
-      const playerCount = room.players ? room.players.length : 0;
-
-      // Help text
-      const hM = document.getElementById('compositionHelpMobile');
-      if (hM) hM.textContent = playerCount <= 3
-        ? "À 3 joueurs : composition fixe."
-        : "L'hôte choisit la composition, les durées et la catégorie.";
-
-      // Inputs numériques : prendre les valeurs desktop si dispo, sinon room
-      const fields = [
-        ['undercoverCountInput','undercoverCountInputM'],
-        ['mrWhiteCountInput','mrWhiteCountInputM'],
-        ['turnDurationInput','turnDurationInputM'],
-        ['voteDurationInput','voteDurationInputM'],
-      ];
-      fields.forEach(([dId, mId]) => {
-        const d = document.getElementById(dId);
-        const m = document.getElementById(mId);
-        if (d && m) m.value = d.value;
+      [['undercoverCountInputM','undercoverCountInput'],
+       ['mrWhiteCountInputM','mrWhiteCountInput'],
+       ['turnDurationInputM','turnDurationInput'],
+       ['voteDurationInputM','voteDurationInput'],
+       ['categorySelectM','categorySelect'],
+       ['subcategorySelectM','subcategorySelect']
+      ].forEach(([m,d]) => {
+        const em = document.getElementById(m), ed = document.getElementById(d);
+        if (em && ed) ed.value = em.value;
       });
-
-      // Affichage durées
-      const tdM = document.getElementById('turnDurationDisplayM');
-      const vdM = document.getElementById('voteDurationDisplayM');
-      const tdI = document.getElementById('turnDurationInputM');
-      const vdI = document.getElementById('voteDurationInputM');
-      if (tdM && tdI) tdM.textContent = tdI.value;
-      if (vdM && vdI) vdM.textContent = vdI.value;
-
-      // Catégories depuis room.categoryOptions
-      const catM = document.getElementById('categorySelectM');
-      const subM = document.getElementById('subcategorySelectM');
-      const opts = Array.isArray(room.categoryOptions) ? room.categoryOptions : [];
-
-      if (catM && opts.length > 0) {
-        const currentCat = room.selectedCategory || opts[0]?.name || '';
-        catM.innerHTML = '';
-        opts.forEach(cat => {
-          const o = document.createElement('option');
-          o.value = cat.name; o.textContent = cat.name;
-          o.selected = cat.name === currentCat;
-          catM.appendChild(o);
-        });
-
-        // Sous-catégories
-        const selCat = opts.find(c => c.name === catM.value) || opts[0];
-        if (subM && selCat) {
-          const currentSub = room.selectedSubcategory || selCat.subcategories[0] || '';
-          subM.innerHTML = '';
-          (selCat.subcategories || []).forEach(name => {
-            const o = document.createElement('option');
-            o.value = name; o.textContent = name;
-            o.selected = name === currentSub;
-            subM.appendChild(o);
-          });
-        }
-      }
-
-      // Résumé
-      const sD = document.getElementById('compositionSummary');
-      const sM = document.getElementById('compositionSummaryM');
-      if (sM) {
-        if (sD && sD.textContent) {
-          sM.textContent = sD.textContent;
-        } else {
-          const uc = document.getElementById('undercoverCountInputM')?.value || 1;
-          const mw = document.getElementById('mrWhiteCountInputM')?.value || 0;
-          const cc = playerCount - Number(uc) - Number(mw);
-          const td = document.getElementById('turnDurationInputM')?.value || 30;
-          const vd = document.getElementById('voteDurationInputM')?.value || 30;
-          sM.textContent = `${cc} civil(s) • ${uc} undercover(s) • Tours ${td}s • Vote ${vd}s`;
-        }
-      }
-
-      // Bouton disabled si 3 joueurs
-      const ucM = document.getElementById('undercoverCountInputM');
-      const mwM = document.getElementById('mrWhiteCountInputM');
-      if (ucM) ucM.disabled = playerCount <= 3;
-      if (mwM) mwM.disabled = playerCount <= 3;
     }
 
-    // Copie desktop -> mobile (fallback)
-    function pushDesktopToMobile() {
-      // Remplacé par populateMobileConfig — gardé pour compatibilité
-    }
-
-    // Interactions selects/inputs mobiles -> desktop
-    document.getElementById('categorySelectM')?.addEventListener('change', () => {
-      const catM = document.getElementById('categorySelectM');
-      const subM = document.getElementById('subcategorySelectM');
+    // ── Changement catégorie mobile ──
+    function onMobileCatChange() {
+      pushMobileToDesktop();
       const room = window.currentRoom;
-      const opts = (room && Array.isArray(room.categoryOptions)) ? room.categoryOptions : [];
-      const selCat = opts.find(c => c.name === catM?.value) || opts[0];
-      if (subM && selCat) {
+      const catM = document.getElementById('categorySelectM');
+      const subM = document.getElementById('subcategorySelectM');
+      const opts = (room && room.categoryOptions) || [];
+      const cat = opts.find(c => c.name === catM.value) || opts[0];
+      if (subM && cat) {
         subM.innerHTML = '';
-        (selCat.subcategories || []).forEach((name, i) => {
+        (cat.subcategories || []).forEach((n,i) => {
           const o = document.createElement('option');
-          o.value = name; o.textContent = name;
-          if (i === 0) o.selected = true;
+          o.value = n; o.textContent = n; if(i===0) o.selected=true;
           subM.appendChild(o);
         });
       }
       pushMobileToDesktop();
-    });
-    document.getElementById('subcategorySelectM')?.addEventListener('change', pushMobileToDesktop);
-    ['undercoverCountInputM','mrWhiteCountInputM'].forEach(id => document.getElementById(id)?.addEventListener('input', pushMobileToDesktop));
-
-    // Code room cliquable
-    const topRoomBtn = document.getElementById('topRoomInfo');
-    const topRoomCode = document.getElementById('topRoomCode');
-    function updateRoomCodeBtn(code) {
-      if (!topRoomBtn || !topRoomCode) return;
-      if (code) { topRoomCode.textContent = 'Room ' + code; topRoomBtn.classList.remove('hidden'); topRoomBtn._code = code; }
-      else { topRoomBtn.classList.add('hidden'); topRoomBtn._code = null; }
     }
-    if (topRoomBtn) {
-      topRoomBtn.addEventListener('click', () => {
-        const code = topRoomBtn._code; if (!code) return;
-        const ok = () => { topRoomBtn.classList.add('copy-flash'); setTimeout(() => topRoomBtn.classList.remove('copy-flash'), 900); };
-        if (navigator.clipboard) navigator.clipboard.writeText(code).then(ok).catch(() => { const e = document.createElement('textarea'); e.value = code; document.body.appendChild(e); e.select(); document.execCommand('copy'); document.body.removeChild(e); ok(); });
-        else { const e = document.createElement('textarea'); e.value = code; document.body.appendChild(e); e.select(); document.execCommand('copy'); document.body.removeChild(e); ok(); }
+
+    // ── Code room cliquable ──
+    document.getElementById('topRoomInfo')?.addEventListener('click', function() {
+      const code = window.currentRoom?.code; if (!code) return;
+      const ok = () => { this.classList.add('copy-flash'); setTimeout(()=>this.classList.remove('copy-flash'),900); };
+      navigator.clipboard ? navigator.clipboard.writeText(code).then(ok).catch(ok) : ok();
+    });
+
+    // ── Système onglets mobile ULTRA SIMPLE ──
+    // Tous les panels : IDs directs, display block/none
+    const MP = {
+      joueurs: 'mpJoueurs', config: 'mpConfig',
+      mot: 'mpMot', chat: 'mpChat', compo: 'mpCompo', vote: 'mpVote'
+    };
+    let _lobbyTab = 'joueurs', _gameTab = 'chat';
+
+    function hideAllMP() {
+      Object.values(MP).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
       });
     }
 
-    // Systeme onglets mobile
-    const ALL_PANELS = ['mobilePanelLobbyJoueurs','mobilePanelLobbyConfig','mobilePanelMot','mobilePanelChat','mobilePanelCompo','mobilePanelVote'];
-    let _activeTab = 'chat', _activeLobbyTab = 'joueurs';
-    function isMobile() { return window.innerWidth <= 820; }
-
-    function hideAllPanels() {
-      ALL_PANELS.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
-      const lt = document.getElementById('mobileGameTabsLobby');
-      const gt = document.getElementById('mobileGameTabs');
-      if (lt) lt.style.display = 'none';
-      if (gt) gt.style.display = 'none';
+    function mobileShowLobby(tab) {
+      _lobbyTab = tab;
+      hideAllMP();
+      const el = document.getElementById(MP[tab]);
+      if (el) el.style.display = 'block';
+      // Mettre à jour boutons onglets
+      document.querySelectorAll('#mobileTabsLobby .mobile-game-tab').forEach(b => {
+        const t = b.getAttribute('onclick')?.match(/'(\w+)'/)?.[1];
+        b.classList.toggle('active', t === tab);
+      });
     }
 
-    function showLobbyTab(tabName) {
-      if (!isMobile()) return;
-      _activeLobbyTab = tabName;
-      hideAllPanels();
-      const tabs = document.getElementById('mobileGameTabsLobby');
-      if (tabs) {
-        tabs.style.display = '';
-        tabs.querySelectorAll('.mobile-game-tab').forEach(b => b.classList.toggle('active', b.getAttribute('data-tab') === tabName));
+    function mobileShowGame(tab) {
+      _gameTab = tab;
+      hideAllMP();
+      const el = document.getElementById(MP[tab]);
+      if (el) el.style.display = 'block';
+      document.querySelectorAll('#mobileTabsGame .mobile-game-tab').forEach(b => {
+        const t = b.getAttribute('onclick')?.match(/'(\w+)'/)?.[1];
+        b.classList.toggle('active', t === tab);
+      });
+      if (tab === 'compo' && window.currentRoom) {
+        syncMobilePlayersList(window.currentRoom);
+        syncMobileRoleDolls(window.currentRoom);
       }
-      const panelId = tabName === 'joueurs' ? 'mobilePanelLobbyJoueurs' : 'mobilePanelLobbyConfig';
-      const panel = document.getElementById(panelId);
-      if (panel) panel.style.display = '';
-    }
-
-    function showGameTab(tabName) {
-      if (!isMobile()) return;
-      _activeTab = tabName;
-      hideAllPanels();
-      const tabs = document.getElementById('mobileGameTabs');
-      if (tabs) {
-        tabs.style.display = '';
-        tabs.querySelectorAll('.mobile-game-tab').forEach(b => b.classList.toggle('active', b.getAttribute('data-tab') === tabName));
-      }
-      const map = { mot:'mobilePanelMot', chat:'mobilePanelChat', compo:'mobilePanelCompo', vote:'mobilePanelVote' };
-      const panel = document.getElementById(map[tabName]);
-      if (panel) panel.style.display = '';
-      if (tabName === 'compo' && window.currentRoom) { syncMobilePlayersList(window.currentRoom); syncMobileRoleDolls(window.currentRoom); }
     }
 
     function syncLobbyPlayers(room) {
@@ -681,7 +542,9 @@
       ul.innerHTML = '';
       (room.players || []).forEach(p => {
         const li = document.createElement('li');
-        li.className = 'players-list-mobile-item' + (p.eliminated ? ' player-dead' : '') + (p.id === room.currentSpeakerId && room.phase === 'speaking' ? ' player-current' : '');
+        li.className = 'players-list-mobile-item'
+          + (p.eliminated ? ' player-dead' : '')
+          + (p.id === room.currentSpeakerId && room.phase === 'speaking' ? ' player-current' : '');
         let t = p.name;
         if (p.id === window.myPlayerId) t += ' (toi)';
         if (p.id === room.hostPlayerId) t += ' 👑';
@@ -695,95 +558,173 @@
       c.innerHTML = '';
       const comp = room.roleComposition || {};
       ['civil','undercover','mrwhite'].forEach(role => {
-        for (let i = 0; i < (comp[role] || 0); i++) {
-          const d = document.createElement('div'); d.className = 'role-doll ' + role;
+        for (let i = 0; i < (comp[role]||0); i++) {
+          const d = document.createElement('div'); d.className = 'role-doll '+role;
           d.innerHTML = '<div class="role-doll-head"></div><div class="role-doll-body"></div>';
           c.appendChild(d);
         }
       });
     }
 
-    document.getElementById('startBtnMobile')?.addEventListener('click', () => { pushMobileToDesktop(); document.getElementById('startBtn')?.click(); });
-    document.getElementById('restartBtnMobile')?.addEventListener('click', () => { pushMobileToDesktop(); document.getElementById('restartBtn')?.click(); });
+    function populateMobileConfig(room) {
+      const isHost = room.hostPlayerId === window.myPlayerId;
+      if (!isHost) return;
 
-    function updateMobileUI(room) {
-      window.updateMobileUI = updateMobileUI; // expose globalement
-      if (!isMobile()) return;
-      updateRoomCodeBtn(room ? room.code : null);
-      if (!room) { hideAllPanels(); return; }
+      // Help
+      const h = document.getElementById('compositionHelpMobile');
+      if (h) h.textContent = room.players.length <= 3
+        ? 'À 3 joueurs : composition fixe.'
+        : "L'hôte choisit la composition, les durées et la catégorie.";
+
+      // Sync valeurs numériques depuis desktop
+      [['undercoverCountInput','undercoverCountInputM'],
+       ['mrWhiteCountInput','mrWhiteCountInputM'],
+       ['turnDurationInput','turnDurationInputM'],
+       ['voteDurationInput','voteDurationInputM']
+      ].forEach(([d,m]) => {
+        const ed = document.getElementById(d), em = document.getElementById(m);
+        if (ed && em) em.value = ed.value;
+      });
+      const tdM = document.getElementById('turnDurationDisplayM');
+      const vdM = document.getElementById('voteDurationDisplayM');
+      const tdI = document.getElementById('turnDurationInputM');
+      const vdI = document.getElementById('voteDurationInputM');
+      if (tdM && tdI) tdM.textContent = tdI.value;
+      if (vdM && vdI) vdM.textContent = vdI.value;
+
+      // Catégories directement depuis room
+      const catM = document.getElementById('categorySelectM');
+      const subM = document.getElementById('subcategorySelectM');
+      const opts = Array.isArray(room.categoryOptions) ? room.categoryOptions : [];
+      if (catM && opts.length) {
+        catM.innerHTML = '';
+        opts.forEach(cat => {
+          const o = document.createElement('option');
+          o.value = cat.name; o.textContent = cat.name;
+          o.selected = cat.name === (room.selectedCategory || opts[0].name);
+          catM.appendChild(o);
+        });
+        const selCat = opts.find(c => c.name === catM.value) || opts[0];
+        if (subM && selCat) {
+          subM.innerHTML = '';
+          (selCat.subcategories||[]).forEach((n,i) => {
+            const o = document.createElement('option');
+            o.value = n; o.textContent = n;
+            o.selected = n === (room.selectedSubcategory || selCat.subcategories[0]);
+            subM.appendChild(o);
+          });
+        }
+      }
+
+      // Résumé
+      const sD = document.getElementById('compositionSummary');
+      const sM = document.getElementById('compositionSummaryM');
+      if (sM && sD) sM.textContent = sD.textContent;
+
+      // Disabled si 3 joueurs
+      const ucM = document.getElementById('undercoverCountInputM');
+      const mwM = document.getElementById('mrWhiteCountInputM');
+      if (ucM) ucM.disabled = room.players.length <= 3;
+      if (mwM) mwM.disabled = room.players.length <= 3;
+    }
+
+    // ── Fonction principale appelée par app.js ──
+    window.updateMobileUI = function(room) {
+      const mobile = window.innerWidth <= 820;
+
+      // Code room cliquable (PC + mobile)
+      const btn = document.getElementById('topRoomInfo');
+      const code = document.getElementById('topRoomCode');
+      if (btn && code && room) { code.textContent = 'Room ' + room.code; btn.classList.remove('hidden'); btn._code = room.code; }
+      else if (btn) btn.classList.add('hidden');
+
+      if (!mobile) return;
+
+      if (!room) { hideAllMP(); return; }
 
       const isHost   = room.hostPlayerId === window.myPlayerId;
       const started  = !!room.started;
       const gameOver = !!room.gameOver;
       const isVoting = room.phase === 'voting' && !gameOver;
 
+      const lobbyTabs = document.getElementById('mobileTabsLobby');
+      const gameTabs  = document.getElementById('mobileTabsGame');
+
       if (!started || gameOver) {
-        populateMobileConfig(room);
-        syncLobbyPlayers(room);
-        const cfgTab = document.querySelector('#mobileGameTabsLobby [data-tab="config"]');
-        if (cfgTab) cfgTab.style.display = isHost ? '' : 'none';
+        // ── LOBBY ──
+        if (lobbyTabs) lobbyTabs.style.display = 'flex';
+        if (gameTabs)  gameTabs.style.display  = 'none';
+
+        // Onglet config : visible seulement hôte
+        const cfgBtn = document.getElementById('mobileConfigTabBtn');
+        if (cfgBtn) cfgBtn.style.display = isHost ? '' : 'none';
+
+        // Boutons
         const sbM = document.getElementById('startBtnMobile');
         const rbM = document.getElementById('restartBtnMobile');
-        if (sbM) sbM.classList.toggle('hidden', !isHost || started);
-        if (rbM) rbM.classList.toggle('hidden', !isHost || !gameOver);
+        if (sbM) sbM.style.display = (isHost && !started) ? 'block' : 'none';
+        if (rbM) rbM.style.display = (isHost && gameOver)  ? 'block' : 'none';
+        // Cacher boutons desktop
         document.getElementById('startBtn')?.classList.add('hidden');
         document.getElementById('restartBtn')?.classList.add('hidden');
-        if (_activeLobbyTab === 'config' && !isHost) _activeLobbyTab = 'joueurs';
-        showLobbyTab(_activeLobbyTab);
+
+        syncLobbyPlayers(room);
+        if (isHost) populateMobileConfig(room);
+
+        // Si non-hôte était sur config → forcer joueurs
+        if (_lobbyTab === 'config' && !isHost) _lobbyTab = 'joueurs';
+        mobileShowLobby(_lobbyTab);
+
       } else {
-        const voteTabBtn = document.querySelector('#mobileGameTabs .vote-tab');
-        if (voteTabBtn) voteTabBtn.classList.toggle('vote-tab-active-phase', isVoting);
+        // ── EN JEU ──
+        if (lobbyTabs) lobbyTabs.style.display = 'none';
+        if (gameTabs)  gameTabs.style.display  = 'flex';
+
+        // Style vote tab
+        const voteBtn = gameTabs?.querySelector('[onclick*="vote"]');
+        if (voteBtn) voteBtn.classList.toggle('vote-tab-active-phase', isVoting);
+
+        // Contenu panel vote
         const voteCard = document.getElementById('voteCard');
         const voteNR   = document.getElementById('voteNotReadyCard');
         if (voteCard) voteCard.style.display = isVoting ? '' : 'none';
         if (voteNR)   voteNR.style.display   = isVoting ? 'none' : '';
-        if (isVoting && _activeTab !== 'vote') showGameTab('vote');
+
+        if (isVoting && _gameTab !== 'vote') mobileShowGame('vote');
         else {
-          if (_activeTab === 'compo') { syncMobilePlayersList(room); syncMobileRoleDolls(room); }
-          showGameTab(_activeTab);
+          if (_gameTab === 'compo') { syncMobilePlayersList(room); syncMobileRoleDolls(room); }
+          mobileShowGame(_gameTab);
         }
       }
-    }
+    };
 
+    // ── Appel au load pour patcher renderRoom ──
     window.addEventListener('load', () => {
-      hideAllPanels();
-
-      const catSelect = document.getElementById('categorySelect');
-      const subSelect = document.getElementById('subcategorySelect');
-      if (catSelect && subSelect) {
-        catSelect.addEventListener('change', () => {
-          const opts = (window.currentRoom && window.currentRoom.categoryOptions) || [];
-          const cat = opts.find(c => c.name === catSelect.value);
+      // Fix catégorie desktop
+      const catD = document.getElementById('categorySelect');
+      const subD = document.getElementById('subcategorySelect');
+      if (catD && subD) {
+        catD.addEventListener('change', () => {
+          const opts = (window.currentRoom?.categoryOptions) || [];
+          const cat = opts.find(c => c.name === catD.value);
           if (cat) {
-            const prev = subSelect.value; subSelect.innerHTML = '';
-            cat.subcategories.forEach((name, i) => {
-              const o = document.createElement('option'); o.value = name; o.textContent = name;
-              if (name === prev || i === 0) o.selected = true; subSelect.appendChild(o);
+            const prev = subD.value; subD.innerHTML = '';
+            cat.subcategories.forEach((n,i) => {
+              const o = document.createElement('option'); o.value=n; o.textContent=n;
+              if(n===prev||i===0) o.selected=true; subD.appendChild(o);
             });
-            if (typeof renderComposition === 'function' && window.currentRoom) renderComposition(window.currentRoom);
-            const catM = document.getElementById('categorySelectM'), subM = document.getElementById('subcategorySelectM');
-            if (catM) catM.value = catSelect.value;
-            if (subM) { subM.innerHTML = subSelect.innerHTML; subM.value = subSelect.value; }
+            if (typeof renderComposition==='function' && window.currentRoom) renderComposition(window.currentRoom);
           }
         });
       }
 
-      document.querySelectorAll('#mobileGameTabsLobby .mobile-game-tab').forEach(btn =>
-        btn.addEventListener('click', () => showLobbyTab(btn.getAttribute('data-tab'))));
-      document.querySelectorAll('#mobileGameTabs .mobile-game-tab').forEach(btn =>
-        btn.addEventListener('click', () => showGameTab(btn.getAttribute('data-tab'))));
-
+      // gameStarted → aller sur mot
       if (window.socket) {
-        window.socket.on('roomUpdated', (room) => updateMobileUI(room));
-        window.socket.on('gameStarted', () => { if (isMobile()) setTimeout(() => showGameTab('mot'), 150); });
-      }
-
-      const origRR = window.renderRoom;
-      if (typeof origRR === 'function') {
-        window.renderRoom = function(room) { origRR(room); updateMobileUI(room); };
+        window.socket.on('gameStarted', () => {
+          if (window.innerWidth <= 820) setTimeout(() => mobileShowGame('mot'), 150);
+        });
       }
     });
   </script>
-
 </body>
 </html>

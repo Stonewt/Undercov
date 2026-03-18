@@ -213,6 +213,14 @@
       </div>
 
       <div class="game-layout">
+        <!-- Tabs mobile pour naviguer entre les cards -->
+        <div class="mobile-game-tabs" id="mobileGameTabs">
+          <button class="mobile-game-tab active" data-panel="secretCard">Mon mot</button>
+          <button class="mobile-game-tab" data-panel="compositionCard">Config</button>
+          <button class="mobile-game-tab" data-panel="voteCard">Vote</button>
+          <button class="mobile-game-tab" data-panel="resultCard">Résultat</button>
+        </div>
+
         <div class="panel panel-left">
 
           <div class="card hidden compact-card" id="secretCard">
@@ -403,36 +411,74 @@
       });
     }
 
-    // Patch renderRoom + fix catégorie
+    // Patch renderRoom + fix catégorie + tabs mobile game
     window.addEventListener('load', () => {
+
+      // Patch renderRoom
       if (typeof renderRoom === 'function') {
         const _orig = renderRoom;
         window.renderRoom = function(room) {
           _orig(room);
           updateCopyBtn(room ? room.code : null);
+          updateMobileGameTabs(room);
         };
       }
 
+      // Fix catégorie — écoute robuste
       const catSelect = document.getElementById('categorySelect');
       const subSelect = document.getElementById('subcategorySelect');
       if (catSelect && subSelect) {
         catSelect.addEventListener('change', () => {
-          if (!window.currentRoom) return;
-          const opts = window.currentRoom.categoryOptions || [];
+          const opts = (window.currentRoom && window.currentRoom.categoryOptions) || [];
           const cat = opts.find(c => c.name === catSelect.value);
           if (cat) {
+            const prevVal = subSelect.value;
             subSelect.innerHTML = '';
             cat.subcategories.forEach((name, i) => {
               const opt = document.createElement('option');
               opt.value = name; opt.textContent = name;
-              if (i === 0) opt.selected = true;
+              if (name === prevVal || i === 0) opt.selected = (name === prevVal || i === 0);
               subSelect.appendChild(opt);
             });
-            if (typeof renderComposition === 'function') renderComposition(window.currentRoom);
+            if (typeof renderComposition === 'function' && window.currentRoom) {
+              renderComposition(window.currentRoom);
+            }
           }
         });
       }
+
+      // Tabs mobile game
+      const tabBtns = document.querySelectorAll('.mobile-game-tab');
+      tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const panelId = btn.getAttribute('data-panel');
+          tabBtns.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          const card = document.getElementById(panelId);
+          if (card && card.parentElement) {
+            card.parentElement.scrollTo({ left: card.offsetLeft - 8, behavior: 'smooth' });
+          }
+        });
+      });
     });
+
+    function updateMobileGameTabs(room) {
+      const tabs = document.getElementById('mobileGameTabs');
+      if (!tabs) return;
+      if (!room || !room.started) {
+        tabs.style.display = 'none';
+        return;
+      }
+      tabs.style.display = '';
+
+      const voteTab = tabs.querySelector('[data-panel="voteCard"]');
+      const resultTab = tabs.querySelector('[data-panel="resultCard"]');
+      const configTab = tabs.querySelector('[data-panel="compositionCard"]');
+
+      if (voteTab) voteTab.style.display = room.phase === 'voting' ? '' : 'none';
+      if (resultTab) resultTab.style.display = '';
+      if (configTab) configTab.style.display = room.gameOver ? '' : 'none';
+    }
   </script>
 </body>
 </html>

@@ -982,21 +982,104 @@ function handlePlayerDeparture(playerId, roomCode) {
   const player = db.prepare("SELECT * FROM players WHERE id = ?").get(playerId);
   if (!player) return;
 
-  updatePlayer(player.id, {
-    connected: 0,
-    socket_id: null
-  });
+  // Marquer déconnecté dans tous les cas
+  updatePlayer(player.id, { connected: 0, socket_id: null });
 
   const players = getPlayersByRoom(room.code);
   const connectedPlayers = players.filter((p) => p.connected);
 
+  // Plus personne → supprimer la room
   if (connectedPlayers.length === 0) {
-    if (!room.started || room.game_over) {
-      clearAllRoomTimers(room.code);
-      db.prepare("DELETE FROM players WHERE room_code = ?").run(room.code);
-      db.prepare("DELETE FROM rooms WHERE code = ?").run(room.code);
-    }
+    clearAllRoomTimers(room.code);
+    db.prepare("DELETE FROM players WHERE room_code = ?").run(room.code);
+    db.prepare("DELETE FROM rooms WHERE code = ?").run(room.code);
     return;
+  }
+
+  // Partie en cours → déconnexion temporaire, le joueur peut revenir
+  if (room.started && !room.game_over) {
+
+    // Si un seul joueur connecté vivant reste → arrêter la partie
+    const connectedAlive = players.filter((p) => p.connected && !p.eliminated);
+    if (connectedAlive.length <= 1) {
+      clearAllRoomTimers(room.code);
+      pushSystemMessage(room.code, "Plus assez de joueurs connectés. La partie est arrêtée.");
+      updateRoom(room.code, {
+        game_over: 1, phase: "finished",
+        turn_ends_at: null, vote_ends_at: null, winner: "aucun"
+      });
+      emitRoom(room.code);
+      return;
+    }
+
+    // Avancer le tour si c'était ce joueur qui devait parler
+    const currentSpeakerId = getCurrentSpeakerId(room);
+    if (room.phase === "speaking" && currentSpeakerId === player.id) {
+      pushSystemMessage(room.code, `${player.name} s'est déconnecté.`);
+      advanceTurn(room.code);
+      return;
+    }
+
+    // Retirer son vote si phase de vote
+    if (room.phase === "voting") {
+      const votes = safeJsonParse(room.votes, {});
+      delete votes[player.id];
+      updateRoom(room.code, { votes: JSON.stringify(votes) });
+      if (everyoneAliveHasVoted(room.code)) {
+        finishVotingNow(room.code);
+        return;
+      }
+    }
+
+    emitRoom(room.code);
+    return;
+  }
+
+  // Pas de partie en cours (lobby ou fin) → supprimer le joueur définitivement
+  db.prepare("DELETE FROM players WHERE id = ?").run(player.id);
+
+  // Réassigner l'hôte si nécessaire
+  if (room.host_player_id === player.id) {
+    const newHost = connectedPlayers.find((p) => p.id !== player.id);
+    if (newHost) updateRoom(room.code, { host_player_id: newHost.id });
+  }
+
+  emitRoom(room.code);
+}
+
+  // Pas de partie en cours (lobby ou fin) → supprimer le joueur définitivement
+  db.prepare("DELETE FROM players WHERE id = ?").run(player.id);
+
+  // Réassigner l'hôte si nécessaire
+  if (room.host_player_id === player.id) {
+    const newHost = connectedPlayers.find((p) => p.id !== player.id);
+    if (newHost) updateRoom(room.code, { host_player_id: newHost.id });
+  }
+
+  emitRoom(room.code);
+}
+
+    // Avancer le tour si c'était ce joueur qui parlait
+    const currentSpeakerId = getCurrentSpeakerId(room);
+    if (room.phase === "speaking" && currentSpeakerId === player.id) {
+      advanceTurn(room.code);
+    }
+
+    // Retirer son vote si phase de vote
+    if (room.phase === "voting") {
+      const votes = safeJsonParse(room.votes, {});
+      delete votes[player.id];
+      updateRoom(room.code, { votes: JSON.stringify(votes) });
+      if (everyoneAliveHasVoted(room.code)) {
+        finishVotingNow(room.code);
+      }
+    }
+  }
+
+  // Réassigner l'hôte si nécessaire
+  if (room.host_player_id === player.id) {
+    const newHost = connectedPlayers.find((p) => p.id !== player.id);
+    if (newHost) updateRoom(room.code, { host_player_id: newHost.id });
   }
 
   emitRoom(room.code);

@@ -618,6 +618,52 @@ body::after {
 
 
 
+
+/* ===== MOBILE GAME TABS ===== */
+.mobile-game-tabs {
+  display: none;
+  flex-shrink: 0;
+  flex-direction: row;
+  gap: 6px;
+  padding: 6px 8px;
+  background: rgba(5,9,20,0.80);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.mobile-game-tabs::-webkit-scrollbar { display: none; }
+
+.mobile-game-tab {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.10);
+  color: rgba(255,255,255,0.65);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  box-shadow: none;
+}
+
+.mobile-game-tab::after { display: none; }
+
+.mobile-game-tab.active {
+  background: linear-gradient(180deg, #3b82f6, #2563eb);
+  border-color: rgba(255,255,255,0.20);
+  color: white;
+  box-shadow: 0 3px 10px rgba(59,130,246,0.30);
+}
+
+.mobile-game-tab:hover:not(.active) {
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.85);
+  filter: none;
+  transform: none;
+}
+
 /* ===== COPY CODE BTN ===== */
 .copy-code-wrap {
   position: absolute;
@@ -1655,6 +1701,10 @@ button:disabled {
   }
 
   /* ── Game mobile ── */
+
+  .mobile-game-tabs {
+    display: flex;
+  }
 
   /* Le game-layout prend tout l'espace restant sous la topbar */
   .game-layout {

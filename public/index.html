@@ -492,31 +492,115 @@
       ].forEach(([m,d]) => { const em = document.getElementById(m), ed = document.getElementById(d); if (em && ed) ed.value = em.value; });
     }
 
-    // Copie desktop -> mobile (pour afficher les valeurs actuelles)
+    // Remplit le panel config mobile directement depuis les données room
+    function populateMobileConfig(room) {
+      if (!room) return;
+      const isHost = room.hostPlayerId === window.myPlayerId;
+      if (!isHost) return;
+
+      const playerCount = room.players ? room.players.length : 0;
+
+      // Help text
+      const hM = document.getElementById('compositionHelpMobile');
+      if (hM) hM.textContent = playerCount <= 3
+        ? "À 3 joueurs : composition fixe."
+        : "L'hôte choisit la composition, les durées et la catégorie.";
+
+      // Inputs numériques : prendre les valeurs desktop si dispo, sinon room
+      const fields = [
+        ['undercoverCountInput','undercoverCountInputM'],
+        ['mrWhiteCountInput','mrWhiteCountInputM'],
+        ['turnDurationInput','turnDurationInputM'],
+        ['voteDurationInput','voteDurationInputM'],
+      ];
+      fields.forEach(([dId, mId]) => {
+        const d = document.getElementById(dId);
+        const m = document.getElementById(mId);
+        if (d && m) m.value = d.value;
+      });
+
+      // Affichage durées
+      const tdM = document.getElementById('turnDurationDisplayM');
+      const vdM = document.getElementById('voteDurationDisplayM');
+      const tdI = document.getElementById('turnDurationInputM');
+      const vdI = document.getElementById('voteDurationInputM');
+      if (tdM && tdI) tdM.textContent = tdI.value;
+      if (vdM && vdI) vdM.textContent = vdI.value;
+
+      // Catégories depuis room.categoryOptions
+      const catM = document.getElementById('categorySelectM');
+      const subM = document.getElementById('subcategorySelectM');
+      const opts = Array.isArray(room.categoryOptions) ? room.categoryOptions : [];
+
+      if (catM && opts.length > 0) {
+        const currentCat = room.selectedCategory || opts[0]?.name || '';
+        catM.innerHTML = '';
+        opts.forEach(cat => {
+          const o = document.createElement('option');
+          o.value = cat.name; o.textContent = cat.name;
+          o.selected = cat.name === currentCat;
+          catM.appendChild(o);
+        });
+
+        // Sous-catégories
+        const selCat = opts.find(c => c.name === catM.value) || opts[0];
+        if (subM && selCat) {
+          const currentSub = room.selectedSubcategory || selCat.subcategories[0] || '';
+          subM.innerHTML = '';
+          (selCat.subcategories || []).forEach(name => {
+            const o = document.createElement('option');
+            o.value = name; o.textContent = name;
+            o.selected = name === currentSub;
+            subM.appendChild(o);
+          });
+        }
+      }
+
+      // Résumé
+      const sD = document.getElementById('compositionSummary');
+      const sM = document.getElementById('compositionSummaryM');
+      if (sM) {
+        if (sD && sD.textContent) {
+          sM.textContent = sD.textContent;
+        } else {
+          const uc = document.getElementById('undercoverCountInputM')?.value || 1;
+          const mw = document.getElementById('mrWhiteCountInputM')?.value || 0;
+          const cc = playerCount - Number(uc) - Number(mw);
+          const td = document.getElementById('turnDurationInputM')?.value || 30;
+          const vd = document.getElementById('voteDurationInputM')?.value || 30;
+          sM.textContent = `${cc} civil(s) • ${uc} undercover(s) • Tours ${td}s • Vote ${vd}s`;
+        }
+      }
+
+      // Bouton disabled si 3 joueurs
+      const ucM = document.getElementById('undercoverCountInputM');
+      const mwM = document.getElementById('mrWhiteCountInputM');
+      if (ucM) ucM.disabled = playerCount <= 3;
+      if (mwM) mwM.disabled = playerCount <= 3;
+    }
+
+    // Copie desktop -> mobile (fallback)
     function pushDesktopToMobile() {
-      [['undercoverCountInput','undercoverCountInputM'],['mrWhiteCountInput','mrWhiteCountInputM'],
-       ['turnDurationInput','turnDurationInputM'],['voteDurationInput','voteDurationInputM']
-      ].forEach(([d,m]) => { const ed = document.getElementById(d), em = document.getElementById(m); if (ed && em) em.value = ed.value; });
-      if (turnDisplayM) turnDisplayM.textContent = document.getElementById('turnDurationInputM')?.value || '30';
-      if (voteDisplayM) voteDisplayM.textContent = document.getElementById('voteDurationInputM')?.value || '30';
-      const catD = document.getElementById('categorySelect'), catM = document.getElementById('categorySelectM');
-      const subD = document.getElementById('subcategorySelect'), subM = document.getElementById('subcategorySelectM');
-      if (catD && catM) { catM.innerHTML = catD.innerHTML; catM.value = catD.value; }
-      if (subD && subM) { subM.innerHTML = subD.innerHTML; subM.value = subD.value; }
-      const sD = document.getElementById('compositionSummary'), sM = document.getElementById('compositionSummaryM');
-      if (sD && sM) sM.textContent = sD.textContent;
-      const hD = document.getElementById('compositionHelp'), hM = document.getElementById('compositionHelpMobile');
-      if (hD && hM) hM.textContent = hD.textContent;
+      // Remplacé par populateMobileConfig — gardé pour compatibilité
     }
 
     // Interactions selects/inputs mobiles -> desktop
     document.getElementById('categorySelectM')?.addEventListener('change', () => {
-      const catD = document.getElementById('categorySelect'), catM = document.getElementById('categorySelectM');
-      if (catD && catM) { catD.value = catM.value; catD.dispatchEvent(new Event('change')); }
-      setTimeout(() => {
-        const subD = document.getElementById('subcategorySelect'), subM = document.getElementById('subcategorySelectM');
-        if (subD && subM) { subM.innerHTML = subD.innerHTML; subM.value = subD.value; }
-      }, 60);
+      const catM = document.getElementById('categorySelectM');
+      const subM = document.getElementById('subcategorySelectM');
+      const room = window.currentRoom;
+      const opts = (room && Array.isArray(room.categoryOptions)) ? room.categoryOptions : [];
+      const selCat = opts.find(c => c.name === catM?.value) || opts[0];
+      if (subM && selCat) {
+        subM.innerHTML = '';
+        (selCat.subcategories || []).forEach((name, i) => {
+          const o = document.createElement('option');
+          o.value = name; o.textContent = name;
+          if (i === 0) o.selected = true;
+          subM.appendChild(o);
+        });
+      }
+      pushMobileToDesktop();
     });
     document.getElementById('subcategorySelectM')?.addEventListener('change', pushMobileToDesktop);
     ['undercoverCountInputM','mrWhiteCountInputM'].forEach(id => document.getElementById(id)?.addEventListener('input', pushMobileToDesktop));
@@ -634,7 +718,7 @@
       const isVoting = room.phase === 'voting' && !gameOver;
 
       if (!started || gameOver) {
-        pushDesktopToMobile();
+        populateMobileConfig(room);
         syncLobbyPlayers(room);
         const cfgTab = document.querySelector('#mobileGameTabsLobby [data-tab="config"]');
         if (cfgTab) cfgTab.style.display = isHost ? '' : 'none';

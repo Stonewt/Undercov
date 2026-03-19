@@ -851,15 +851,31 @@ function renderPlayers(room) {
   });
 }
 
+function getDisplayCounts(room) {
+  if (room.started) return room.roleComposition || {};
+  const n = room.players.length;
+  if (n < 3) return {};
+  if (n === 3) return { civil: 2, undercover: 1, mrwhite: 0 };
+  if (undercoverCountInput && mrWhiteCountInput) {
+    let u = Math.max(1, parseInt(undercoverCountInput.value, 10) || 1);
+    let m = Math.max(0, Math.min(1, parseInt(mrWhiteCountInput.value, 10) || 0));
+    u = Math.min(u, Math.max(1, n - m - 1));
+    let c = n - u - m;
+    if (c < 1) { u = Math.max(1, n - m - 1); c = n - u - m; }
+    return { civil: c, undercover: u, mrwhite: m };
+  }
+  return room.roleComposition || {};
+}
+
 function fillRoleDolls(container, room) {
-  if(!container) return;
-  container.innerHTML="";
-  const c=room.roleComposition||{};
-  [...Array(c.civil||0).fill("civil"),...Array(c.undercover||0).fill("undercover"),...Array(c.mrwhite||0).fill("mrwhite")]
-    .forEach(role=>{
-      const d=document.createElement("div"); d.className=`role-doll ${role}`;
-      const h=document.createElement("div"); h.className="role-doll-head";
-      const b=document.createElement("div"); b.className="role-doll-body";
+  if (!container) return;
+  container.innerHTML = "";
+  const c = getDisplayCounts(room);
+  [...Array(c.civil||0).fill("civil"), ...Array(c.undercover||0).fill("undercover"), ...Array(c.mrwhite||0).fill("mrwhite")]
+    .forEach(role => {
+      const d = document.createElement("div"); d.className = `role-doll ${role}`;
+      const h = document.createElement("div"); h.className = "role-doll-head";
+      const b = document.createElement("div"); b.className = "role-doll-body";
       d.appendChild(h); d.appendChild(b); container.appendChild(d);
     });
 }

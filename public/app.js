@@ -1,3 +1,4 @@
+
 const socket = io();
 window.socket = socket;
 
@@ -461,18 +462,6 @@ function fillRoleDolls(container, room) {
 function renderRoleDolls(room) {
   fillRoleDolls(roleDolls, room);
   fillRoleDolls(waitingRoleDolls, room);
-  // Sur mobile, bonhommes aussi dans l'onglet Config
-  const mobile = window.innerWidth <= 820;
-  const configDolls = document.getElementById("roleDollsConfig");
-  const configWrap = document.getElementById("roleDollsConfigWrap");
-  if (configDolls && configWrap) {
-    if (mobile) {
-      configWrap.style.display = "";
-      fillRoleDolls(configDolls, room);
-    } else {
-      configWrap.style.display = "none";
-    }
-  }
 }
 
 function renderMessages(room) {

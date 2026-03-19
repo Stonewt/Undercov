@@ -884,14 +884,16 @@ function fillRoleDolls(container, room) {
 function renderRoleDolls(room) {
   fillRoleDolls(roleDolls, room);
   fillRoleDolls(waitingRoleDolls, room);
-  // Bonhommes à droite de la liste joueurs (desktop)
-  const wrap = document.getElementById("roleDollsPlayersWrap");
-  const cont = document.getElementById("roleDollsPlayers");
-  if (wrap && cont) {
+  // Bonhommes hôte dans le panel centre (sous le timer)
+  const hw = document.getElementById("roleDollsHostWrap");
+  const hc = document.getElementById("roleDollsHost");
+  if (hw && hc) {
+    const isHost = room.hostPlayerId === myPlayerId;
+    const show = isHost && !room.started && !room.gameOver;
     const c = getDisplayCounts(room);
     const total = (c.civil||0) + (c.undercover||0) + (c.mrwhite||0);
-    wrap.style.display = total > 0 ? "" : "none";
-    fillRoleDolls(cont, room);
+    hw.style.display = (show && total > 0) ? "" : "none";
+    if (show) fillRoleDolls(hc, room);
   }
 }
 function renderMessages(room) {
@@ -1059,7 +1061,8 @@ function renderComposition(room) {
   else { undercoverCountInput.disabled=false; mrWhiteCountInput.disabled=false; undercoverCountInput.min="1"; undercoverCountInput.max=String(n-1); mrWhiteCountInput.min="0"; mrWhiteCountInput.max="1"; compositionHelp.textContent="Choisissez la composition, les durées et la catégorie."; }
   const vals=clampCompositionValues(room); const sets=getSelectedSettings(room);
   compositionSummary.textContent=`${vals.civilCount} civil(s) • ${vals.undercoverCount} undercover(s)${vals.mrwhiteCount?" • 1 Mr White":""} • Tours ${sets.turnDurationSeconds}s • Vote ${sets.voteDurationSeconds}s`;
-
+  // Mettre à jour les bonhommes dans le panel centre
+  renderRoleDolls(room);
 }
 window.renderComposition=renderComposition;
 

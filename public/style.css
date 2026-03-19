@@ -1994,6 +1994,29 @@ button:disabled {
   opacity: 0.40;
   text-decoration: line-through;
 }
+#mobilePlayersCard .players-box {
+  max-height: none;
+  overflow: visible;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 18px;
+  padding: 14px;
+}
+
+#mobilePlayersCard .players-list-mobile {
+  max-height: 38vh;
+  overflow-y: auto;
+}
+
+@media (max-width: 820px) {
+  #mobilePlayersCard {
+    display: block;
+  }
+
+  #mobilePlayersCard .players-list-mobile {
+    max-height: none;
+  }
+}
 
 /* Carte "pas encore le moment de voter" */
 .vote-not-ready-card {
@@ -2073,4 +2096,36 @@ button:disabled {
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
   background-repeat: repeat;
   background-size: 128px 128px;
+}
+/* ===== CORRECTIONS MOBILES À AJOUTER À LA FIN DE style.css ===== */
+
+@media (max-width: 820px) {
+  /* Panel gauche = plein écran, panel centre = caché */
+  .panel-left {
+    order: 1;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    padding: 8px !important;
+    gap: 0 !important;
+  }
+
+  .panel-center { display: none !important; }
+
+  /* Cards : plein écran, cachées sauf celle active */
+  .panel-left .card {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 16px;
+    padding: 14px;
+  }
+
+  .mobile-hidden-panel { display: none !important; }
+
+  /* Mot secret mobile */
+  #wordText { font-size: 28px !important; padding: 20px !important; }
 }

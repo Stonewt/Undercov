@@ -1,4 +1,3 @@
-
 const socket = io();
 window.socket = socket;
 
@@ -9,6 +8,9 @@ let myPlayerId = localStorage.getItem("playerId") || null;
 window.myPlayerId = myPlayerId;
 let myPlayerToken = localStorage.getItem("playerToken") || null;
 let myRoomCode = localStorage.getItem("roomCode") || null;
+let lastPlayerName = localStorage.getItem("lastPlayerName") || "";
+let lastRoomCode = localStorage.getItem("lastRoomCode") || myRoomCode || "";
+let mobileLobbyActivePanel = "compositionCard";
 let timerInterval = null;
 let selectedVoteTargetId = null;
 let selectedVoteTargetName = null;
@@ -26,6 +28,9 @@ const joinBtn = document.getElementById("joinBtn");
 const resumeBlock = document.getElementById("resumeBlock");
 const resumeBtn = document.getElementById("resumeBtn");
 const resumeSeparator = document.getElementById("resumeSeparator");
+const rejoinBlock = document.getElementById("rejoinBlock");
+const rejoinBtn = document.getElementById("rejoinBtn");
+const rejoinSeparator = document.getElementById("rejoinSeparator");
 
 const statusBanner = document.getElementById("statusBanner");
 const topRoomInfo = document.getElementById("topRoomInfo");
@@ -50,6 +55,9 @@ const wordText = document.getElementById("wordText");
 const compositionCard = document.getElementById("compositionCard");
 const compositionHelp = document.getElementById("compositionHelp");
 const compositionSummary = document.getElementById("compositionSummary");
+const mobilePlayersCard = document.getElementById("mobilePlayersCard");
+const mobilePlayersRoleDolls = document.getElementById("mobilePlayersRoleDolls");
+const playersListMobile = document.getElementById("playersListMobile");
 const undercoverCountInput = document.getElementById("undercoverCountInput");
 const mrWhiteCountInput = document.getElementById("mrWhiteCountInput");
 const turnDurationInput = document.getElementById("turnDurationInput");
@@ -302,9 +310,20 @@ function saveSession(playerId, playerToken, roomCode) {
   localStorage.setItem("playerToken", playerToken);
   if (myRoomCode) localStorage.setItem("roomCode", myRoomCode);
 }
-
+function saveLastJoinInfo(name, roomCode) {
+  if (name) {
+    lastPlayerName = name;
+    localStorage.setItem("lastPlayerName", name);
+  }
+  if (roomCode) {
+    lastRoomCode = roomCode;
+    localStorage.setItem("lastRoomCode", roomCode);
+  }
+}
 function clearSession() {
-  myPlayerId = null; myPlayerToken = null; myRoomCode = null;
+  myPlayerId = null;
+  myPlayerToken = null;
+  myRoomCode = null;
   localStorage.removeItem("playerId");
   localStorage.removeItem("playerToken");
   localStorage.removeItem("roomCode");
@@ -317,12 +336,33 @@ function updateResumeUI(canResume = false) {
     resumeBtn.textContent = `Reprendre ma partie (${myRoomCode})`;
   }
 }
+function updateRejoinUI(canRejoin = false) {
+  if (!rejoinBlock || !rejoinSeparator) return;
+  rejoinBlock.classList.toggle("hidden", !canRejoin);
+  rejoinSeparator.classList.toggle("hidden", !canRejoin);
+  if (rejoinBtn && canRejoin && lastRoomCode) {
+    rejoinBtn.textContent = `Rejoindre la partie (${lastRoomCode})`;
+  }
+}
 
 function validateStoredSession() {
-  if (!myPlayerToken || !myRoomCode) { updateResumeUI(false); return; }
+  const canFallbackRejoin = !!(lastPlayerName && lastRoomCode);
+
+  if (!myPlayerToken || !myRoomCode) {
+    updateResumeUI(false);
+    updateRejoinUI(canFallbackRejoin);
+    return;
+  }
+
   socket.emit("checkSession", { playerToken: myPlayerToken, roomCode: myRoomCode }, (res) => {
-    if (!res?.ok) { clearSession(); updateResumeUI(false); return; }
+    if (!res?.ok) {
+      clearSession();
+      updateResumeUI(false);
+      updateRejoinUI(canFallbackRejoin);
+      return;
+    }
     updateResumeUI(true);
+    updateRejoinUI(false);
   });
 }
 
@@ -352,6 +392,7 @@ function resetUI() {
   currentTurnKey = null; autoSubmittedTurnKey = null;
   previousVisiblePlayerIds = []; lastTensionSecondPlayed = null;
   mobileGameActivePanel = "chatCard";
+  mobileLobbyActivePanel = "compositionCard";
 
   lobby.classList.add("hidden");
   secretCard.classList.add("hidden");
@@ -441,6 +482,42 @@ function renderPlayers(room) {
     playersList.appendChild(li);
   });
 }
+function renderMobilePlayersCard(room) {
+  if (!mobilePlayersCard || !playersListMobile) return;
+
+  const shouldShow =
+    (window.innerWidth <= 820) &&
+    (
+      (room.started && !room.gameOver) ||
+      (!room.started && !room.gameOver && room.hostPlayerId === myPlayerId)
+    );
+
+  mobilePlayersCard.classList.toggle("hidden", !shouldShow);
+  if (!shouldShow) return;
+
+  fillRoleDolls(mobilePlayersRoleDolls, room);
+
+  playersListMobile.innerHTML = "";
+  const orderedPlayers = sortPlayersForDisplay(room);
+
+  orderedPlayers.forEach((player) => {
+    const li = document.createElement("li");
+    li.className = "players-list-mobile-item";
+
+    if (player.eliminated) li.classList.add("player-dead");
+    if (player.id === room.currentSpeakerId && room.phase === "speaking" && !room.gameOver) {
+      li.classList.add("player-current");
+    }
+
+    let label = player.name;
+    if (player.id === myPlayerId) label += " (toi)";
+    if (player.id === room.hostPlayerId) label += " 👑";
+    if (player.eliminated) label += " • éliminé";
+
+    li.textContent = label;
+    playersListMobile.appendChild(li);
+  });
+}
 
 function fillRoleDolls(container, room) {
   if (!container) return;
@@ -462,6 +539,18 @@ function fillRoleDolls(container, room) {
 function renderRoleDolls(room) {
   fillRoleDolls(roleDolls, room);
   fillRoleDolls(waitingRoleDolls, room);
+  // Sur mobile, bonhommes aussi dans l'onglet Config
+  const mobile = window.innerWidth <= 820;
+  const configDolls = document.getElementById("roleDollsConfig");
+  const configWrap = document.getElementById("roleDollsConfigWrap");
+  if (configDolls && configWrap) {
+    if (mobile) {
+      configWrap.style.display = "";
+      fillRoleDolls(configDolls, room);
+    } else {
+      configWrap.style.display = "none";
+    }
+  }
 }
 
 function renderMessages(room) {
@@ -733,20 +822,35 @@ function updateMobileGamePanels() {
   if (!tabs) {
     // HTML doc 5 : déléguer à window.updateMobileUI défini dans le script inline
     if (typeof window.updateMobileUI === "function") window.updateMobileUI(currentRoom);
+    updateMobileLobbyPanels();
     return;
   }
 
-  const panelIds = ["secretCard", "chatCard", "compositionCard", "voteCard"];
+  const gameTabs = document.getElementById("mobileGameTabs");
+  const lobbyTabs = document.getElementById("mobileLobbyTabs");
+
+  const panelIds = ["secretCard", "chatCard", "mobilePlayersCard", "voteCard"];
   const phasePanel =
     currentRoom?.gameOver ? "chatCard" :
     currentRoom?.phase === "voting" ? "voteCard" :
     currentRoom?.phase === "speaking" ? "chatCard" :
-    currentRoom && !currentRoom.started && currentRoom.hostPlayerId === myPlayerId ? "compositionCard" :
+    currentRoom && !currentRoom.started && currentRoom.hostPlayerId === myPlayerId ? "mobilePlayersCard" :
     "chatCard";
 
   if (!mobileGameActivePanel || !panelIds.includes(mobileGameActivePanel)) {
     mobileGameActivePanel = phasePanel;
   }
+  const showGameTabs = isMobile && currentRoom && (currentRoom.started || currentRoom.gameOver);
+if (gameTabs) gameTabs.classList.toggle("hidden", !showGameTabs);
+
+const showLobbyTabs =
+  isMobile &&
+  currentRoom &&
+  !currentRoom.started &&
+  !currentRoom.gameOver &&
+  currentRoom.hostPlayerId === myPlayerId;
+
+if (lobbyTabs) lobbyTabs.classList.toggle("hidden", !showLobbyTabs);
 
   if (!isMobile) {
     panelIds.forEach((id) => {
@@ -773,10 +877,9 @@ function updateMobileGamePanels() {
     voteNotReady.style.display = (mobileGameActivePanel === "voteCard" && !isVoting) ? "" : "none";
   }
 
-  const configTab = tabs.querySelector('[data-panel="compositionCard"]');
+  const configTab = tabs.querySelector('[data-panel="mobilePlayersCard"]');
   if (configTab) {
-    const showConfig = currentRoom && !currentRoom.started && !currentRoom.gameOver && currentRoom.hostPlayerId === myPlayerId;
-    configTab.style.display = showConfig ? "" : "none";
+    configTab.style.display = (currentRoom?.started || currentRoom?.gameOver) ? "" : "none";
   }
 
   const motTab = tabs.querySelector('[data-panel="secretCard"]');
@@ -801,6 +904,51 @@ function initMobileGameTabs() {
     });
   });
   window.addEventListener("resize", updateMobileGamePanels);
+}
+function updateMobileLobbyPanels() {
+  const tabs = document.getElementById("mobileLobbyTabs");
+  if (!tabs) return;
+
+  const isMobile = window.innerWidth <= 820;
+  const isHostLobby =
+    isMobile &&
+    currentRoom &&
+    !currentRoom.started &&
+    !currentRoom.gameOver &&
+    currentRoom.hostPlayerId === myPlayerId;
+
+  tabs.classList.toggle("hidden", !isHostLobby);
+
+  if (!isHostLobby) {
+    compositionCard?.classList.remove("mobile-hidden-panel");
+    mobilePlayersCard?.classList.remove("mobile-hidden-panel");
+    return;
+  }
+
+  const panels = ["compositionCard", "mobilePlayersCard"];
+  panels.forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.toggle("mobile-hidden-panel", id !== mobileLobbyActivePanel);
+  });
+
+  tabs.querySelectorAll(".mobile-game-tab").forEach((btn) => {
+    btn.classList.toggle("active", btn.getAttribute("data-lobby-panel") === mobileLobbyActivePanel);
+  });
+}
+
+function initMobileLobbyTabs() {
+  const tabs = document.getElementById("mobileLobbyTabs");
+  if (!tabs) return;
+
+  tabs.querySelectorAll(".mobile-game-tab").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      mobileLobbyActivePanel = btn.getAttribute("data-lobby-panel");
+      updateMobileLobbyPanels();
+    });
+  });
+
+  window.addEventListener("resize", updateMobileLobbyPanels);
 }
 
 window.setMobileGameActivePanel = (panelId) => {
@@ -844,6 +992,7 @@ function renderRoom(room) {
   }
 
   renderPlayers(room);
+  renderMobilePlayersCard(room);
   renderComposition(room);
   renderChat(room);
   renderWaitingRoom(room);
@@ -859,7 +1008,7 @@ function renderRoom(room) {
 
   if (room.phase === "voting" && !room.gameOver) mobileGameActivePanel = "voteCard";
   else if (room.phase === "speaking") mobileGameActivePanel = "chatCard";
-  else if (!room.started && isHost) mobileGameActivePanel = "compositionCard";
+  else if (!room.started && isHost) mobileGameActivePanel = "mobilePlayersCard";
   else if (!room.started && !isHost) mobileGameActivePanel = "chatCard";
 
   updateMobileGamePanels();
@@ -903,6 +1052,7 @@ createBtn.addEventListener("click", () => {
   socket.emit("createRoom", { name }, (res) => {
     if (!res?.ok) return setStatus(res?.error || "Impossible de créer la room", true);
     saveSession(res.playerId, res.playerToken, res.room.code);
+    saveLastJoinInfo(name, res.room.code);
     renderRoom(res.room);
     if (typeof window.updateMobileUI === "function") window.updateMobileUI(res.room);
     updateResumeUI(true); playClickSound("success"); setStatus("Room créée");
@@ -917,6 +1067,7 @@ joinBtn.addEventListener("click", () => {
   socket.emit("joinRoom", { name, code, playerToken: existingToken }, (res) => {
     if (!res?.ok) return setStatus(res?.error || "Impossible de rejoindre la room", true);
     saveSession(res.playerId, res.playerToken, res.room.code);
+    saveLastJoinInfo(name, res.room.code);
     renderRoom(res.room);
     if (typeof window.updateMobileUI === "function") window.updateMobileUI(res.room);
     updateResumeUI(true); playClickSound("join"); setStatus("Room rejointe");
@@ -928,9 +1079,57 @@ resumeBtn.addEventListener("click", () => {
   socket.emit("resumeSession", { playerToken: myPlayerToken }, (res) => {
     if (!res?.ok) { clearSession(); resetUI(); return setStatus(res?.error || "Impossible de reprendre la session", true); }
     saveSession(res.playerId, res.playerToken, res.room.code);
+    saveLastJoinInfo(lastPlayerName || nameInput.value.trim(), res.room.code);
     renderRoom(res.room);
     if (typeof window.updateMobileUI === "function") window.updateMobileUI(res.room);
     updateResumeUI(true); playClickSound("join"); setStatus("Reconnexion réussie");
+  });
+});
+rejoinBtn?.addEventListener("click", () => {
+  if (!lastPlayerName || !lastRoomCode) {
+    return setStatus("Aucune partie à rejoindre", true);
+  }
+
+  if (myPlayerToken) {
+    socket.emit("resumeSession", { playerToken: myPlayerToken }, (resumeRes) => {
+      if (resumeRes?.ok) {
+        saveSession(resumeRes.playerId, resumeRes.playerToken, resumeRes.room.code);
+        saveLastJoinInfo(lastPlayerName, resumeRes.room.code);
+        renderRoom(resumeRes.room);
+        updateResumeUI(true);
+        updateRejoinUI(false);
+        playClickSound("join");
+        setStatus("Reconnexion réussie");
+        return;
+      }
+
+      socket.emit("joinRoom", { name: lastPlayerName, code: lastRoomCode }, (joinRes) => {
+        if (!joinRes?.ok) {
+          return setStatus(joinRes?.error || "Impossible de rejoindre la partie", true);
+        }
+        saveSession(joinRes.playerId, joinRes.playerToken, joinRes.room.code);
+        saveLastJoinInfo(lastPlayerName, joinRes.room.code);
+        renderRoom(joinRes.room);
+        updateResumeUI(true);
+        updateRejoinUI(false);
+        playClickSound("join");
+        setStatus("Partie rejointe");
+      });
+    });
+    return;
+  }
+
+  socket.emit("joinRoom", { name: lastPlayerName, code: lastRoomCode }, (res) => {
+    if (!res?.ok) {
+      return setStatus(res?.error || "Impossible de rejoindre la partie", true);
+    }
+    saveSession(res.playerId, res.playerToken, res.room.code);
+    saveLastJoinInfo(lastPlayerName, res.room.code);
+    renderRoom(res.room);
+    updateResumeUI(true);
+    updateRejoinUI(false);
+    playClickSound("join");
+    setStatus("Partie rejointe");
   });
 });
 
@@ -1028,4 +1227,6 @@ attachUiSounds();
 initAds();
 initTopRoomCopy();
 initMobileGameTabs();
+initMobileLobbyTabs();
 validateStoredSession();
+

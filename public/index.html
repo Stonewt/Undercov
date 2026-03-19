@@ -75,7 +75,13 @@
 
     <div class="topbar">
       <div class="topbar-side topbar-left">
-        <div id="topRoomInfo" class="top-meta hidden"></div>
+        <div id="topRoomInfo" class="top-meta top-room-clickable hidden">
+          <span id="topRoomCode"></span>
+          <svg class="copy-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+        </div>
       </div>
 
       <div class="brand-title">
@@ -256,6 +262,11 @@
               <select id="subcategorySelect"></select>
             </div>
             <p id="compositionSummary"></p>
+            <!-- Bonhommes visibles sur mobile dans l'onglet Config -->
+            <div class="role-dolls-wrap" id="roleDollsConfigWrap" style="display:none">
+              <div class="role-dolls-title">Composition</div>
+              <div id="roleDollsConfig" class="role-dolls"></div>
+            </div>
           </div>
 
           <!-- Vote -->

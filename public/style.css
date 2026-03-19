@@ -2184,3 +2184,103 @@ button:disabled {
     display: block;
   }
 }
+/* =====================================================
+   AJOUTS MOBILES — coller à la toute fin de style.css
+   ===================================================== */
+
+/* ── Zone de contenu mobile ── */
+.mobile-area {
+  display: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ── Sur mobile : cacher le desktop-game-layout, montrer mobile ── */
+@media (max-width: 820px) {
+  /* Cacher complètement le layout desktop */
+  .desktop-game-layout {
+    display: none !important;
+  }
+
+  /* Afficher la barre d'onglets et la zone mobile */
+  #mobileTabBar {
+    flex-shrink: 0;
+  }
+
+  .mobile-area {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 10px 12px 20px;
+    box-sizing: border-box;
+  }
+
+  /* page-center en flex colonne pour que mobile-area prenne l'espace restant */
+  .page-center {
+    display: flex;
+    flex-direction: column;
+    padding: 0 !important;
+    height: calc(100dvh - 64px);
+    overflow: hidden;
+  }
+
+  /* start-screen garde son scroll */
+  .start-screen {
+    flex: 1 1 auto;
+    overflow-y: auto;
+  }
+
+  /* mobileTabBar positionné dans le flux */
+  #mobileTabBar {
+    display: none; /* JS passe à flex quand nécessaire */
+    flex-direction: row;
+    gap: 6px;
+    padding: 6px 8px;
+    background: rgba(5,9,20,0.90);
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    overflow-x: auto;
+    scrollbar-width: none;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+
+  #mobileTabBar::-webkit-scrollbar { display: none; }
+
+  /* Panels mobiles dans mobileArea */
+  #mobileArea > div {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Chat mobile : hauteur fixe pour que les messages scrollent */
+  .mob-panel-chat {
+    display: flex !important;
+    flex-direction: column;
+    height: calc(100dvh - 64px - 50px - 20px); /* viewport - topbar - tabs - padding */
+    max-height: 100%;
+  }
+
+  .mob-panel-chat .messages {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Mot mobile : centré verticalement */
+  .mob-panel-word {
+    display: flex !important;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100dvh - 64px - 50px - 40px);
+  }
+}
+
+/* ── Sur desktop : s'assurer que mobileTabBar et mobileArea restent cachés ── */
+@media (min-width: 821px) {
+  #mobileTabBar { display: none !important; }
+  .mobile-area  { display: none !important; }
+  .desktop-game-layout { display: grid !important; }
+}

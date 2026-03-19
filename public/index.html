@@ -117,8 +117,6 @@
 
       <div class="topbar-side topbar-right">
         <div id="topHostInfo" class="top-meta hidden"></div>
-        <!-- AJOUT : bouton Reprendre visible dans la topbar quand on est déconnecté -->
-        <button id="topResumeBtn" class="leave-btn topbar-leave-btn hidden">↩ Reprendre</button>
         <div class="hidden" id="leaveWrap">
           <button id="leaveBtn" class="leave-btn topbar-leave-btn">Quitter</button>
         </div>
@@ -170,10 +168,13 @@
               <div class="start-content start-content-full">
                 <h2>Se connecter à une salle</h2>
                 <p class="start-subtitle">Crée une room ou rejoins-en une avec un code.</p>
+
+                <!-- Bouton reprendre : visible ici sur l'écran d'accueil -->
                 <div class="form-block hidden" id="resumeBlock">
-                  <button id="resumeBtn" class="big-btn">Reprendre ma partie</button>
+                  <button id="resumeBtn" class="big-btn" style="background:linear-gradient(180deg,#22c55e,#16a34a);box-shadow:0 5px 0 rgba(0,0,0,.28),0 8px 18px rgba(34,197,94,.28);">↩ Reprendre ma partie</button>
                 </div>
                 <div class="separator hidden" id="resumeSeparator">ou</div>
+
                 <div class="form-block">
                   <label for="nameInput">Pseudo</label>
                   <input id="nameInput" maxlength="20" placeholder="Ton pseudo" autocomplete="off" />
@@ -216,69 +217,28 @@
       </div>
 
       <!-- ===== ÉCRAN JEU ===== -->
-      <div class="game-layout">
+      <!--
+        Sur MOBILE : mobileTabBar + mobileArea remplacent toute l'interface.
+        Sur DESKTOP : game-layout s'affiche normalement.
+        Les deux coexistent dans le DOM, CSS les sépare.
+      -->
 
-        <!-- Onglets mobiles jeu — 4 onglets pendant la partie + Joueurs en attente -->
-        <div class="mobile-game-tabs hidden" id="mobileGameTabs">
-          <!-- Onglets affichés pendant la partie -->
-          <button class="mobile-game-tab" data-panel="secretCard">🔤 Mot</button>
-          <button class="mobile-game-tab active" data-panel="chatCard">💬 Chat</button>
-          <button class="mobile-game-tab" data-panel="playersCompoCard">👥 Joueurs</button>
-          <button class="mobile-game-tab vote-tab" data-panel="voteCard">🗳 Vote</button>
-          <!-- Onglets affichés en attente (hôte) -->
-          <button class="mobile-game-tab" data-panel="waitingPlayersTab">👥 Joueurs</button>
-          <button class="mobile-game-tab" data-panel="compositionCard">⚙ Config</button>
-        </div>
+      <!-- Barre d'onglets mobile (cachée par défaut, affichée par JS quand on entre en room) -->
+      <div id="mobileTabBar" class="mobile-game-tabs" style="display:none;"></div>
 
-        <!-- ===== PANEL GAUCHE ===== -->
+      <!-- Zone de contenu mobile (cachée par défaut) -->
+      <div id="mobileArea" class="mobile-area" style="display:none;"></div>
+
+      <!-- Layout desktop (caché sur mobile via CSS) -->
+      <div class="game-layout desktop-game-layout">
+
         <div class="panel panel-left">
 
-          <!-- Mot secret -->
           <div class="card hidden compact-card" id="secretCard">
             <h2>Ton mot</h2>
             <p id="wordText"></p>
           </div>
 
-          <!-- Onglet Joueurs + Composition (pendant la partie, mobile) -->
-          <div class="card hidden compact-card" id="playersCompoCard">
-            <h2>Joueurs</h2>
-            <ul id="playersListMobile" class="players-list-mobile"></ul>
-            <div class="role-dolls-wrap" style="margin-top:14px;">
-              <div class="role-dolls-title">Composition</div>
-              <div id="roleDollsMobile" class="role-dolls"></div>
-            </div>
-          </div>
-
-          <!-- Onglet Joueurs en attente (hôte en lobby, mobile) -->
-          <div class="card hidden compact-card" id="waitingPlayersTab">
-            <h2>Joueurs</h2>
-            <ul id="waitingPlayersListMobile" class="players-list-mobile"></ul>
-            <div class="role-dolls-wrap" style="margin-top:14px;">
-              <div class="role-dolls-title">Composition</div>
-              <div id="waitingRoleDollsMobile" class="role-dolls"></div>
-            </div>
-            <div class="waiting-meta" style="margin-top:14px;">
-              <div class="waiting-meta-item">
-                <span class="waiting-meta-label">Catégorie</span>
-                <span id="waitingCategoryMobile">--</span>
-              </div>
-              <div class="waiting-meta-item">
-                <span class="waiting-meta-label">Sous-cat.</span>
-                <span id="waitingSubcategoryMobile">--</span>
-              </div>
-              <div class="waiting-meta-item">
-                <span class="waiting-meta-label">Tour</span>
-                <span id="waitingTurnMobile">--</span>
-              </div>
-              <div class="waiting-meta-item">
-                <span class="waiting-meta-label">Vote</span>
-                <span id="waitingVoteMobile">--</span>
-              </div>
-            </div>
-            <button id="startBtnMobile" class="big-btn hidden" style="margin-top:16px;">Lancer la partie</button>
-          </div>
-
-          <!-- Configuration hôte -->
           <div class="card hidden compact-card" id="compositionCard">
             <h2>Configuration</h2>
             <p id="compositionHelp"></p>
@@ -311,10 +271,8 @@
               <div class="role-dolls-title">Composition</div>
               <div id="roleDollsConfig" class="role-dolls"></div>
             </div>
-            <button id="startBtnConfig" class="big-btn hidden" style="margin-top:16px;">Lancer la partie</button>
           </div>
 
-          <!-- Vote -->
           <div class="card hidden compact-card vote-card-active" id="voteCard">
             <div id="voteNotReadyCard" style="display:none">
               <div class="vote-not-ready-inner">
@@ -343,7 +301,6 @@
 
         </div>
 
-        <!-- ===== PANEL CENTRE ===== -->
         <div class="panel panel-center">
           <div class="card room-card hidden" id="lobby">
 
@@ -424,7 +381,7 @@
           </div>
         </div>
 
-      </div>
+      </div><!-- /.game-layout -->
 
     </main>
   </div>
@@ -432,7 +389,6 @@
   <script src="/socket.io/socket.io.js"></script>
   <script src="app.js"></script>
   <script>
-    // Sliders desktop
     const turnSlider = document.getElementById('turnDurationInput');
     const voteSlider = document.getElementById('voteDurationInput');
     const turnDisplay = document.getElementById('turnDurationDisplay');

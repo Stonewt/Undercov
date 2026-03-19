@@ -8,9 +8,6 @@ let myPlayerId = localStorage.getItem("playerId") || null;
 window.myPlayerId = myPlayerId;
 let myPlayerToken = localStorage.getItem("playerToken") || null;
 let myRoomCode = localStorage.getItem("roomCode") || null;
-let lastPlayerName = localStorage.getItem("lastPlayerName") || "";
-let lastRoomCode = localStorage.getItem("lastRoomCode") || myRoomCode || "";
-let mobileLobbyActivePanel = "compositionCard";
 let timerInterval = null;
 let selectedVoteTargetId = null;
 let selectedVoteTargetName = null;
@@ -28,13 +25,12 @@ const joinBtn = document.getElementById("joinBtn");
 const resumeBlock = document.getElementById("resumeBlock");
 const resumeBtn = document.getElementById("resumeBtn");
 const resumeSeparator = document.getElementById("resumeSeparator");
-const rejoinBlock = document.getElementById("rejoinBlock");
-const rejoinBtn = document.getElementById("rejoinBtn");
-const rejoinSeparator = document.getElementById("rejoinSeparator");
 
 const statusBanner = document.getElementById("statusBanner");
 const topRoomInfo = document.getElementById("topRoomInfo");
 const topHostInfo = document.getElementById("topHostInfo");
+// AJOUT : bouton reprendre dans la topbar
+const topResumeBtn = document.getElementById("topResumeBtn");
 
 const startWrap = document.getElementById("startWrap");
 const roomSetupCard = document.getElementById("roomSetupCard");
@@ -48,6 +44,9 @@ const playersList = document.getElementById("playersList");
 
 const startBtn = document.getElementById("startBtn");
 const restartBtn = document.getElementById("restartBtn");
+// AJOUT : boutons lancer dans les cards mobiles
+const startBtnMobile = document.getElementById("startBtnMobile");
+const startBtnConfig = document.getElementById("startBtnConfig");
 
 const secretCard = document.getElementById("secretCard");
 const wordText = document.getElementById("wordText");
@@ -55,9 +54,6 @@ const wordText = document.getElementById("wordText");
 const compositionCard = document.getElementById("compositionCard");
 const compositionHelp = document.getElementById("compositionHelp");
 const compositionSummary = document.getElementById("compositionSummary");
-const mobilePlayersCard = document.getElementById("mobilePlayersCard");
-const mobilePlayersRoleDolls = document.getElementById("mobilePlayersRoleDolls");
-const playersListMobile = document.getElementById("playersListMobile");
 const undercoverCountInput = document.getElementById("undercoverCountInput");
 const mrWhiteCountInput = document.getElementById("mrWhiteCountInput");
 const turnDurationInput = document.getElementById("turnDurationInput");
@@ -310,20 +306,9 @@ function saveSession(playerId, playerToken, roomCode) {
   localStorage.setItem("playerToken", playerToken);
   if (myRoomCode) localStorage.setItem("roomCode", myRoomCode);
 }
-function saveLastJoinInfo(name, roomCode) {
-  if (name) {
-    lastPlayerName = name;
-    localStorage.setItem("lastPlayerName", name);
-  }
-  if (roomCode) {
-    lastRoomCode = roomCode;
-    localStorage.setItem("lastRoomCode", roomCode);
-  }
-}
+
 function clearSession() {
-  myPlayerId = null;
-  myPlayerToken = null;
-  myRoomCode = null;
+  myPlayerId = null; myPlayerToken = null; myRoomCode = null;
   localStorage.removeItem("playerId");
   localStorage.removeItem("playerToken");
   localStorage.removeItem("roomCode");
@@ -335,34 +320,20 @@ function updateResumeUI(canResume = false) {
   if (resumeBtn && canResume && myRoomCode) {
     resumeBtn.textContent = `Reprendre ma partie (${myRoomCode})`;
   }
-}
-function updateRejoinUI(canRejoin = false) {
-  if (!rejoinBlock || !rejoinSeparator) return;
-  rejoinBlock.classList.toggle("hidden", !canRejoin);
-  rejoinSeparator.classList.toggle("hidden", !canRejoin);
-  if (rejoinBtn && canRejoin && lastRoomCode) {
-    rejoinBtn.textContent = `Rejoindre la partie (${lastRoomCode})`;
+  // AJOUT : bouton reprendre dans topbar (visible quand on est sur l'écran d'accueil avec session existante)
+  if (topResumeBtn) {
+    topResumeBtn.classList.toggle("hidden", !canResume);
+    if (canResume && myRoomCode) {
+      topResumeBtn.textContent = `↩ ${myRoomCode}`;
+    }
   }
 }
 
 function validateStoredSession() {
-  const canFallbackRejoin = !!(lastPlayerName && lastRoomCode);
-
-  if (!myPlayerToken || !myRoomCode) {
-    updateResumeUI(false);
-    updateRejoinUI(canFallbackRejoin);
-    return;
-  }
-
+  if (!myPlayerToken || !myRoomCode) { updateResumeUI(false); return; }
   socket.emit("checkSession", { playerToken: myPlayerToken, roomCode: myRoomCode }, (res) => {
-    if (!res?.ok) {
-      clearSession();
-      updateResumeUI(false);
-      updateRejoinUI(canFallbackRejoin);
-      return;
-    }
+    if (!res?.ok) { clearSession(); updateResumeUI(false); return; }
     updateResumeUI(true);
-    updateRejoinUI(false);
   });
 }
 
@@ -392,7 +363,6 @@ function resetUI() {
   currentTurnKey = null; autoSubmittedTurnKey = null;
   previousVisiblePlayerIds = []; lastTensionSecondPlayed = null;
   mobileGameActivePanel = "chatCard";
-  mobileLobbyActivePanel = "compositionCard";
 
   lobby.classList.add("hidden");
   secretCard.classList.add("hidden");
@@ -404,6 +374,12 @@ function resetUI() {
   leaveWrap.classList.add("hidden");
   startWrap.classList.remove("hidden");
   roomSetupCard.classList.remove("hidden");
+
+  // AJOUT : cacher les nouvelles cards mobiles
+  const playersCompoCard = document.getElementById("playersCompoCard");
+  if (playersCompoCard) playersCompoCard.classList.add("hidden");
+  const waitingPlayersTab = document.getElementById("waitingPlayersTab");
+  if (waitingPlayersTab) waitingPlayersTab.classList.add("hidden");
 
   topRoomInfo.classList.add("hidden");
   topHostInfo.classList.add("hidden");
@@ -442,6 +418,8 @@ function resetUI() {
 function hideGameplayButtons() {
   startBtn.classList.add("hidden");
   restartBtn.classList.add("hidden");
+  if (startBtnMobile) startBtnMobile.classList.add("hidden");
+  if (startBtnConfig) startBtnConfig.classList.add("hidden");
 }
 
 function sortPlayersForDisplay(room) {
@@ -482,41 +460,64 @@ function renderPlayers(room) {
     playersList.appendChild(li);
   });
 }
-function renderMobilePlayersCard(room) {
-  if (!mobilePlayersCard || !playersListMobile) return;
 
-  const shouldShow =
-    (window.innerWidth <= 820) &&
-    (
-      (room.started && !room.gameOver) ||
-      (!room.started && !room.gameOver && room.hostPlayerId === myPlayerId)
-    );
-
-  mobilePlayersCard.classList.toggle("hidden", !shouldShow);
-  if (!shouldShow) return;
-
-  fillRoleDolls(mobilePlayersRoleDolls, room);
-
-  playersListMobile.innerHTML = "";
+// AJOUT : render la liste des joueurs dans le panel mobile dédié (pendant la partie)
+function renderPlayersMobile(room) {
+  const list = document.getElementById("playersListMobile");
+  if (!list) return;
+  list.innerHTML = "";
   const orderedPlayers = sortPlayersForDisplay(room);
-
   orderedPlayers.forEach((player) => {
     const li = document.createElement("li");
     li.className = "players-list-mobile-item";
-
     if (player.eliminated) li.classList.add("player-dead");
-    if (player.id === room.currentSpeakerId && room.phase === "speaking" && !room.gameOver) {
-      li.classList.add("player-current");
-    }
-
+    if (player.id === room.currentSpeakerId && room.phase === "speaking" && !room.gameOver) li.classList.add("player-current");
     let label = player.name;
     if (player.id === myPlayerId) label += " (toi)";
     if (player.id === room.hostPlayerId) label += " 👑";
-    if (player.eliminated) label += " • éliminé";
-
+    if (player.eliminated) label += " — éliminé";
+    else if (player.id === room.currentSpeakerId && room.phase === "speaking" && !room.gameOver) label += " — réfléchit";
     li.textContent = label;
-    playersListMobile.appendChild(li);
+    list.appendChild(li);
   });
+}
+
+// AJOUT : render la liste des joueurs dans l'onglet d'attente mobile (lobby hôte)
+function renderWaitingPlayersMobile(room) {
+  const list = document.getElementById("waitingPlayersListMobile");
+  if (!list) return;
+  list.innerHTML = "";
+  room.players.forEach((player) => {
+    const li = document.createElement("li");
+    li.className = "players-list-mobile-item";
+    let label = player.name;
+    if (player.id === myPlayerId) label += " (toi)";
+    if (player.id === room.hostPlayerId) label += " 👑";
+    if (!player.connected) label += " — déconnecté";
+    li.textContent = label;
+    list.appendChild(li);
+  });
+
+  // Mettre à jour les infos de config dans l'onglet Joueurs
+  const catEl = document.getElementById("waitingCategoryMobile");
+  const subcatEl = document.getElementById("waitingSubcategoryMobile");
+  const turnEl = document.getElementById("waitingTurnMobile");
+  const voteEl = document.getElementById("waitingVoteMobile");
+  if (catEl) catEl.textContent = room.selectedCategory || "--";
+  if (subcatEl) subcatEl.textContent = room.selectedSubcategory || "--";
+  if (turnEl) turnEl.textContent = `${room.turnDurationSeconds || 30} s`;
+  if (voteEl) voteEl.textContent = `${room.voteDurationSeconds || 30} s`;
+
+  // Bouton lancer dans l'onglet Joueurs (hôte)
+  const btn = document.getElementById("startBtnMobile");
+  if (btn) {
+    const isHost = room.hostPlayerId === myPlayerId;
+    btn.classList.toggle("hidden", !(!room.started && isHost));
+  }
+
+  // Bonhommes dans l'onglet Joueurs
+  const dollsEl = document.getElementById("waitingRoleDollsMobile");
+  if (dollsEl) fillRoleDolls(dollsEl, room);
 }
 
 function fillRoleDolls(container, room) {
@@ -539,7 +540,11 @@ function fillRoleDolls(container, room) {
 function renderRoleDolls(room) {
   fillRoleDolls(roleDolls, room);
   fillRoleDolls(waitingRoleDolls, room);
-  // Sur mobile, bonhommes aussi dans l'onglet Config
+
+  // AJOUT : bonhommes dans l'onglet joueurs pendant la partie (mobile)
+  const mobileDolls = document.getElementById("roleDollsMobile");
+  if (mobileDolls) fillRoleDolls(mobileDolls, room);
+
   const mobile = window.innerWidth <= 820;
   const configDolls = document.getElementById("roleDollsConfig");
   const configWrap = document.getElementById("roleDollsConfigWrap");
@@ -802,6 +807,9 @@ function renderComposition(room) {
     `${values.mrwhiteCount ? " • 1 Mr White" : ""}` +
     ` • Tours ${settings.turnDurationSeconds}s • Vote ${settings.voteDurationSeconds}s` +
     ` • ${settings.category || "--"} / ${settings.subcategory || "--"}`;
+
+  // AJOUT : bouton Lancer dans l'onglet Config mobile
+  if (startBtnConfig) startBtnConfig.classList.remove("hidden");
 }
 
 window.renderComposition = renderComposition;
@@ -816,81 +824,101 @@ function handlePresenceSounds(room) {
   previousVisiblePlayerIds = currentIds;
 }
 
+// AJOUT : liste complète des panels possibles (incluant les nouveaux)
+const ALL_MOBILE_PANELS = ["secretCard", "chatCard", "playersCompoCard", "voteCard", "waitingPlayersTab", "compositionCard"];
+
 function updateMobileGamePanels() {
   const isMobile = window.innerWidth <= 820;
   const tabs = document.getElementById("mobileGameTabs");
   if (!tabs) {
-    // HTML doc 5 : déléguer à window.updateMobileUI défini dans le script inline
     if (typeof window.updateMobileUI === "function") window.updateMobileUI(currentRoom);
-    updateMobileLobbyPanels();
     return;
   }
 
-  const gameTabs = document.getElementById("mobileGameTabs");
-  const lobbyTabs = document.getElementById("mobileLobbyTabs");
+  const isHost = currentRoom?.hostPlayerId === myPlayerId;
+  const isLobby = currentRoom && !currentRoom.started && !currentRoom.gameOver;
+  const isPlaying = currentRoom?.started && !currentRoom?.gameOver;
+  const isVoting = currentRoom?.phase === "voting" && !currentRoom?.gameOver;
 
-  const panelIds = ["secretCard", "chatCard", "mobilePlayersCard", "voteCard"];
-  const phasePanel =
+  // Panels disponibles selon le contexte
+  // En lobby hôte : waitingPlayersTab + compositionCard
+  // En jeu : secretCard + chatCard + playersCompoCard + voteCard
+  // Fin de partie : chatCard uniquement
+  let availablePanels = [];
+  if (isLobby && isHost) {
+    availablePanels = ["waitingPlayersTab", "compositionCard"];
+  } else if (isPlaying) {
+    availablePanels = ["secretCard", "chatCard", "playersCompoCard", "voteCard"];
+  } else {
+    availablePanels = ["chatCard"];
+  }
+
+  // Panel par défaut selon contexte
+  const defaultPanel =
     currentRoom?.gameOver ? "chatCard" :
-    currentRoom?.phase === "voting" ? "voteCard" :
-    currentRoom?.phase === "speaking" ? "chatCard" :
-    currentRoom && !currentRoom.started && currentRoom.hostPlayerId === myPlayerId ? "mobilePlayersCard" :
+    isVoting ? "voteCard" :
+    isPlaying ? "chatCard" :
+    isLobby && isHost ? "waitingPlayersTab" :
     "chatCard";
 
-  if (!mobileGameActivePanel || !panelIds.includes(mobileGameActivePanel)) {
-    mobileGameActivePanel = phasePanel;
+  if (!mobileGameActivePanel || !availablePanels.includes(mobileGameActivePanel)) {
+    mobileGameActivePanel = defaultPanel;
   }
-  const showGameTabs = isMobile && currentRoom && (currentRoom.started || currentRoom.gameOver);
-if (gameTabs) gameTabs.classList.toggle("hidden", !showGameTabs);
-
-const showLobbyTabs =
-  isMobile &&
-  currentRoom &&
-  !currentRoom.started &&
-  !currentRoom.gameOver &&
-  currentRoom.hostPlayerId === myPlayerId;
-
-if (lobbyTabs) lobbyTabs.classList.toggle("hidden", !showLobbyTabs);
 
   if (!isMobile) {
-    panelIds.forEach((id) => {
+    // Desktop : tout afficher, aucun panel mobile
+    ALL_MOBILE_PANELS.forEach((id) => {
       const panel = document.getElementById(id);
       if (panel) panel.classList.remove("mobile-hidden-panel");
+    });
+    // Cacher les panels qui ne sont destinés qu'au mobile
+    ["playersCompoCard", "waitingPlayersTab"].forEach((id) => {
+      const panel = document.getElementById(id);
+      if (panel) panel.classList.add("hidden");
     });
     return;
   }
 
-  panelIds.forEach((id) => {
+  // Mobile : afficher uniquement le panel actif parmi les disponibles
+  ALL_MOBILE_PANELS.forEach((id) => {
     const panel = document.getElementById(id);
     if (!panel) return;
-    panel.classList.toggle("mobile-hidden-panel", id !== mobileGameActivePanel);
+    const shouldShow = availablePanels.includes(id) && id === mobileGameActivePanel;
+    panel.classList.toggle("mobile-hidden-panel", !shouldShow);
+    if (availablePanels.includes(id)) {
+      panel.classList.remove("hidden");
+    } else {
+      panel.classList.add("hidden");
+    }
   });
 
+  // Mettre à jour les onglets visibles et actifs
   tabs.querySelectorAll(".mobile-game-tab").forEach((btn) => {
-    const isActive = btn.getAttribute("data-panel") === mobileGameActivePanel;
+    const panelId = btn.getAttribute("data-panel");
+    const isAvailable = availablePanels.includes(panelId);
+    const isActive = panelId === mobileGameActivePanel;
+    btn.style.display = isAvailable ? "" : "none";
     btn.classList.toggle("active", isActive);
   });
 
-  const voteNotReady = document.getElementById("voteNotReadyCard");
-  if (voteNotReady) {
-    const isVoting = currentRoom?.phase === "voting" && !currentRoom?.gameOver;
-    voteNotReady.style.display = (mobileGameActivePanel === "voteCard" && !isVoting) ? "" : "none";
-  }
-
-  const configTab = tabs.querySelector('[data-panel="mobilePlayersCard"]');
-  if (configTab) {
-    configTab.style.display = (currentRoom?.started || currentRoom?.gameOver) ? "" : "none";
-  }
-
-  const motTab = tabs.querySelector('[data-panel="secretCard"]');
-  if (motTab) {
-    motTab.style.display = (currentRoom?.started && !currentRoom?.gameOver) ? "" : "none";
-  }
-
+  // Onglet Vote : état spécial
   const voteTab = tabs.querySelector('[data-panel="voteCard"]');
   if (voteTab) {
-    const isVoting = currentRoom?.phase === "voting" && !currentRoom?.gameOver;
     voteTab.classList.toggle("vote-tab-active-phase", isVoting);
+  }
+
+  // voteNotReadyCard : afficher si on est sur l'onglet vote mais pas en phase vote
+  const voteNotReady = document.getElementById("voteNotReadyCard");
+  const voteCardInner = document.getElementById("voteCardInner");
+  if (voteNotReady && voteCardInner) {
+    const onVoteTab = mobileGameActivePanel === "voteCard";
+    if (onVoteTab && !isVoting && isPlaying) {
+      voteNotReady.style.display = "";
+      voteCardInner.style.display = "none";
+    } else {
+      voteNotReady.style.display = "none";
+      voteCardInner.style.display = "";
+    }
   }
 }
 
@@ -904,51 +932,6 @@ function initMobileGameTabs() {
     });
   });
   window.addEventListener("resize", updateMobileGamePanels);
-}
-function updateMobileLobbyPanels() {
-  const tabs = document.getElementById("mobileLobbyTabs");
-  if (!tabs) return;
-
-  const isMobile = window.innerWidth <= 820;
-  const isHostLobby =
-    isMobile &&
-    currentRoom &&
-    !currentRoom.started &&
-    !currentRoom.gameOver &&
-    currentRoom.hostPlayerId === myPlayerId;
-
-  tabs.classList.toggle("hidden", !isHostLobby);
-
-  if (!isHostLobby) {
-    compositionCard?.classList.remove("mobile-hidden-panel");
-    mobilePlayersCard?.classList.remove("mobile-hidden-panel");
-    return;
-  }
-
-  const panels = ["compositionCard", "mobilePlayersCard"];
-  panels.forEach((id) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.classList.toggle("mobile-hidden-panel", id !== mobileLobbyActivePanel);
-  });
-
-  tabs.querySelectorAll(".mobile-game-tab").forEach((btn) => {
-    btn.classList.toggle("active", btn.getAttribute("data-lobby-panel") === mobileLobbyActivePanel);
-  });
-}
-
-function initMobileLobbyTabs() {
-  const tabs = document.getElementById("mobileLobbyTabs");
-  if (!tabs) return;
-
-  tabs.querySelectorAll(".mobile-game-tab").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      mobileLobbyActivePanel = btn.getAttribute("data-lobby-panel");
-      updateMobileLobbyPanels();
-    });
-  });
-
-  window.addEventListener("resize", updateMobileLobbyPanels);
 }
 
 window.setMobileGameActivePanel = (panelId) => {
@@ -965,6 +948,9 @@ function renderRoom(room) {
   lobby.classList.remove("hidden");
   leaveWrap.classList.remove("hidden");
   startWrap.classList.add("hidden");
+
+  // AJOUT : cacher le bouton topbar reprendre quand on est dans une room
+  if (topResumeBtn) topResumeBtn.classList.add("hidden");
 
   const host = room.players.find((p) => p.id === room.hostPlayerId);
 
@@ -992,7 +978,8 @@ function renderRoom(room) {
   }
 
   renderPlayers(room);
-  renderMobilePlayersCard(room);
+  renderPlayersMobile(room);              // AJOUT
+  renderWaitingPlayersMobile(room);       // AJOUT
   renderComposition(room);
   renderChat(room);
   renderWaitingRoom(room);
@@ -1006,10 +993,27 @@ function renderRoom(room) {
   renderVoteButtons(room);
   renderEndGame(room);
 
-  if (room.phase === "voting" && !room.gameOver) mobileGameActivePanel = "voteCard";
-  else if (room.phase === "speaking") mobileGameActivePanel = "chatCard";
-  else if (!room.started && isHost) mobileGameActivePanel = "mobilePlayersCard";
-  else if (!room.started && !isHost) mobileGameActivePanel = "chatCard";
+  // Déterminer le bon panel actif selon la phase
+  const isVoting = room.phase === "voting" && !room.gameOver;
+  const isLobby = !room.started && !room.gameOver;
+  const isPlaying = room.started && !room.gameOver;
+
+  if (room.gameOver) {
+    mobileGameActivePanel = "chatCard";
+  } else if (isVoting) {
+    mobileGameActivePanel = "voteCard";
+  } else if (isPlaying) {
+    // Ne pas forcer le changement si l'utilisateur a choisi un autre onglet
+    if (!["chatCard", "secretCard", "playersCompoCard"].includes(mobileGameActivePanel)) {
+      mobileGameActivePanel = "chatCard";
+    }
+  } else if (isLobby && isHost) {
+    if (!["waitingPlayersTab", "compositionCard"].includes(mobileGameActivePanel)) {
+      mobileGameActivePanel = "waitingPlayersTab";
+    }
+  } else {
+    mobileGameActivePanel = "chatCard";
+  }
 
   updateMobileGamePanels();
 }
@@ -1052,7 +1056,6 @@ createBtn.addEventListener("click", () => {
   socket.emit("createRoom", { name }, (res) => {
     if (!res?.ok) return setStatus(res?.error || "Impossible de créer la room", true);
     saveSession(res.playerId, res.playerToken, res.room.code);
-    saveLastJoinInfo(name, res.room.code);
     renderRoom(res.room);
     if (typeof window.updateMobileUI === "function") window.updateMobileUI(res.room);
     updateResumeUI(true); playClickSound("success"); setStatus("Room créée");
@@ -1067,7 +1070,6 @@ joinBtn.addEventListener("click", () => {
   socket.emit("joinRoom", { name, code, playerToken: existingToken }, (res) => {
     if (!res?.ok) return setStatus(res?.error || "Impossible de rejoindre la room", true);
     saveSession(res.playerId, res.playerToken, res.room.code);
-    saveLastJoinInfo(name, res.room.code);
     renderRoom(res.room);
     if (typeof window.updateMobileUI === "function") window.updateMobileUI(res.room);
     updateResumeUI(true); playClickSound("join"); setStatus("Room rejointe");
@@ -1079,68 +1081,38 @@ resumeBtn.addEventListener("click", () => {
   socket.emit("resumeSession", { playerToken: myPlayerToken }, (res) => {
     if (!res?.ok) { clearSession(); resetUI(); return setStatus(res?.error || "Impossible de reprendre la session", true); }
     saveSession(res.playerId, res.playerToken, res.room.code);
-    saveLastJoinInfo(lastPlayerName || nameInput.value.trim(), res.room.code);
     renderRoom(res.room);
     if (typeof window.updateMobileUI === "function") window.updateMobileUI(res.room);
     updateResumeUI(true); playClickSound("join"); setStatus("Reconnexion réussie");
   });
 });
-rejoinBtn?.addEventListener("click", () => {
-  if (!lastPlayerName || !lastRoomCode) {
-    return setStatus("Aucune partie à rejoindre", true);
-  }
 
-  if (myPlayerToken) {
-    socket.emit("resumeSession", { playerToken: myPlayerToken }, (resumeRes) => {
-      if (resumeRes?.ok) {
-        saveSession(resumeRes.playerId, resumeRes.playerToken, resumeRes.room.code);
-        saveLastJoinInfo(lastPlayerName, resumeRes.room.code);
-        renderRoom(resumeRes.room);
-        updateResumeUI(true);
-        updateRejoinUI(false);
-        playClickSound("join");
-        setStatus("Reconnexion réussie");
-        return;
-      }
-
-      socket.emit("joinRoom", { name: lastPlayerName, code: lastRoomCode }, (joinRes) => {
-        if (!joinRes?.ok) {
-          return setStatus(joinRes?.error || "Impossible de rejoindre la partie", true);
-        }
-        saveSession(joinRes.playerId, joinRes.playerToken, joinRes.room.code);
-        saveLastJoinInfo(lastPlayerName, joinRes.room.code);
-        renderRoom(joinRes.room);
-        updateResumeUI(true);
-        updateRejoinUI(false);
-        playClickSound("join");
-        setStatus("Partie rejointe");
-      });
+// AJOUT : bouton reprendre dans la topbar
+if (topResumeBtn) {
+  topResumeBtn.addEventListener("click", () => {
+    if (!myPlayerToken) { updateResumeUI(false); return setStatus("Aucune session à reprendre", true); }
+    socket.emit("resumeSession", { playerToken: myPlayerToken }, (res) => {
+      if (!res?.ok) { clearSession(); resetUI(); return setStatus(res?.error || "Impossible de reprendre la session", true); }
+      saveSession(res.playerId, res.playerToken, res.room.code);
+      renderRoom(res.room);
+      updateResumeUI(true); playClickSound("join"); setStatus("Reconnexion réussie");
     });
-    return;
-  }
-
-  socket.emit("joinRoom", { name: lastPlayerName, code: lastRoomCode }, (res) => {
-    if (!res?.ok) {
-      return setStatus(res?.error || "Impossible de rejoindre la partie", true);
-    }
-    saveSession(res.playerId, res.playerToken, res.room.code);
-    saveLastJoinInfo(lastPlayerName, res.room.code);
-    renderRoom(res.room);
-    updateResumeUI(true);
-    updateRejoinUI(false);
-    playClickSound("join");
-    setStatus("Partie rejointe");
   });
-});
+}
 
-startBtn.addEventListener("click", () => {
+function doStartGame() {
   const composition = currentRoom ? getSelectedComposition(currentRoom) : null;
   const settings = currentRoom ? getSelectedSettings(currentRoom) : null;
   socket.emit("startGame", { composition, settings }, (res) => {
     if (!res?.ok) return setStatus(res?.error || "Impossible de lancer", true);
     playClickSound("success"); setStatus("Partie lancée");
   });
-});
+}
+
+startBtn.addEventListener("click", doStartGame);
+// AJOUT : boutons lancer dans les cards mobiles
+if (startBtnMobile) startBtnMobile.addEventListener("click", doStartGame);
+if (startBtnConfig) startBtnConfig.addEventListener("click", doStartGame);
 
 restartBtn.addEventListener("click", () => {
   const composition = currentRoom ? getSelectedComposition(currentRoom) : null;
@@ -1227,6 +1199,4 @@ attachUiSounds();
 initAds();
 initTopRoomCopy();
 initMobileGameTabs();
-initMobileLobbyTabs();
 validateStoredSession();
-

@@ -117,6 +117,8 @@
 
       <div class="topbar-side topbar-right">
         <div id="topHostInfo" class="top-meta hidden"></div>
+        <!-- AJOUT : bouton Reprendre visible dans la topbar quand on est déconnecté -->
+        <button id="topResumeBtn" class="leave-btn topbar-leave-btn hidden">↩ Reprendre</button>
         <div class="hidden" id="leaveWrap">
           <button id="leaveBtn" class="leave-btn topbar-leave-btn">Quitter</button>
         </div>
@@ -169,14 +171,8 @@
                 <h2>Se connecter à une salle</h2>
                 <p class="start-subtitle">Crée une room ou rejoins-en une avec un code.</p>
                 <div class="form-block hidden" id="resumeBlock">
-                  <button id="resumeBtn" class="big-btn">Reprendre ma partie</button><div class="form-block hidden" id="rejoinBlock">
-                 </div>
-                 <div class="form-block hidden" id="rejoinBlock">
-                  <button id="rejoinBtn" class="big-btn">Rejoindre la partie</button>
-                 </div>
-                 <div class="separator hidden" id="rejoinSeparator">ou</div>
-
-
+                  <button id="resumeBtn" class="big-btn">Reprendre ma partie</button>
+                </div>
                 <div class="separator hidden" id="resumeSeparator">ou</div>
                 <div class="form-block">
                   <label for="nameInput">Pseudo</label>
@@ -222,19 +218,19 @@
       <!-- ===== ÉCRAN JEU ===== -->
       <div class="game-layout">
 
-        <!-- Onglets mobiles — cachés sur PC via CSS, gérés par app.js -->
-        <div class="mobile-game-tabs hidden" id="mobileLobbyTabs">
-          <button class="mobile-game-tab active" data-lobby-panel="compositionCard">⚙ Config</button>
-          <button class="mobile-game-tab" data-lobby-panel="mobilePlayersCard">👥 Joueurs</button>
-        </div>
+        <!-- Onglets mobiles jeu — 4 onglets pendant la partie + Joueurs en attente -->
         <div class="mobile-game-tabs hidden" id="mobileGameTabs">
+          <!-- Onglets affichés pendant la partie -->
           <button class="mobile-game-tab" data-panel="secretCard">🔤 Mot</button>
-          <button class="mobile-game-tab active" data-panel="chatCard">Chat</button>
-          <button class="mobile-game-tab" data-panel="mobilePlayersCard">👥 Composition</button>
+          <button class="mobile-game-tab active" data-panel="chatCard">💬 Chat</button>
+          <button class="mobile-game-tab" data-panel="playersCompoCard">👥 Joueurs</button>
           <button class="mobile-game-tab vote-tab" data-panel="voteCard">🗳 Vote</button>
+          <!-- Onglets affichés en attente (hôte) -->
+          <button class="mobile-game-tab" data-panel="waitingPlayersTab">👥 Joueurs</button>
+          <button class="mobile-game-tab" data-panel="compositionCard">⚙ Config</button>
         </div>
 
-        <!-- ===== PANEL GAUCHE (PC + mobile via mobile-hidden-panel) ===== -->
+        <!-- ===== PANEL GAUCHE ===== -->
         <div class="panel panel-left">
 
           <!-- Mot secret -->
@@ -243,21 +239,47 @@
             <p id="wordText"></p>
           </div>
 
+          <!-- Onglet Joueurs + Composition (pendant la partie, mobile) -->
+          <div class="card hidden compact-card" id="playersCompoCard">
+            <h2>Joueurs</h2>
+            <ul id="playersListMobile" class="players-list-mobile"></ul>
+            <div class="role-dolls-wrap" style="margin-top:14px;">
+              <div class="role-dolls-title">Composition</div>
+              <div id="roleDollsMobile" class="role-dolls"></div>
+            </div>
+          </div>
+
+          <!-- Onglet Joueurs en attente (hôte en lobby, mobile) -->
+          <div class="card hidden compact-card" id="waitingPlayersTab">
+            <h2>Joueurs</h2>
+            <ul id="waitingPlayersListMobile" class="players-list-mobile"></ul>
+            <div class="role-dolls-wrap" style="margin-top:14px;">
+              <div class="role-dolls-title">Composition</div>
+              <div id="waitingRoleDollsMobile" class="role-dolls"></div>
+            </div>
+            <div class="waiting-meta" style="margin-top:14px;">
+              <div class="waiting-meta-item">
+                <span class="waiting-meta-label">Catégorie</span>
+                <span id="waitingCategoryMobile">--</span>
+              </div>
+              <div class="waiting-meta-item">
+                <span class="waiting-meta-label">Sous-cat.</span>
+                <span id="waitingSubcategoryMobile">--</span>
+              </div>
+              <div class="waiting-meta-item">
+                <span class="waiting-meta-label">Tour</span>
+                <span id="waitingTurnMobile">--</span>
+              </div>
+              <div class="waiting-meta-item">
+                <span class="waiting-meta-label">Vote</span>
+                <span id="waitingVoteMobile">--</span>
+              </div>
+            </div>
+            <button id="startBtnMobile" class="big-btn hidden" style="margin-top:16px;">Lancer la partie</button>
+          </div>
+
           <!-- Configuration hôte -->
           <div class="card hidden compact-card" id="compositionCard">
-            <div class="card hidden compact-card" id="mobilePlayersCard">
-              <h2>Composition & joueurs</h2>
-
-              <div class="role-dolls-wrap">
-                <div class="role-dolls-title">Composition</div>
-                <div id="mobilePlayersRoleDolls" class="role-dolls"></div>
-              </div>
-
-              <div class="players-box" style="margin-top:10px;">
-                <h3>Joueurs</h3>
-                <ul id="playersListMobile" class="players-list-mobile"></ul>
-              </div>
-          </div>
             <h2>Configuration</h2>
             <p id="compositionHelp"></p>
             <div class="form-block">
@@ -285,11 +307,11 @@
               <select id="subcategorySelect"></select>
             </div>
             <p id="compositionSummary"></p>
-            <!-- Bonhommes visibles sur mobile dans l'onglet Config -->
             <div class="role-dolls-wrap" id="roleDollsConfigWrap" style="display:none">
               <div class="role-dolls-title">Composition</div>
               <div id="roleDollsConfig" class="role-dolls"></div>
             </div>
+            <button id="startBtnConfig" class="big-btn hidden" style="margin-top:16px;">Lancer la partie</button>
           </div>
 
           <!-- Vote -->
@@ -321,7 +343,7 @@
 
         </div>
 
-        <!-- ===== PANEL CENTRE (identique doc 5 / screenshot PC) ===== -->
+        <!-- ===== PANEL CENTRE ===== -->
         <div class="panel panel-center">
           <div class="card room-card hidden" id="lobby">
 

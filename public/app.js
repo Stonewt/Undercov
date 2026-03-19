@@ -852,19 +852,20 @@ function renderPlayers(room) {
 }
 
 function getDisplayCounts(room) {
+  // En jeu : composition réelle assignée par le serveur
   if (room.started) return room.roleComposition || {};
+  // En lobby : composition prévue depuis les inputs (peu importe le nb de joueurs actuels)
   const n = room.players.length;
-  if (n < 3) return {};
-  if (n === 3) return { civil: 2, undercover: 1, mrwhite: 0 };
-  if (undercoverCountInput && mrWhiteCountInput) {
-    let u = Math.max(1, parseInt(undercoverCountInput.value, 10) || 1);
-    let m = Math.max(0, Math.min(1, parseInt(mrWhiteCountInput.value, 10) || 0));
-    u = Math.min(u, Math.max(1, n - m - 1));
-    let c = n - u - m;
-    if (c < 1) { u = Math.max(1, n - m - 1); c = n - u - m; }
-    return { civil: c, undercover: u, mrwhite: m };
-  }
-  return room.roleComposition || {};
+  let u = 1, m = 0;
+  if (undercoverCountInput) u = Math.max(1, parseInt(undercoverCountInput.value, 10) || 1);
+  if (mrWhiteCountInput)    m = Math.max(0, Math.min(1, parseInt(mrWhiteCountInput.value, 10) || 0));
+  // À 3 joueurs ou moins : composition fixe
+  if (n <= 3) return { civil: 2, undercover: 1, mrwhite: 0 };
+  // Clamp pour éviter les valeurs impossibles
+  u = Math.min(u, Math.max(1, n - m - 1));
+  let c = n - u - m;
+  if (c < 1) { u = Math.max(1, n - m - 1); c = n - u - m; }
+  return { civil: c, undercover: u, mrwhite: m };
 }
 
 function fillRoleDolls(container, room) {
@@ -1049,7 +1050,7 @@ function renderComposition(room) {
   else { undercoverCountInput.disabled=false; mrWhiteCountInput.disabled=false; undercoverCountInput.min="1"; undercoverCountInput.max=String(n-1); mrWhiteCountInput.min="0"; mrWhiteCountInput.max="1"; compositionHelp.textContent="Choisissez la composition, les durées et la catégorie."; }
   const vals=clampCompositionValues(room); const sets=getSelectedSettings(room);
   compositionSummary.textContent=`${vals.civilCount} civil(s) • ${vals.undercoverCount} undercover(s)${vals.mrwhiteCount?" • 1 Mr White":""} • Tours ${sets.turnDurationSeconds}s • Vote ${sets.voteDurationSeconds}s`;
-  const cw=document.getElementById("roleDollsConfigWrap"); if(cw) cw.style.display="";
+  const cw=document.getElementById("roleDollsConfigWrap"); if(cw) cw.style.display="block";
   fillRoleDolls(document.getElementById("roleDollsConfig"),room);
 }
 window.renderComposition=renderComposition;

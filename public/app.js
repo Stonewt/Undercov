@@ -210,37 +210,30 @@ function playClickSound(type = "default") {
     playTone({ type: "sine", from: 520, to: 760, duration: 0.05, gain: 0.035 });
     return;
   }
-
   if (type === "success") {
     playTone({ type: "triangle", from: 660, to: 980, duration: 0.09, gain: 0.05 });
     return;
   }
-
   if (type === "join") {
     playTone({ type: "triangle", from: 520, to: 840, duration: 0.1, gain: 0.05 });
     return;
   }
-
   if (type === "leave") {
     playTone({ type: "sawtooth", from: 420, to: 220, duration: 0.1, gain: 0.04 });
     return;
   }
-
   if (type === "vote") {
     playTone({ type: "square", from: 500, to: 680, duration: 0.07, gain: 0.035 });
     return;
   }
-
   if (type === "tension") {
     playTone({ type: "square", from: 780, to: 840, duration: 0.06, gain: 0.028 });
     return;
   }
-
   if (type === "reveal") {
     playTone({ type: "triangle", from: 340, to: 720, duration: 0.16, gain: 0.045 });
     return;
   }
-
   playTone({ type: "triangle", from: 420, to: 620, duration: 0.04, gain: 0.04 });
 }
 
@@ -248,12 +241,10 @@ function attachUiSounds() {
   document.addEventListener("pointerdown", (e) => {
     const target = e.target;
     if (!target) return;
-
     if (target.closest("button")) {
       playClickSound("default");
       return;
     }
-
     if (target.closest("select") || target.closest("input")) {
       playClickSound("soft");
     }
@@ -264,7 +255,6 @@ function setStatus(message, important = false) {
   statusBanner.textContent = message;
   statusBanner.classList.remove("hidden");
   statusBanner.classList.toggle("important", important);
-
   clearTimeout(setStatus._timer);
   setStatus._timer = setTimeout(() => {
     statusBanner.classList.add("hidden");
@@ -274,42 +264,26 @@ function setStatus(message, important = false) {
 
 function copyText(text, onSuccess) {
   if (!text) return;
-
-  const done = () => {
-    if (typeof onSuccess === "function") onSuccess();
-  };
-
+  const done = () => { if (typeof onSuccess === "function") onSuccess(); };
   if (navigator.clipboard?.writeText) {
     navigator.clipboard.writeText(text).then(done).catch(() => {
       const el = document.createElement("textarea");
-      el.value = text;
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand("copy");
-      document.body.removeChild(el);
-      done();
+      el.value = text; document.body.appendChild(el); el.select();
+      document.execCommand("copy"); document.body.removeChild(el); done();
     });
     return;
   }
-
   const el = document.createElement("textarea");
-  el.value = text;
-  document.body.appendChild(el);
-  el.select();
-  document.execCommand("copy");
-  document.body.removeChild(el);
-  done();
+  el.value = text; document.body.appendChild(el); el.select();
+  document.execCommand("copy"); document.body.removeChild(el); done();
 }
 
 function initTopRoomCopy() {
   if (!topRoomInfo) return;
-
   topRoomInfo.style.cursor = "pointer";
   topRoomInfo.title = "Cliquer pour copier le code";
-
   topRoomInfo.addEventListener("click", () => {
     if (!currentRoom?.code) return;
-
     copyText(currentRoom.code, () => {
       topRoomInfo.classList.add("copied");
       setStatus(`Code ${currentRoom.code} copié`);
@@ -323,20 +297,13 @@ function saveSession(playerId, playerToken, roomCode) {
   window.myPlayerId = playerId;
   myPlayerToken = playerToken;
   myRoomCode = roomCode || myRoomCode;
-
   localStorage.setItem("playerId", playerId);
   localStorage.setItem("playerToken", playerToken);
-
-  if (myRoomCode) {
-    localStorage.setItem("roomCode", myRoomCode);
-  }
+  if (myRoomCode) localStorage.setItem("roomCode", myRoomCode);
 }
 
 function clearSession() {
-  myPlayerId = null;
-  myPlayerToken = null;
-  myRoomCode = null;
-
+  myPlayerId = null; myPlayerToken = null; myRoomCode = null;
   localStorage.removeItem("playerId");
   localStorage.removeItem("playerToken");
   localStorage.removeItem("roomCode");
@@ -345,31 +312,17 @@ function clearSession() {
 function updateResumeUI(canResume = false) {
   resumeBlock.classList.toggle("hidden", !canResume);
   resumeSeparator.classList.toggle("hidden", !canResume);
-
   if (resumeBtn && canResume && myRoomCode) {
     resumeBtn.textContent = `Reprendre ma partie (${myRoomCode})`;
   }
 }
 
 function validateStoredSession() {
-  if (!myPlayerToken || !myRoomCode) {
-    updateResumeUI(false);
-    return;
-  }
-
-  socket.emit(
-    "checkSession",
-    { playerToken: myPlayerToken, roomCode: myRoomCode },
-    (res) => {
-      if (!res?.ok) {
-        clearSession();
-        updateResumeUI(false);
-        return;
-      }
-
-      updateResumeUI(true);
-    }
-  );
+  if (!myPlayerToken || !myRoomCode) { updateResumeUI(false); return; }
+  socket.emit("checkSession", { playerToken: myPlayerToken, roomCode: myRoomCode }, (res) => {
+    if (!res?.ok) { clearSession(); updateResumeUI(false); return; }
+    updateResumeUI(true);
+  });
 }
 
 function normalizeSingleWordInput(value) {
@@ -380,10 +333,7 @@ function normalizeSingleWordInput(value) {
 }
 
 function stopTimer() {
-  if (timerInterval) {
-    clearInterval(timerInterval);
-    timerInterval = null;
-  }
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
   timerFill.style.width = "0%";
   timerText.textContent = "--";
   timerFill.style.background = "#22c55e";
@@ -391,20 +341,15 @@ function stopTimer() {
 }
 
 function resetVoteSelection() {
-  selectedVoteTargetId = null;
-  selectedVoteTargetName = null;
-  voteAlreadySent = false;
+  selectedVoteTargetId = null; selectedVoteTargetName = null; voteAlreadySent = false;
   selectedVoteText.textContent = "Aucun joueur sélectionné.";
   confirmVoteBtn.disabled = true;
 }
 
 function resetUI() {
-  currentRoom = null;
-  window.currentRoom = null;
-  currentTurnKey = null;
-  autoSubmittedTurnKey = null;
-  previousVisiblePlayerIds = [];
-  lastTensionSecondPlayed = null;
+  currentRoom = null; window.currentRoom = null;
+  currentTurnKey = null; autoSubmittedTurnKey = null;
+  previousVisiblePlayerIds = []; lastTensionSecondPlayed = null;
   mobileGameActivePanel = "chatCard";
 
   lobby.classList.add("hidden");
@@ -420,7 +365,8 @@ function resetUI() {
 
   topRoomInfo.classList.add("hidden");
   topHostInfo.classList.add("hidden");
-  topRoomInfo.textContent = "";
+  const _codeSpan = document.getElementById("topRoomCode");
+  if (_codeSpan) _codeSpan.textContent = "";
   topHostInfo.textContent = "";
   topRoomInfo.classList.remove("clickable-room", "copied");
 
@@ -431,10 +377,8 @@ function resetUI() {
   if (roleDolls) roleDolls.innerHTML = "";
   if (waitingRoleDolls) waitingRoleDolls.innerHTML = "";
 
-  phaseInfo.textContent = "";
-  speakerInfo.textContent = "";
-  wordText.textContent = "";
-  winnerText.textContent = "";
+  phaseInfo.textContent = ""; speakerInfo.textContent = "";
+  wordText.textContent = ""; winnerText.textContent = "";
   if (compositionHelp) compositionHelp.textContent = "";
   if (compositionSummary) compositionSummary.textContent = "";
   if (waitingCategory) waitingCategory.textContent = "--";
@@ -442,10 +386,8 @@ function resetUI() {
   if (waitingTurnDuration) waitingTurnDuration.textContent = "--";
   if (waitingVoteDuration) waitingVoteDuration.textContent = "--";
   chatInput.value = "";
-
   if (categorySelect) categorySelect.innerHTML = "";
   if (subcategorySelect) subcategorySelect.innerHTML = "";
-
   endCard.dataset.renderedRound = "";
   endCard.dataset.renderedWinner = "";
 
@@ -464,7 +406,6 @@ function sortPlayersForDisplay(room) {
   if (!room.started || !Array.isArray(room.speakingOrder) || room.speakingOrder.length === 0) {
     return [...room.players];
   }
-
   const indexMap = new Map(room.speakingOrder.map((id, index) => [id, index]));
   return [...room.players].sort((a, b) => {
     const ia = indexMap.has(a.id) ? indexMap.get(a.id) : Number.MAX_SAFE_INTEGER;
@@ -475,75 +416,45 @@ function sortPlayersForDisplay(room) {
 
 function renderPlayers(room) {
   playersList.innerHTML = "";
-
   const orderedPlayers = sortPlayersForDisplay(room);
-
   orderedPlayers.forEach((player) => {
     const li = document.createElement("li");
-
-    if (player.eliminated) {
-      li.classList.add("player-dead");
-    }
-
-    if (player.id === room.currentSpeakerId && room.phase === "speaking" && !room.gameOver) {
-      li.classList.add("player-current");
-    }
-
+    if (player.eliminated) li.classList.add("player-dead");
+    if (player.id === room.currentSpeakerId && room.phase === "speaking" && !room.gameOver) li.classList.add("player-current");
     const nameLine = document.createElement("span");
     nameLine.className = "player-name";
-
     let mainLabel = player.name;
     if (player.id === myPlayerId) mainLabel += " (toi)";
-    if (player.id === room.hostPlayerId) mainLabel += " \uD83D\uDC51";
+    if (player.id === room.hostPlayerId) mainLabel += " 👑";
     nameLine.textContent = mainLabel;
     li.appendChild(nameLine);
-
     const subParts = [];
-
-    if (player.id === room.currentSpeakerId && room.phase === "speaking" && !room.gameOver) {
-      subParts.push("réfléchit");
-    }
-
-    if (player.eliminated) {
-      subParts.push("éliminé");
-    }
-
+    if (player.id === room.currentSpeakerId && room.phase === "speaking" && !room.gameOver) subParts.push("réfléchit");
+    if (player.eliminated) subParts.push("éliminé");
     if (subParts.length > 0) {
       const subLine = document.createElement("span");
       subLine.className = "player-sub";
       subLine.textContent = subParts.join(" • ");
       li.appendChild(subLine);
     }
-
     playersList.appendChild(li);
   });
 }
 
 function fillRoleDolls(container, room) {
   if (!container) return;
-
   container.innerHTML = "";
-
   const composition = room.roleComposition || {};
   const dolls = [];
-
   for (let i = 0; i < (composition.civil || 0); i++) dolls.push("civil");
   for (let i = 0; i < (composition.undercover || 0); i++) dolls.push("undercover");
   for (let i = 0; i < (composition.mrwhite || 0); i++) dolls.push("mrwhite");
-
   dolls.forEach((role) => {
     const doll = document.createElement("div");
     doll.className = `role-doll ${role}`;
-
-    const head = document.createElement("div");
-    head.className = "role-doll-head";
-
-    const body = document.createElement("div");
-    body.className = "role-doll-body";
-
-    doll.appendChild(head);
-    doll.appendChild(body);
-    container.appendChild(doll);
+    const head = document.createElement("div"); head.className = "role-doll-head";
+    const body = document.createElement("div"); body.className = "role-doll-body";
+    doll.appendChild(head); doll.appendChild(body); container.appendChild(doll);
   });
 }
 
@@ -555,72 +466,41 @@ function renderRoleDolls(room) {
 function renderMessages(room) {
   messagesList.innerHTML = "";
   const messages = room.messages || [];
-
   messages.forEach((msg) => {
     const div = document.createElement("div");
     div.className = "message";
-
-    if (!msg.playerId) {
-      div.classList.add("system");
-    }
-
+    if (!msg.playerId) div.classList.add("system");
     const nameSpan = document.createElement("span");
-    nameSpan.className = "message-name";
-    nameSpan.textContent = `${msg.playerName}`;
-
+    nameSpan.className = "message-name"; nameSpan.textContent = `${msg.playerName}`;
     const textSpan = document.createElement("span");
-    textSpan.className = "message-text";
-    textSpan.textContent = msg.text;
-
-    div.appendChild(nameSpan);
-    div.appendChild(textSpan);
-
+    textSpan.className = "message-text"; textSpan.textContent = msg.text;
+    div.appendChild(nameSpan); div.appendChild(textSpan);
     messagesList.appendChild(div);
   });
-
   messagesList.scrollTop = messagesList.scrollHeight;
 }
 
 function renderChat(room) {
-  if (!room.started || room.gameOver) {
-    chatCard.classList.add("hidden");
-    return;
-  }
-
+  if (!room.started || room.gameOver) { chatCard.classList.add("hidden"); return; }
   chatCard.classList.remove("hidden");
   renderRoleDolls(room);
   renderMessages(room);
-
   const me = room.players.find((p) => p.id === myPlayerId);
-
-  const isMyTurn =
-    room.phase === "speaking" &&
-    room.currentSpeakerId === myPlayerId &&
-    me &&
-    !me.eliminated;
-
+  const isMyTurn = room.phase === "speaking" && room.currentSpeakerId === myPlayerId && me && !me.eliminated;
   chatInput.disabled = !isMyTurn;
   sendChatBtn.disabled = !isMyTurn || !normalizeSingleWordInput(chatInput.value);
-
-  if (room.phase === "voting") {
-    chatHelp.textContent = "Vote en cours.";
-  } else if (isMyTurn) {
-    chatHelp.textContent = "Entre un seul mot. Tu ne peux pas écrire ton mot secret.";
-  } else {
-    chatHelp.textContent = "Ce n'est pas ton tour. Tu peux lire.";
-  }
+  if (room.phase === "voting") chatHelp.textContent = "Vote en cours.";
+  else if (isMyTurn) chatHelp.textContent = "Entre un seul mot. Tu ne peux pas écrire ton mot secret.";
+  else chatHelp.textContent = "Ce n'est pas ton tour. Tu peux lire.";
 }
 
 function renderWaitingRoom(room) {
   const isHost = room.hostPlayerId === myPlayerId;
   const shouldShow = !room.started && !room.gameOver && !isHost;
-
   waitingCard.classList.toggle("hidden", !shouldShow);
-
   if (!shouldShow) return;
-
   renderRoleDolls(room);
-  waitingText.textContent = "En attente du lancement de la partie par l'hôte\u2026";
+  waitingText.textContent = "En attente du lancement de la partie par l'hôte…";
   waitingCategory.textContent = room.selectedCategory || "--";
   waitingSubcategory.textContent = room.selectedSubcategory || "--";
   waitingTurnDuration.textContent = `${room.turnDurationSeconds || 30} s`;
@@ -629,40 +509,24 @@ function renderWaitingRoom(room) {
 
 function renderVoteButtons(room) {
   voteButtons.innerHTML = "";
-
   const me = room.players.find((p) => p.id === myPlayerId);
-
   if (!me || me.eliminated || room.phase !== "voting" || room.gameOver) {
-    voteCard.classList.add("hidden");
-    resetVoteSelection();
-    return;
+    voteCard.classList.add("hidden"); resetVoteSelection(); return;
   }
-
   voteCard.classList.remove("hidden");
-
-  room.players
-    .filter((p) => !p.eliminated && p.id !== myPlayerId)
-    .forEach((player) => {
-      const btn = document.createElement("button");
-      btn.className = "vote-btn";
-      btn.textContent = `Choisir ${player.name}`;
-
-      if (selectedVoteTargetId === player.id) {
-        btn.classList.add("vote-btn-selected");
-      }
-
-      btn.onclick = () => {
-        if (voteAlreadySent) return;
-        selectedVoteTargetId = player.id;
-        selectedVoteTargetName = player.name;
-        selectedVoteText.textContent = `Cible sélectionnée : ${player.name}`;
-        confirmVoteBtn.disabled = false;
-        renderVoteButtons(room);
-      };
-
-      voteButtons.appendChild(btn);
-    });
-
+  room.players.filter((p) => !p.eliminated && p.id !== myPlayerId).forEach((player) => {
+    const btn = document.createElement("button");
+    btn.className = "vote-btn"; btn.textContent = `Choisir ${player.name}`;
+    if (selectedVoteTargetId === player.id) btn.classList.add("vote-btn-selected");
+    btn.onclick = () => {
+      if (voteAlreadySent) return;
+      selectedVoteTargetId = player.id; selectedVoteTargetName = player.name;
+      selectedVoteText.textContent = `Cible sélectionnée : ${player.name}`;
+      confirmVoteBtn.disabled = false;
+      renderVoteButtons(room);
+    };
+    voteButtons.appendChild(btn);
+  });
   if (voteAlreadySent) {
     confirmVoteBtn.disabled = true;
     selectedVoteText.textContent = `Vote confirmé contre ${selectedVoteTargetName}.`;
@@ -671,14 +535,9 @@ function renderVoteButtons(room) {
 
 function getMyOutcome(room) {
   if (!room.gameOver || !room.reveal) return null;
-
-  if (room.winner === "aucun") {
-    return "Partie arrêtée";
-  }
-
+  if (room.winner === "aucun") return "Partie arrêtée";
   const me = room.reveal.find((p) => p.id === myPlayerId);
   if (!me) return null;
-
   if (room.winner === "civils" && me.role === "civil") return "Victoire";
   if (room.winner === "undercover" && me.role === "undercover") return "Victoire";
   if (room.winner === "mrwhite" && me.role === "mrwhite") return "Victoire";
@@ -686,115 +545,57 @@ function getMyOutcome(room) {
 }
 
 function renderEndGame(room) {
-  if (!room.gameOver) {
-    endCard.classList.add("hidden");
-    return;
-  }
-
-  const alreadyRendered =
-    endCard.dataset.renderedRound === String(room.round) &&
-    endCard.dataset.renderedWinner === String(room.winner);
-
+  if (!room.gameOver) { endCard.classList.add("hidden"); return; }
+  const alreadyRendered = endCard.dataset.renderedRound === String(room.round) && endCard.dataset.renderedWinner === String(room.winner);
   endCard.classList.remove("hidden");
-
   const outcome = getMyOutcome(room) || "Fin de partie";
   endTitle.textContent = outcome;
-  winnerText.textContent =
-    room.winner === "aucun"
-      ? "La partie a été interrompue : aucun indice n'a été donné pendant la manche."
-      : `Équipe gagnante : ${room.winner}`;
-
+  winnerText.textContent = room.winner === "aucun"
+    ? "La partie a été interrompue : aucun indice n'a été donné pendant la manche."
+    : `Équipe gagnante : ${room.winner}`;
   if (!alreadyRendered) {
     revealList.innerHTML = "";
-
     room.reveal.forEach((player, index) => {
       const li = document.createElement("li");
-      li.className = "reveal-item";
-      li.style.animationDelay = `${index * 120}ms`;
-
+      li.className = "reveal-item"; li.style.animationDelay = `${index * 120}ms`;
       const badge = document.createElement("span");
-      badge.className = `reveal-role-badge ${player.role}`;
-      badge.textContent = player.role;
-
+      badge.className = `reveal-role-badge ${player.role}`; badge.textContent = player.role;
       const text = document.createElement("span");
       text.className = "reveal-main-text";
-      text.textContent =
-        `${player.name}` + `${player.word ? ` • ${player.word}` : " • aucun mot"}`;
-
-      li.appendChild(badge);
-      li.appendChild(text);
-      revealList.appendChild(li);
+      text.textContent = `${player.name}` + `${player.word ? ` • ${player.word}` : " • aucun mot"}`;
+      li.appendChild(badge); li.appendChild(text); revealList.appendChild(li);
     });
-
     endCard.dataset.renderedRound = String(room.round);
     endCard.dataset.renderedWinner = String(room.winner);
-
     playClickSound("reveal");
   }
 }
 
 function renderTimer(room) {
   stopTimer();
-
-  let endAt = null;
-  let total = null;
-
-  if (room.phase === "speaking" && room.turnEndsAt) {
-    endAt = room.turnEndsAt;
-    total = room.turnDurationMs || 30000;
-  } else if (room.phase === "voting" && room.voteEndsAt) {
-    endAt = room.voteEndsAt;
-    total = room.voteDurationMs || 30000;
-  } else {
-    return;
-  }
-
+  let endAt = null, total = null;
+  if (room.phase === "speaking" && room.turnEndsAt) { endAt = room.turnEndsAt; total = room.turnDurationMs || 30000; }
+  else if (room.phase === "voting" && room.voteEndsAt) { endAt = room.voteEndsAt; total = room.voteDurationMs || 30000; }
+  else return;
   const tick = () => {
     const remaining = Math.max(0, endAt - Date.now());
     const percent = Math.max(0, Math.min(100, (remaining / total) * 100));
     const secondsLeft = Math.ceil(remaining / 1000);
-
     timerFill.style.width = `${percent}%`;
     timerText.textContent = `${secondsLeft} s`;
-
-    if (remaining <= 7000) {
-      timerFill.style.background = "#f59e0b";
-    } else {
-      timerFill.style.background = "#22c55e";
-    }
-
-    if (remaining <= 3000) {
-      timerFill.style.background = "#ef4444";
-    }
-
+    if (remaining <= 7000) timerFill.style.background = "#f59e0b";
+    else timerFill.style.background = "#22c55e";
+    if (remaining <= 3000) timerFill.style.background = "#ef4444";
     if (secondsLeft <= 5 && secondsLeft > 0 && lastTensionSecondPlayed !== secondsLeft) {
-      lastTensionSecondPlayed = secondsLeft;
-      playClickSound("tension");
+      lastTensionSecondPlayed = secondsLeft; playClickSound("tension");
     }
-
-    const isMyTurn =
-      room.phase === "speaking" &&
-      room.currentSpeakerId === myPlayerId &&
-      !room.gameOver;
-
-    if (
-      isMyTurn &&
-      remaining <= 250 &&
-      currentTurnKey &&
-      autoSubmittedTurnKey !== currentTurnKey
-    ) {
+    const isMyTurn = room.phase === "speaking" && room.currentSpeakerId === myPlayerId && !room.gameOver;
+    if (isMyTurn && remaining <= 250 && currentTurnKey && autoSubmittedTurnKey !== currentTurnKey) {
       const word = normalizeSingleWordInput(chatInput.value);
-      if (word && !sendChatBtn.disabled) {
-        autoSubmittedTurnKey = currentTurnKey;
-        sendChatBtn.click();
-      }
+      if (word && !sendChatBtn.disabled) { autoSubmittedTurnKey = currentTurnKey; sendChatBtn.click(); }
     }
-
-    if (remaining <= 0) {
-      stopTimer();
-    }
+    if (remaining <= 0) stopTimer();
   };
-
   tick();
   timerInterval = setInterval(tick, 250);
 }
@@ -803,46 +604,27 @@ function clampCompositionValues(room) {
   if (!undercoverCountInput || !mrWhiteCountInput) {
     return { undercoverCount: 1, mrwhiteCount: 0, civilCount: room.players.length - 1 };
   }
-
   const playerCount = room.players.length;
-
   if (playerCount <= 3) {
-    undercoverCountInput.value = "1";
-    mrWhiteCountInput.value = "0";
-    return {
-      undercoverCount: 1,
-      mrwhiteCount: 0,
-      civilCount: 2
-    };
+    undercoverCountInput.value = "1"; mrWhiteCountInput.value = "0";
+    return { undercoverCount: 1, mrwhiteCount: 0, civilCount: 2 };
   }
-
   let undercoverCount = Number.parseInt(undercoverCountInput.value, 10);
   let mrwhiteCount = Number.parseInt(mrWhiteCountInput.value, 10);
-
   if (!Number.isInteger(undercoverCount)) undercoverCount = 1;
   if (!Number.isInteger(mrwhiteCount)) mrwhiteCount = 0;
-
   mrwhiteCount = Math.max(0, Math.min(1, mrwhiteCount));
   undercoverCount = Math.max(1, undercoverCount);
-
   const maxUndercover = Math.max(1, playerCount - mrwhiteCount - 1);
   undercoverCount = Math.min(undercoverCount, maxUndercover);
-
   let civilCount = playerCount - undercoverCount - mrwhiteCount;
-
   if (civilCount < 1) {
     undercoverCount = Math.max(1, playerCount - mrwhiteCount - 1);
     civilCount = playerCount - undercoverCount - mrwhiteCount;
   }
-
   undercoverCountInput.value = String(undercoverCount);
   mrWhiteCountInput.value = String(mrwhiteCount);
-
-  return {
-    undercoverCount,
-    mrwhiteCount,
-    civilCount
-  };
+  return { undercoverCount, mrwhiteCount, civilCount };
 }
 
 function clampSeconds(value, fallback = 30) {
@@ -853,47 +635,32 @@ function clampSeconds(value, fallback = 30) {
 
 function populateCategorySelect(room) {
   if (!categorySelect || !subcategorySelect) return;
-
   const options = Array.isArray(room.categoryOptions) ? room.categoryOptions : [];
   const currentValue = categorySelect.value;
-  const selectedCategory =
-    options.find(opt => opt.name === currentValue)?.name ||
-    room.selectedCategory ||
-    options[0]?.name ||
-    "";
-
+  const selectedCategory = options.find(opt => opt.name === currentValue)?.name || room.selectedCategory || options[0]?.name || "";
   categorySelect.innerHTML = "";
   options.forEach((category) => {
     const option = document.createElement("option");
-    option.value = category.name;
-    option.textContent = category.name;
+    option.value = category.name; option.textContent = category.name;
     option.selected = category.name === selectedCategory;
     categorySelect.appendChild(option);
   });
-
   populateSubcategorySelect(room, selectedCategory, subcategorySelect.value || room.selectedSubcategory);
 }
 
 function populateSubcategorySelect(room, categoryName, preferredSubcategory = null) {
   if (!subcategorySelect) return;
-
   const options = Array.isArray(room.categoryOptions) ? room.categoryOptions : [];
   const category = options.find((item) => item.name === categoryName) || options[0];
-
   const subcategories = category?.subcategories || [];
   const selectedSubcategory =
-    preferredSubcategory && subcategories.includes(preferredSubcategory)
-      ? preferredSubcategory
-      : room.selectedSubcategory && subcategories.includes(room.selectedSubcategory)
-        ? room.selectedSubcategory
-        : subcategories[0] || "";
-
+    preferredSubcategory && subcategories.includes(preferredSubcategory) ? preferredSubcategory :
+    room.selectedSubcategory && subcategories.includes(room.selectedSubcategory) ? room.selectedSubcategory :
+    subcategories[0] || "";
   subcategorySelect.innerHTML = "";
-
   subcategories.forEach((name) => {
     const option = document.createElement("option");
-    option.value = name;
-    option.textContent = name;
+    option.value = name; option.textContent = name;
     option.selected = name === selectedSubcategory;
     subcategorySelect.appendChild(option);
   });
@@ -901,88 +668,45 @@ function populateSubcategorySelect(room, categoryName, preferredSubcategory = nu
 
 function getSelectedComposition(room) {
   const values = clampCompositionValues(room);
-  return {
-    undercoverCount: values.undercoverCount,
-    mrwhiteCount: values.mrwhiteCount
-  };
+  return { undercoverCount: values.undercoverCount, mrwhiteCount: values.mrwhiteCount };
 }
 
 function getSelectedSettings(room) {
-  const turnDurationSeconds = clampSeconds(
-    turnDurationInput?.value,
-    room?.turnDurationSeconds || 30
-  );
-  const voteDurationSeconds = clampSeconds(
-    voteDurationInput?.value,
-    room?.voteDurationSeconds || 30
-  );
-
+  const turnDurationSeconds = clampSeconds(turnDurationInput?.value, room?.turnDurationSeconds || 30);
+  const voteDurationSeconds = clampSeconds(voteDurationInput?.value, room?.voteDurationSeconds || 30);
   if (turnDurationInput) turnDurationInput.value = String(turnDurationSeconds);
   if (voteDurationInput) voteDurationInput.value = String(voteDurationSeconds);
-
   return {
-    turnDurationSeconds,
-    voteDurationSeconds,
+    turnDurationSeconds, voteDurationSeconds,
     category: categorySelect?.value || room?.selectedCategory || null,
     subcategory: subcategorySelect?.value || room?.selectedSubcategory || null
   };
 }
 
 function renderComposition(room) {
-  if (
-    !compositionCard ||
-    !compositionHelp ||
-    !compositionSummary ||
-    !undercoverCountInput ||
-    !mrWhiteCountInput ||
-    !turnDurationInput ||
-    !voteDurationInput ||
-    !categorySelect ||
-    !subcategorySelect
-  ) {
-    return;
-  }
-
+  if (!compositionCard || !compositionHelp || !compositionSummary ||
+      !undercoverCountInput || !mrWhiteCountInput || !turnDurationInput ||
+      !voteDurationInput || !categorySelect || !subcategorySelect) return;
   const isHost = room.hostPlayerId === myPlayerId;
   const canConfigure = !room.started && !room.gameOver && isHost;
-
-  if (!canConfigure) {
-    compositionCard.classList.add("hidden");
-    return;
-  }
-
+  if (!canConfigure) { compositionCard.classList.add("hidden"); return; }
   compositionCard.classList.remove("hidden");
-
   const playerCount = room.players.length;
-
-  if (turnDurationInput !== document.activeElement) {
-    turnDurationInput.value = String(clampSeconds(turnDurationInput.value, room.turnDurationSeconds || 30));
-  }
-  if (voteDurationInput !== document.activeElement) {
-    voteDurationInput.value = String(clampSeconds(voteDurationInput.value, room.voteDurationSeconds || 30));
-  }
-
+  if (turnDurationInput !== document.activeElement) turnDurationInput.value = String(clampSeconds(turnDurationInput.value, room.turnDurationSeconds || 30));
+  if (voteDurationInput !== document.activeElement) voteDurationInput.value = String(clampSeconds(voteDurationInput.value, room.voteDurationSeconds || 30));
   populateCategorySelect(room);
-
   if (playerCount <= 3) {
-    undercoverCountInput.disabled = true;
-    mrWhiteCountInput.disabled = true;
-    undercoverCountInput.value = "1";
-    mrWhiteCountInput.value = "0";
+    undercoverCountInput.disabled = true; mrWhiteCountInput.disabled = true;
+    undercoverCountInput.value = "1"; mrWhiteCountInput.value = "0";
     compositionHelp.textContent = "À 3 joueurs : composition fixe. L'hôte peut aussi choisir la durée et la catégorie.";
   } else {
-    undercoverCountInput.disabled = false;
-    mrWhiteCountInput.disabled = false;
-    undercoverCountInput.min = "1";
-    undercoverCountInput.max = String(playerCount - 1);
-    mrWhiteCountInput.min = "0";
-    mrWhiteCountInput.max = "1";
+    undercoverCountInput.disabled = false; mrWhiteCountInput.disabled = false;
+    undercoverCountInput.min = "1"; undercoverCountInput.max = String(playerCount - 1);
+    mrWhiteCountInput.min = "0"; mrWhiteCountInput.max = "1";
     compositionHelp.textContent = "L'hôte choisit la composition, les durées et la catégorie.";
   }
-
   const values = clampCompositionValues(room);
   const settings = getSelectedSettings(room);
-
   compositionSummary.textContent =
     `${values.civilCount} civil(s) • ${values.undercoverCount} undercover(s)` +
     `${values.mrwhiteCount ? " • 1 Mr White" : ""}` +
@@ -994,30 +718,24 @@ window.renderComposition = renderComposition;
 
 function handlePresenceSounds(room) {
   const currentIds = (room.players || []).map((p) => p.id);
-  if (!previousVisiblePlayerIds.length) {
-    previousVisiblePlayerIds = currentIds;
-    return;
-  }
-
+  if (!previousVisiblePlayerIds.length) { previousVisiblePlayerIds = currentIds; return; }
   const joined = currentIds.filter((id) => !previousVisiblePlayerIds.includes(id));
   const left = previousVisiblePlayerIds.filter((id) => !currentIds.includes(id));
-
-  if (joined.length > 0) {
-    playClickSound("join");
-  } else if (left.length > 0) {
-    playClickSound("leave");
-  }
-
+  if (joined.length > 0) playClickSound("join");
+  else if (left.length > 0) playClickSound("leave");
   previousVisiblePlayerIds = currentIds;
 }
 
 function updateMobileGamePanels() {
   const isMobile = window.innerWidth <= 820;
   const tabs = document.getElementById("mobileGameTabs");
-  if (!tabs) return;
+  if (!tabs) {
+    // HTML doc 5 : déléguer à window.updateMobileUI défini dans le script inline
+    if (typeof window.updateMobileUI === "function") window.updateMobileUI(currentRoom);
+    return;
+  }
 
   const panelIds = ["secretCard", "chatCard", "compositionCard", "voteCard"];
-
   const phasePanel =
     currentRoom?.gameOver ? "chatCard" :
     currentRoom?.phase === "voting" ? "voteCard" :
@@ -1048,27 +766,23 @@ function updateMobileGamePanels() {
     btn.classList.toggle("active", isActive);
   });
 
-  // Message "pas encore le moment" dans l'onglet vote
   const voteNotReady = document.getElementById("voteNotReadyCard");
   if (voteNotReady) {
     const isVoting = currentRoom?.phase === "voting" && !currentRoom?.gameOver;
     voteNotReady.style.display = (mobileGameActivePanel === "voteCard" && !isVoting) ? "" : "none";
   }
 
-  // Onglet composition : visible seulement pour l'hote avant la partie
   const configTab = tabs.querySelector('[data-panel="compositionCard"]');
   if (configTab) {
     const showConfig = currentRoom && !currentRoom.started && !currentRoom.gameOver && currentRoom.hostPlayerId === myPlayerId;
     configTab.style.display = showConfig ? "" : "none";
   }
 
-  // Onglet mot secret : visible seulement si la partie est lancée
   const motTab = tabs.querySelector('[data-panel="secretCard"]');
   if (motTab) {
     motTab.style.display = (currentRoom?.started && !currentRoom?.gameOver) ? "" : "none";
   }
 
-  // Style onglet vote en phase de vote
   const voteTab = tabs.querySelector('[data-panel="voteCard"]');
   if (voteTab) {
     const isVoting = currentRoom?.phase === "voting" && !currentRoom?.gameOver;
@@ -1079,14 +793,12 @@ function updateMobileGamePanels() {
 function initMobileGameTabs() {
   const tabs = document.getElementById("mobileGameTabs");
   if (!tabs) return;
-
   tabs.querySelectorAll(".mobile-game-tab").forEach((btn) => {
     btn.addEventListener("click", () => {
       mobileGameActivePanel = btn.getAttribute("data-panel");
       updateMobileGamePanels();
     });
   });
-
   window.addEventListener("resize", updateMobileGamePanels);
 }
 
@@ -1097,9 +809,7 @@ window.setMobileGameActivePanel = (panelId) => {
 
 function renderRoom(room) {
   handlePresenceSounds(room);
-
-  currentRoom = room;
-  window.currentRoom = room;
+  currentRoom = room; window.currentRoom = room;
   myRoomCode = room.code;
   localStorage.setItem("roomCode", room.code);
 
@@ -1109,21 +819,16 @@ function renderRoom(room) {
 
   const host = room.players.find((p) => p.id === room.hostPlayerId);
 
-  topRoomInfo.textContent = `Room ${room.code}`;
-  topRoomInfo.classList.add("clickable-room");
-  topHostInfo.textContent = host ? `Hôte : ${host.name}` : "Pas d'hôte";
+  const codeSpan = document.getElementById("topRoomCode");
+  if (codeSpan) codeSpan.textContent = "Room " + room.code;
   topRoomInfo.classList.remove("hidden");
+  topHostInfo.textContent = host ? `Hôte : ${host.name}` : "Pas d'hôte";
   topHostInfo.classList.remove("hidden");
 
   const nextTurnKey = `${room.code}-${room.phase}-${room.round}-${room.currentSpeakerId || "none"}`;
   if (currentTurnKey !== nextTurnKey) {
-    currentTurnKey = nextTurnKey;
-    autoSubmittedTurnKey = null;
-    lastTensionSecondPlayed = null;
-
-    if (!(room.phase === "speaking" && room.currentSpeakerId === myPlayerId)) {
-      chatInput.value = "";
-    }
+    currentTurnKey = nextTurnKey; autoSubmittedTurnKey = null; lastTensionSecondPlayed = null;
+    if (!(room.phase === "speaking" && room.currentSpeakerId === myPlayerId)) chatInput.value = "";
   }
 
   if (!room.started) {
@@ -1131,16 +836,10 @@ function renderRoom(room) {
     speakerInfo.textContent = "La partie n'a pas encore commencé";
   } else {
     phaseInfo.textContent = `Manche ${room.round}`;
-
     const speaker = room.players.find((p) => p.id === room.currentSpeakerId);
-
-    if (room.phase === "speaking" && speaker) {
-      speakerInfo.textContent = `${speaker.name} réfléchit`;
-    } else if (room.phase === "voting") {
-      speakerInfo.textContent = `Vote en cours (${room.voteCount}/${room.players.filter((p) => !p.eliminated).length})`;
-    } else {
-      speakerInfo.textContent = "";
-    }
+    if (room.phase === "speaking" && speaker) speakerInfo.textContent = `${speaker.name} réfléchit`;
+    else if (room.phase === "voting") speakerInfo.textContent = `Vote en cours (${room.voteCount}/${room.players.filter((p) => !p.eliminated).length})`;
+    else speakerInfo.textContent = "";
   }
 
   renderPlayers(room);
@@ -1151,23 +850,16 @@ function renderRoom(room) {
   hideGameplayButtons();
 
   const isHost = room.hostPlayerId === myPlayerId;
-
   if (!room.started && isHost) startBtn.classList.remove("hidden");
   if (room.gameOver && isHost) restartBtn.classList.remove("hidden");
 
   renderVoteButtons(room);
   renderEndGame(room);
 
-  // Auto-switch onglet mobile selon la phase
-  if (room.phase === "voting" && !room.gameOver) {
-    mobileGameActivePanel = "voteCard";
-  } else if (room.phase === "speaking") {
-    mobileGameActivePanel = "chatCard";
-  } else if (!room.started && isHost) {
-    mobileGameActivePanel = "compositionCard";
-  } else if (!room.started && !isHost) {
-    mobileGameActivePanel = "chatCard";
-  }
+  if (room.phase === "voting" && !room.gameOver) mobileGameActivePanel = "voteCard";
+  else if (room.phase === "speaking") mobileGameActivePanel = "chatCard";
+  else if (!room.started && isHost) mobileGameActivePanel = "compositionCard";
+  else if (!room.started && !isHost) mobileGameActivePanel = "chatCard";
 
   updateMobileGamePanels();
 }
@@ -1179,225 +871,131 @@ function closeAd(adId) {
   if (!ad) return;
   ad.classList.add("hidden");
   localStorage.setItem(`adClosed:${adId}`, "1");
-
   ["leftAds", "rightAds"].forEach((columnId) => {
     const column = document.getElementById(columnId);
     if (!column) return;
     const visibleAds = [...column.querySelectorAll(".ad-slot:not(.hidden)")];
-    if (visibleAds.length === 0) {
-      column.classList.add("hidden");
-    }
+    if (visibleAds.length === 0) column.classList.add("hidden");
   });
 }
 
 function initAds() {
   document.querySelectorAll("[data-close-ad]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      closeAd(btn.dataset.closeAd);
-    });
+    btn.addEventListener("click", () => { closeAd(btn.dataset.closeAd); });
   });
-
   document.querySelectorAll("[data-ad]").forEach((ad) => {
     const adId = ad.dataset.ad;
-    if (localStorage.getItem(`adClosed:${adId}`) === "1") {
-      ad.classList.add("hidden");
-    }
+    if (localStorage.getItem(`adClosed:${adId}`) === "1") ad.classList.add("hidden");
   });
-
   ["leftAds", "rightAds"].forEach((columnId) => {
     const column = document.getElementById(columnId);
     if (!column) return;
     const visibleAds = [...column.querySelectorAll(".ad-slot:not(.hidden)")];
-    if (visibleAds.length === 0) {
-      column.classList.add("hidden");
-    }
+    if (visibleAds.length === 0) column.classList.add("hidden");
   });
 }
 
 createBtn.addEventListener("click", () => {
   const name = nameInput.value.trim();
   if (!name) return setStatus("Entre un pseudo", true);
-
-  clearSession();
-  resetUI();
-
+  clearSession(); resetUI();
   socket.emit("createRoom", { name }, (res) => {
     if (!res?.ok) return setStatus(res?.error || "Impossible de créer la room", true);
-
     saveSession(res.playerId, res.playerToken, res.room.code);
     renderRoom(res.room);
     if (typeof window.updateMobileUI === "function") window.updateMobileUI(res.room);
-    updateResumeUI(true);
-    playClickSound("success");
-    setStatus("Room créée");
+    updateResumeUI(true); playClickSound("success"); setStatus("Room créée");
   });
 });
 
 joinBtn.addEventListener("click", () => {
   const name = nameInput.value.trim();
   const code = roomInput.value.trim().toUpperCase();
-
   if (!name || !code) return setStatus("Entre un pseudo et un code", true);
-
   const existingToken = myRoomCode === code ? myPlayerToken : null;
-
   socket.emit("joinRoom", { name, code, playerToken: existingToken }, (res) => {
     if (!res?.ok) return setStatus(res?.error || "Impossible de rejoindre la room", true);
-
     saveSession(res.playerId, res.playerToken, res.room.code);
     renderRoom(res.room);
     if (typeof window.updateMobileUI === "function") window.updateMobileUI(res.room);
-    updateResumeUI(true);
-    playClickSound("join");
-    setStatus("Room rejointe");
+    updateResumeUI(true); playClickSound("join"); setStatus("Room rejointe");
   });
 });
 
 resumeBtn.addEventListener("click", () => {
-  if (!myPlayerToken) {
-    updateResumeUI(false);
-    return setStatus("Aucune session à reprendre", true);
-  }
-
+  if (!myPlayerToken) { updateResumeUI(false); return setStatus("Aucune session à reprendre", true); }
   socket.emit("resumeSession", { playerToken: myPlayerToken }, (res) => {
-    if (!res?.ok) {
-      clearSession();
-      resetUI();
-      return setStatus(res?.error || "Impossible de reprendre la session", true);
-    }
-
+    if (!res?.ok) { clearSession(); resetUI(); return setStatus(res?.error || "Impossible de reprendre la session", true); }
     saveSession(res.playerId, res.playerToken, res.room.code);
     renderRoom(res.room);
     if (typeof window.updateMobileUI === "function") window.updateMobileUI(res.room);
-    updateResumeUI(true);
-    playClickSound("join");
-    setStatus("Reconnexion réussie");
+    updateResumeUI(true); playClickSound("join"); setStatus("Reconnexion réussie");
   });
 });
 
 startBtn.addEventListener("click", () => {
   const composition = currentRoom ? getSelectedComposition(currentRoom) : null;
   const settings = currentRoom ? getSelectedSettings(currentRoom) : null;
-
   socket.emit("startGame", { composition, settings }, (res) => {
     if (!res?.ok) return setStatus(res?.error || "Impossible de lancer", true);
-    playClickSound("success");
-    setStatus("Partie lancée");
+    playClickSound("success"); setStatus("Partie lancée");
   });
 });
 
 restartBtn.addEventListener("click", () => {
   const composition = currentRoom ? getSelectedComposition(currentRoom) : null;
   const settings = currentRoom ? getSelectedSettings(currentRoom) : null;
-
   socket.emit("restartGame", { composition, settings }, (res) => {
     if (!res?.ok) return setStatus(res?.error || "Impossible de relancer", true);
-    playClickSound("success");
-    setStatus("Nouvelle partie lancée");
+    playClickSound("success"); setStatus("Nouvelle partie lancée");
   });
 });
 
 leaveBtn.addEventListener("click", () => {
   socket.emit("leaveRoom", {}, () => {
-    resetUI();
-    validateStoredSession();
-    playClickSound("leave");
-    setStatus("Tu as quitté la partie.");
+    resetUI(); validateStoredSession(); playClickSound("leave"); setStatus("Tu as quitté la partie.");
   });
 });
 
 sendChatBtn.addEventListener("click", () => {
   const text = normalizeSingleWordInput(chatInput.value);
   if (!text) return;
-
   socket.emit("sendTurnMessage", { text }, (res) => {
     if (!res?.ok) return setStatus(res?.error || "Impossible d'envoyer", true);
-    chatInput.value = "";
-    sendChatBtn.disabled = true;
-    playClickSound("success");
-    setStatus("Mot envoyé");
+    chatInput.value = ""; sendChatBtn.disabled = true; playClickSound("success"); setStatus("Mot envoyé");
   });
 });
 
 confirmVoteBtn.addEventListener("click", () => {
   if (!selectedVoteTargetId || voteAlreadySent) return;
-
   socket.emit("votePlayer", { targetId: selectedVoteTargetId }, (res) => {
     if (!res?.ok) return setStatus(res?.error || "Impossible de voter", true);
-
-    voteAlreadySent = true;
-    confirmVoteBtn.disabled = true;
+    voteAlreadySent = true; confirmVoteBtn.disabled = true;
     selectedVoteText.textContent = `Vote confirmé contre ${selectedVoteTargetName}.`;
-    playClickSound("vote");
-    setStatus("Vote envoyé", true);
+    playClickSound("vote"); setStatus("Vote envoyé", true);
   });
 });
 
 chatInput.addEventListener("input", () => {
   const normalized = normalizeSingleWordInput(chatInput.value);
-  if (chatInput.value !== normalized) {
-    chatInput.value = normalized;
-  }
-
-  const isMyTurn =
-    currentRoom &&
-    currentRoom.phase === "speaking" &&
-    currentRoom.currentSpeakerId === myPlayerId &&
-    !currentRoom.gameOver;
-
+  if (chatInput.value !== normalized) chatInput.value = normalized;
+  const isMyTurn = currentRoom && currentRoom.phase === "speaking" && currentRoom.currentSpeakerId === myPlayerId && !currentRoom.gameOver;
   sendChatBtn.disabled = !isMyTurn || !normalized;
 });
 
 chatInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !sendChatBtn.disabled) {
-    sendChatBtn.click();
-  }
+  if (e.key === "Enter" && !sendChatBtn.disabled) sendChatBtn.click();
 });
 
-if (undercoverCountInput) {
-  undercoverCountInput.addEventListener("input", () => {
-    if (currentRoom) renderComposition(currentRoom);
-  });
-}
-
-if (mrWhiteCountInput) {
-  mrWhiteCountInput.addEventListener("input", () => {
-    if (currentRoom) renderComposition(currentRoom);
-  });
-}
-
-if (turnDurationInput) {
-  turnDurationInput.addEventListener("input", () => {
-    turnDurationInput.value = String(clampSeconds(turnDurationInput.value, 30));
-    if (currentRoom) renderComposition(currentRoom);
-  });
-}
-
-if (voteDurationInput) {
-  voteDurationInput.addEventListener("input", () => {
-    voteDurationInput.value = String(clampSeconds(voteDurationInput.value, 30));
-    if (currentRoom) renderComposition(currentRoom);
-  });
-}
-
-if (categorySelect) {
-  categorySelect.addEventListener("change", () => {
-    if (!currentRoom) return;
-    populateSubcategorySelect(currentRoom, categorySelect.value);
-    renderComposition(currentRoom);
-  });
-}
-
-if (subcategorySelect) {
-  subcategorySelect.addEventListener("change", () => {
-    if (currentRoom) renderComposition(currentRoom);
-  });
-}
+if (undercoverCountInput) undercoverCountInput.addEventListener("input", () => { if (currentRoom) renderComposition(currentRoom); });
+if (mrWhiteCountInput) mrWhiteCountInput.addEventListener("input", () => { if (currentRoom) renderComposition(currentRoom); });
+if (turnDurationInput) turnDurationInput.addEventListener("input", () => { turnDurationInput.value = String(clampSeconds(turnDurationInput.value, 30)); if (currentRoom) renderComposition(currentRoom); });
+if (voteDurationInput) voteDurationInput.addEventListener("input", () => { voteDurationInput.value = String(clampSeconds(voteDurationInput.value, 30)); if (currentRoom) renderComposition(currentRoom); });
+if (categorySelect) categorySelect.addEventListener("change", () => { if (!currentRoom) return; populateSubcategorySelect(currentRoom, categorySelect.value); renderComposition(currentRoom); });
+if (subcategorySelect) subcategorySelect.addEventListener("change", () => { if (currentRoom) renderComposition(currentRoom); });
 
 socket.on("roomUpdated", (room) => {
-  if (room.phase !== "voting") {
-    resetVoteSelection();
-  }
+  if (room.phase !== "voting") resetVoteSelection();
   renderRoom(room);
   if (typeof window.updateMobileUI === "function") window.updateMobileUI(room);
 });
@@ -1408,8 +1006,7 @@ socket.on("gameStarted", ({ word }) => {
   waitingCard.classList.add("hidden");
   resetVoteSelection();
   wordText.textContent = word || "Tu n'as pas de mot.";
-  playClickSound("success");
-  setStatus("La partie commence");
+  playClickSound("success"); setStatus("La partie commence");
   mobileGameActivePanel = "secretCard";
   updateMobileGamePanels();
 });
@@ -1421,13 +1018,8 @@ socket.on("sessionResumed", ({ word }) => {
 
 socket.on("voteResult", (result) => {
   resetVoteSelection();
-
-  if (result.tie) {
-    setStatus("Égalité : personne n'est éliminé.", true);
-  } else {
-    setStatus(`${result.eliminated.name} est éliminé (${result.eliminated.role}).`, true);
-  }
-
+  if (result.tie) setStatus("Égalité : personne n'est éliminé.", true);
+  else setStatus(`${result.eliminated.name} est éliminé (${result.eliminated.role}).`, true);
   playClickSound("vote");
 });
 

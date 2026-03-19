@@ -865,8 +865,16 @@ function fillRoleDolls(container, room) {
 }
 
 function renderRoleDolls(room) {
-  fillRoleDolls(roleDolls,room);
-  fillRoleDolls(waitingRoleDolls,room);
+  fillRoleDolls(roleDolls, room);
+  fillRoleDolls(waitingRoleDolls, room);
+  const dpw = document.getElementById("roleDollsPlayersWrap");
+  const dp  = document.getElementById("roleDollsPlayers");
+  if (dp && dpw) {
+    const c = room.roleComposition || {};
+    const total = (c.civil||0) + (c.undercover||0) + (c.mrwhite||0);
+    dpw.style.display = (room.started && total > 0) ? "" : "none";
+    fillRoleDolls(dp, room);
+  }
 }
 
 function renderMessages(room) {

@@ -884,6 +884,15 @@ function fillRoleDolls(container, room) {
 function renderRoleDolls(room) {
   fillRoleDolls(roleDolls, room);
   fillRoleDolls(waitingRoleDolls, room);
+  // Bonhommes à droite de la liste joueurs (desktop)
+  const wrap = document.getElementById("roleDollsPlayersWrap");
+  const cont = document.getElementById("roleDollsPlayers");
+  if (wrap && cont) {
+    const c = getDisplayCounts(room);
+    const total = (c.civil||0) + (c.undercover||0) + (c.mrwhite||0);
+    wrap.style.display = total > 0 ? "" : "none";
+    fillRoleDolls(cont, room);
+  }
 }
 function renderMessages(room) {
   messagesList.innerHTML="";
@@ -1050,8 +1059,7 @@ function renderComposition(room) {
   else { undercoverCountInput.disabled=false; mrWhiteCountInput.disabled=false; undercoverCountInput.min="1"; undercoverCountInput.max=String(n-1); mrWhiteCountInput.min="0"; mrWhiteCountInput.max="1"; compositionHelp.textContent="Choisissez la composition, les durées et la catégorie."; }
   const vals=clampCompositionValues(room); const sets=getSelectedSettings(room);
   compositionSummary.textContent=`${vals.civilCount} civil(s) • ${vals.undercoverCount} undercover(s)${vals.mrwhiteCount?" • 1 Mr White":""} • Tours ${sets.turnDurationSeconds}s • Vote ${sets.voteDurationSeconds}s`;
-  const cw=document.getElementById("roleDollsConfigWrap"); if(cw) cw.style.display="block";
-  fillRoleDolls(document.getElementById("roleDollsConfig"),room);
+
 }
 window.renderComposition=renderComposition;
 

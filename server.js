@@ -13,6 +13,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = Number(process.env.PORT || 3000);
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "https://undercov-production.up.railway.app";
 const DEFAULT_TURN_DURATION_MS = 30_000;
 const DEFAULT_VOTE_DURATION_MS = 30_000;
 const MIN_DURATION_SECONDS = 15;
@@ -21,13 +22,15 @@ const MAX_DURATION_SECONDS = 45;
 const app = express();
 const server = http.createServer(app);
 
+// ─── SOCKET.IO avec CORS strict ──────────────────────────
 const io = new Server(server, {
   cors: {
-    origin: true,
+    origin: ALLOWED_ORIGIN,
     credentials: true
   }
 });
 
+// ─── BASE DE DONNÉES ─────────────────────────────────────
 const dataDir = path.join(__dirname, "data");
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
@@ -102,6 +105,64 @@ if (!columnExists("rooms", "selected_subcategory")) {
   db.exec(`ALTER TABLE rooms ADD COLUMN selected_subcategory TEXT`);
 }
 
+// ─── NETTOYAGE DES ROOMS MORTES ──────────────────────────
+function cleanupStaleRooms() {
+  try {
+    // Supprimer les rooms terminées ou en lobby depuis plus de 12h
+    db.prepare(`
+      DELETE FROM rooms
+      WHERE updated_at < datetime('now', '-12 hours')
+      AND (game_over = 1 OR started = 0)
+    `).run();
+
+    // Supprimer les players sans room valide
+    db.prepare(`
+      DELETE FROM players
+      WHERE room_code NOT IN (SELECT code FROM rooms)
+    `).run();
+
+    // Déconnecter les players qui n'ont pas eu d'activité depuis 2h
+    db.prepare(`
+      UPDATE players SET connected = 0, socket_id = NULL
+      WHERE updated_at < datetime('now', '-2 hours')
+      AND connected = 1
+    `).run();
+
+    console.log(`[cleanup] Rooms mortes nettoyées — ${new Date().toISOString()}`);
+  } catch (err) {
+    console.error("[cleanup] Erreur :", err.message);
+  }
+}
+
+// Nettoyage au démarrage puis toutes les heures
+cleanupStaleRooms();
+setInterval(cleanupStaleRooms, 60 * 60 * 1000);
+
+// ─── RATE LIMITING WEBSOCKET ─────────────────────────────
+const socketRateLimits = new Map();
+
+function checkSocketRate(socketId, event, maxPerMinute = 20) {
+  const key = `${socketId}:${event}`;
+  const now = Date.now();
+  const record = socketRateLimits.get(key) || { count: 0, resetAt: now + 60_000 };
+  if (now > record.resetAt) {
+    record.count = 0;
+    record.resetAt = now + 60_000;
+  }
+  record.count++;
+  socketRateLimits.set(key, record);
+  return record.count <= maxPerMinute;
+}
+
+// Nettoyer la map de rate limit toutes les 5 minutes pour éviter les fuites mémoire
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, record] of socketRateLimits.entries()) {
+    if (now > record.resetAt) socketRateLimits.delete(key);
+  }
+}, 5 * 60 * 1000);
+
+// ─── MIDDLEWARE HTTP ─────────────────────────────────────
 app.use(
   helmet({
     contentSecurityPolicy: false
@@ -119,6 +180,7 @@ app.use(
 
 app.use(express.static(path.join(__dirname, "public")));
 
+// ─── DONNÉES MOTS ────────────────────────────────────────
 const rawWordData = JSON.parse(
   fs.readFileSync(
     path.join(__dirname, "undercover_word_pairs_1000.json"),
@@ -220,6 +282,7 @@ function getWordPairsForSelection(category, subcategory) {
   return wordCatalog[selection.category]?.[selection.subcategory] || [];
 }
 
+// ─── TIMERS ──────────────────────────────────────────────
 const roomTurnTimers = new Map();
 const roomVoteTimers = new Map();
 
@@ -284,6 +347,7 @@ function shuffle(array) {
   return arr;
 }
 
+// ─── DB HELPERS ──────────────────────────────────────────
 function getRoom(code) {
   return db.prepare("SELECT * FROM rooms WHERE code = ?").get(code);
 }
@@ -907,13 +971,11 @@ function handlePlayerDeparture(playerId, roomCode) {
   const player = db.prepare("SELECT * FROM players WHERE id = ?").get(playerId);
   if (!player) return;
 
-  // Toujours marquer déconnecté
   updatePlayer(player.id, { connected: 0, socket_id: null });
 
   const players = getPlayersByRoom(room.code);
   const connectedPlayers = players.filter((p) => p.connected);
 
-  // Plus personne → supprimer la room
   if (connectedPlayers.length === 0) {
     clearAllRoomTimers(room.code);
     db.prepare("DELETE FROM players WHERE room_code = ?").run(room.code);
@@ -921,10 +983,7 @@ function handlePlayerDeparture(playerId, roomCode) {
     return;
   }
 
-  // Partie en cours → déconnexion temporaire, le joueur peut revenir
   if (room.started && !room.game_over) {
-
-    // Si plus qu'un seul joueur connecté vivant → arrêter la partie
     const connectedAlive = players.filter((p) => p.connected && !p.eliminated);
     if (connectedAlive.length <= 1) {
       clearAllRoomTimers(room.code);
@@ -940,7 +999,6 @@ function handlePlayerDeparture(playerId, roomCode) {
       return;
     }
 
-    // Avancer le tour si c'était ce joueur qui devait parler
     const currentSpeakerId = getCurrentSpeakerId(room);
     if (room.phase === "speaking" && currentSpeakerId === player.id) {
       pushSystemMessage(room.code, `${player.name} s'est déconnecté.`);
@@ -948,7 +1006,6 @@ function handlePlayerDeparture(playerId, roomCode) {
       return;
     }
 
-    // Retirer son vote si phase de vote
     if (room.phase === "voting") {
       const votes = safeJsonParse(room.votes, {});
       delete votes[player.id];
@@ -963,10 +1020,8 @@ function handlePlayerDeparture(playerId, roomCode) {
     return;
   }
 
-  // Pas de partie en cours (lobby ou fin) → supprimer le joueur définitivement
   db.prepare("DELETE FROM players WHERE id = ?").run(player.id);
 
-  // Réassigner l'hôte si nécessaire
   if (room.host_player_id === player.id) {
     const remaining = connectedPlayers.filter((p) => p.id !== player.id);
     if (remaining.length > 0) {
@@ -992,7 +1047,9 @@ function findDisconnectedPlayerByName(roomCode, name) {
   );
 }
 
+// ─── SOCKET.IO EVENTS ────────────────────────────────────
 io.on("connection", (socket) => {
+
   socket.on("checkSession", ({ playerToken, roomCode }, callback) => {
     try {
       if (!playerToken || !roomCode) {
@@ -1046,6 +1103,11 @@ io.on("connection", (socket) => {
   });
 
   socket.on("createRoom", ({ name }, callback) => {
+    // Rate limit : max 5 créations de room par minute par socket
+    if (!checkSocketRate(socket.id, "createRoom", 5)) {
+      return callback({ ok: false, error: "Trop de requêtes, attends un moment" });
+    }
+
     try {
       removeSocketFromPreviousRoom(socket);
 
@@ -1087,6 +1149,11 @@ io.on("connection", (socket) => {
   });
 
   socket.on("joinRoom", ({ name, code, playerToken }, callback) => {
+    // Rate limit : max 10 tentatives de join par minute par socket
+    if (!checkSocketRate(socket.id, "joinRoom", 10)) {
+      return callback({ ok: false, error: "Trop de requêtes, attends un moment" });
+    }
+
     try {
       removeSocketFromPreviousRoom(socket);
 
@@ -1166,6 +1233,11 @@ io.on("connection", (socket) => {
   });
 
   socket.on("startGame", ({ composition, settings } = {}, callback) => {
+    // Rate limit : max 5 lancements par minute par socket
+    if (!checkSocketRate(socket.id, "startGame", 5)) {
+      return callback({ ok: false, error: "Trop de requêtes, attends un moment" });
+    }
+
     const player = requirePlayer(socket, callback);
     if (!player) return;
 
@@ -1190,6 +1262,11 @@ io.on("connection", (socket) => {
   });
 
   socket.on("restartGame", ({ composition, settings } = {}, callback) => {
+    // Rate limit : max 5 relances par minute par socket
+    if (!checkSocketRate(socket.id, "restartGame", 5)) {
+      return callback({ ok: false, error: "Trop de requêtes, attends un moment" });
+    }
+
     const player = requirePlayer(socket, callback);
     if (!player) return;
 
@@ -1212,6 +1289,11 @@ io.on("connection", (socket) => {
   });
 
   socket.on("sendTurnMessage", ({ text }, callback) => {
+    // Rate limit : max 10 messages par minute par socket
+    if (!checkSocketRate(socket.id, "sendTurnMessage", 10)) {
+      return callback({ ok: false, error: "Trop de requêtes, attends un moment" });
+    }
+
     const player = requirePlayer(socket, callback);
     if (!player) return;
 
@@ -1256,6 +1338,11 @@ io.on("connection", (socket) => {
   });
 
   socket.on("votePlayer", ({ targetId }, callback) => {
+    // Rate limit : max 10 votes par minute par socket
+    if (!checkSocketRate(socket.id, "votePlayer", 10)) {
+      return callback({ ok: false, error: "Trop de requêtes, attends un moment" });
+    }
+
     const player = requirePlayer(socket, callback);
     if (!player) return;
 
@@ -1307,6 +1394,9 @@ io.on("connection", (socket) => {
   });
 });
 
+// ─── DÉMARRAGE ───────────────────────────────────────────
 server.listen(PORT, () => {
   console.log(`Serveur lancé sur http://localhost:${PORT}`);
+  console.log(`CORS autorisé pour : ${ALLOWED_ORIGIN}`);
+  console.log(`Environnement : ${process.env.NODE_ENV}`);
 });

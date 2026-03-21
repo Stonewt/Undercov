@@ -1396,7 +1396,7 @@ io.on("connection", (socket) => {
 
 // ─── DÉMARRAGE ───────────────────────────────────────────
 app.get("/mentions-legales", (req, res) => res.sendFile(path.join(__dirname, "public", "mentions-legales.html")));
-app.get("/confidentialite", (req, res) => res.sendFile(path.join(__dirname, "public", "confidentialité.html")));
+app.get("/confidentialite", (req, res) => res.sendFile(path.join(__dirname, "public", "confidentialite.html")));
 app.get("/cgu", (req, res) => res.sendFile(path.join(__dirname, "public", "cgu.html")));
 server.listen(PORT, () => {
   console.log(`Serveur lancé sur http://localhost:${PORT}`);

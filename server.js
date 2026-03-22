@@ -311,6 +311,7 @@ function getWordPairsForSelection(category, subcategory) {
 // ─── TIMERS ──────────────────────────────────────────────
 const roomTurnTimers = new Map();
 const roomVoteTimers = new Map();
+const reconnectTimers = new Map(); // timers d'attente de reconnexion (15s)
 
 function nowIso() {
   return new Date().toISOString();
@@ -570,6 +571,7 @@ function buildPublicRoom(code) {
     roleComposition,
     gameOver: Boolean(room.game_over),
     winner: room.winner,
+    gameId: `${room.code}-${room.round}-${room.winner || "ongoing"}`,
     messages,
     voteCount: Object.keys(votes).length,
     players: players.map((p) => ({
@@ -617,6 +619,15 @@ function clearVoteTimer(roomCode) {
 function clearAllRoomTimers(roomCode) {
   clearTurnTimer(roomCode);
   clearVoteTimer(roomCode);
+  clearReconnectTimer(roomCode);
+}
+
+function clearReconnectTimer(playerId) {
+  const timer = reconnectTimers.get(playerId);
+  if (timer) {
+    clearTimeout(timer);
+    reconnectTimers.delete(playerId);
+  }
 }
 
 function pushSystemMessage(roomCode, text) {
@@ -997,11 +1008,13 @@ function handlePlayerDeparture(playerId, roomCode) {
   const player = db.prepare("SELECT * FROM players WHERE id = ?").get(playerId);
   if (!player) return;
 
+  // Toujours marquer déconnecté
   updatePlayer(player.id, { connected: 0, socket_id: null });
 
   const players = getPlayersByRoom(room.code);
   const connectedPlayers = players.filter((p) => p.connected);
 
+  // Plus personne → supprimer la room
   if (connectedPlayers.length === 0) {
     clearAllRoomTimers(room.code);
     db.prepare("DELETE FROM players WHERE room_code = ?").run(room.code);
@@ -1009,49 +1022,90 @@ function handlePlayerDeparture(playerId, roomCode) {
     return;
   }
 
+  // Partie en cours → attendre 15s avant de traiter le départ
   if (room.started && !room.game_over) {
-    const connectedAlive = players.filter((p) => p.connected && !p.eliminated);
-    if (connectedAlive.length <= 1) {
-      clearAllRoomTimers(room.code);
-      pushSystemMessage(room.code, "Plus assez de joueurs connectés. La partie est arrêtée.");
-      updateRoom(room.code, {
-        game_over: 1,
-        phase: "finished",
-        turn_ends_at: null,
-        vote_ends_at: null,
-        winner: "aucun"
-      });
-      emitRoom(room.code);
-      return;
-    }
 
-    const currentSpeakerId = getCurrentSpeakerId(room);
-    if (room.phase === "speaking" && currentSpeakerId === player.id) {
-      pushSystemMessage(room.code, `${player.name} s'est déconnecté.`);
-      advanceTurn(room.code);
-      return;
-    }
+    // Annuler un éventuel timer de reconnexion existant pour ce joueur
+    clearReconnectTimer(playerId);
 
-    if (room.phase === "voting") {
-      const votes = safeJsonParse(room.votes, {});
-      delete votes[player.id];
-      updateRoom(room.code, { votes: JSON.stringify(votes) });
-      if (everyoneAliveHasVoted(room.code)) {
-        finishVotingNow(room.code);
-        return;
-      }
-    }
+    // Démarrer un timer de 15s pour attendre la reconnexion
+    const timer = setTimeout(() => {
+      reconnectTimers.delete(playerId);
+      handlePlayerFinalDeparture(playerId, roomCode);
+    }, 15_000);
+
+    reconnectTimers.set(playerId, timer);
 
     emitRoom(room.code);
     return;
   }
 
+  // Pas de partie en cours (lobby ou fin) → supprimer le joueur définitivement
   db.prepare("DELETE FROM players WHERE id = ?").run(player.id);
 
+  // Réassigner l'hôte si nécessaire
   if (room.host_player_id === player.id) {
     const remaining = connectedPlayers.filter((p) => p.id !== player.id);
     if (remaining.length > 0) {
       updateRoom(room.code, { host_player_id: remaining[0].id });
+    }
+  }
+
+  emitRoom(room.code);
+}
+
+// Appelée après 15s si le joueur ne s'est pas reconnecté
+function handlePlayerFinalDeparture(playerId, roomCode) {
+  const room = getRoom(roomCode);
+  if (!room || room.game_over) return;
+
+  const player = db.prepare("SELECT * FROM players WHERE id = ?").get(playerId);
+  if (!player || player.connected) return; // Le joueur s'est reconnecté entre-temps
+
+  const players = getPlayersByRoom(room.code);
+  const connectedPlayers = players.filter((p) => p.connected);
+
+  // Plus personne → supprimer la room
+  if (connectedPlayers.length === 0) {
+    clearAllRoomTimers(room.code);
+    db.prepare("DELETE FROM players WHERE room_code = ?").run(room.code);
+    db.prepare("DELETE FROM rooms WHERE code = ?").run(room.code);
+    return;
+  }
+
+  // Vérifier s'il reste assez de joueurs connectés vivants
+  const connectedAlive = players.filter((p) => p.connected && !p.eliminated);
+  if (connectedAlive.length <= 1) {
+    clearAllRoomTimers(room.code);
+    pushSystemMessage(room.code, "Plus assez de joueurs connectés. La partie est arrêtée.");
+    updateRoom(room.code, {
+      game_over: 1,
+      phase: "finished",
+      turn_ends_at: null,
+      vote_ends_at: null,
+      winner: "aucun"
+    });
+    emitRoom(room.code);
+    return;
+  }
+
+  // Avancer le tour si c'était ce joueur qui devait parler
+  const freshRoom = getRoom(roomCode);
+  const currentSpeakerId = getCurrentSpeakerId(freshRoom);
+  if (freshRoom.phase === "speaking" && currentSpeakerId === player.id) {
+    pushSystemMessage(room.code, `${player.name} a quitté la partie.`);
+    advanceTurn(room.code);
+    return;
+  }
+
+  // Retirer son vote si phase de vote
+  if (freshRoom.phase === "voting") {
+    const votes = safeJsonParse(freshRoom.votes, {});
+    delete votes[player.id];
+    updateRoom(room.code, { votes: JSON.stringify(votes) });
+    if (everyoneAliveHasVoted(room.code)) {
+      finishVotingNow(room.code);
+      return;
     }
   }
 
@@ -1107,6 +1161,7 @@ io.on("connection", (socket) => {
       if (!room) return callback?.({ ok: false, error: "Room introuvable" });
 
       updatePlayer(player.id, { connected: 1, socket_id: socket.id });
+      clearReconnectTimer(player.id); // Annuler le timer de reconnexion si le joueur revient
       socket.join(player.room_code);
 
       const freshPlayer = getPlayerByToken(playerToken);
@@ -1312,6 +1367,45 @@ io.on("connection", (socket) => {
     } catch (error) {
       callback({ ok: false, error: error?.message || "Impossible de relancer la partie" });
     }
+  });
+
+  // Retour au lobby entre deux parties pour que l'hôte puisse changer la config
+  socket.on("returnToLobby", (_, callback) => {
+    if (!checkSocketRate(socket.id, "returnToLobby", 5)) {
+      return callback?.({ ok: false, error: "Trop de requêtes" });
+    }
+
+    const player = requirePlayer(socket, callback);
+    if (!player) return;
+
+    const room = getRoom(player.room_code);
+    if (!room) return callback?.({ ok: false, error: "Room introuvable" });
+    if (!isHost(player, room)) return callback?.({ ok: false, error: "Seul l'hôte peut faire ça" });
+    if (!room.game_over) return callback?.({ ok: false, error: "La partie n'est pas terminée" });
+
+    // Remettre la room en état de lobby
+    updateRoom(room.code, {
+      started: 0,
+      phase: "lobby",
+      round: 0,
+      current_speaker_index: 0,
+      speaking_order: JSON.stringify([]),
+      votes: JSON.stringify({}),
+      messages: JSON.stringify([]),
+      turn_ends_at: null,
+      vote_ends_at: null,
+      game_over: 0,
+      winner: null
+    });
+
+    // Réinitialiser les rôles et mots des joueurs
+    const players = getPlayersByRoom(room.code);
+    players.forEach(p => {
+      db.prepare("UPDATE players SET role = NULL, word = NULL, eliminated = 0 WHERE id = ?").run(p.id);
+    });
+
+    emitRoom(room.code);
+    callback?.({ ok: true });
   });
 
   socket.on("sendTurnMessage", ({ text }, callback) => {

@@ -962,7 +962,7 @@ function getMyOutcome(room) {
 
 function renderEndGame(room) {
   if(!room.gameOver) { endCard.classList.add("hidden"); return; }
-  const already=endCard.dataset.renderedRound===String(room.round)&&endCard.dataset.renderedWinner===String(room.winner);
+  const already=endCard.dataset.renderedGameId===String(room.gameId);
   endCard.classList.remove("hidden");
   endTitle.textContent=getMyOutcome(room)||"Fin de partie";
   winnerText.textContent=room.winner==="aucun"?"La partie a été interrompue : aucun indice n'a été donné pendant la manche.":`Équipe gagnante : ${room.winner}`;
@@ -974,8 +974,7 @@ function renderEndGame(room) {
       const text=document.createElement("span"); text.className="reveal-main-text"; text.textContent=`${player.name} • ${player.word||"aucun mot"}`;
       li.appendChild(badge); li.appendChild(text); revealList.appendChild(li);
     });
-    endCard.dataset.renderedRound=String(room.round);
-    endCard.dataset.renderedWinner=String(room.winner);
+    endCard.dataset.renderedGameId=String(room.gameId);
     playClickSound("reveal");
   }
 }
@@ -1127,7 +1126,26 @@ function renderRoom(room) {
 
   const isHost=room.hostPlayerId===myPlayerId;
   if(!room.started&&isHost) startBtn.classList.remove("hidden");
-  if(room.gameOver&&isHost) restartBtn.classList.remove("hidden");
+  if(room.gameOver&&isHost) {
+  restartBtn.classList.add("hidden");
+  // Afficher bouton retour lobby
+  let lobbyBtn = document.getElementById("returnToLobbyBtn");
+  if(!lobbyBtn) {
+    lobbyBtn = document.createElement("button");
+    lobbyBtn.id = "returnToLobbyBtn";
+    lobbyBtn.textContent = "⚙ Configurer & Rejouer";
+    lobbyBtn.style.background = "linear-gradient(180deg,#22c55e,#16a34a)";
+    lobbyBtn.addEventListener("click", () => {
+      socket.emit("returnToLobby", {}, (res) => {
+        if(!res?.ok) return setStatus(res?.error||"Impossible", true);
+      });
+    });
+    document.querySelector(".room-actions-bottom")?.appendChild(lobbyBtn);
+  }
+  lobbyBtn.classList.remove("hidden");
+} else {
+  document.getElementById("returnToLobbyBtn")?.classList.add("hidden");
+}
   if(room.started&&!room.gameOver) secretCard.classList.remove("hidden");
   renderVoteButtons(room);
   renderEndGame(room);

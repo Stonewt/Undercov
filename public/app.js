@@ -1022,20 +1022,31 @@ function populateCategorySelect(room) {
   if(!categorySelect||!subcategorySelect) return;
   const opts=Array.isArray(room.categoryOptions)?room.categoryOptions:[];
   const cur=categorySelect.value;
-  const sel=opts.find(o=>o.name===cur)?.name||room.selectedCategory||opts[0]?.name||"";
+  const sel=opts.find(o=>o.name===cur)?.name||room.selectedCategory||opts[0]?.name||"Tout";
   categorySelect.innerHTML="";
   opts.forEach(cat=>{ const o=document.createElement("option"); o.value=cat.name; o.textContent=cat.name; o.selected=cat.name===sel; categorySelect.appendChild(o); });
-  populateSubcategorySelect(room, sel, subcategorySelect.value||room.selectedSubcategory);
+  const isTout=categorySelect.value==="Tout";
+  const subWrap=subcategorySelect?.closest(".form-block");
+  if(subWrap) subWrap.style.display=isTout?"none":"";
+  if(!isTout) populateSubcategorySelect(room, sel, subcategorySelect.value||room.selectedSubcategory);
 }
 
 function populateSubcategorySelect(room,catName,pref=null) {
   if(!subcategorySelect) return;
+  if(catName==="Tout") {
+    subcategorySelect.innerHTML="";
+    const subWrap=subcategorySelect.closest(".form-block");
+    if(subWrap) subWrap.style.display="none";
+    return;
+  }
   const opts=Array.isArray(room.categoryOptions)?room.categoryOptions:[];
   const cat=opts.find(i=>i.name===catName)||opts[0];
   const subs=cat?.subcategories||[];
   const sel=(pref&&subs.includes(pref))?pref:(room.selectedSubcategory&&subs.includes(room.selectedSubcategory))?room.selectedSubcategory:subs[0]||"";
   subcategorySelect.innerHTML="";
   subs.forEach(name=>{ const o=document.createElement("option"); o.value=name; o.textContent=name; o.selected=name===sel; subcategorySelect.appendChild(o); });
+  const subWrap=subcategorySelect.closest(".form-block");
+  if(subWrap) subWrap.style.display="";
 }
 
 function getSelectedComposition(room) { const v=clampCompositionValues(room); return {undercoverCount:v.undercoverCount,mrwhiteCount:v.mrwhiteCount}; }
@@ -1045,7 +1056,9 @@ function getSelectedSettings(room) {
   const v=clampSeconds(voteDurationInput?.value,room?.voteDurationSeconds||30);
   if(turnDurationInput) turnDurationInput.value=String(t);
   if(voteDurationInput) voteDurationInput.value=String(v);
-  return {turnDurationSeconds:t,voteDurationSeconds:v,category:categorySelect?.value||room?.selectedCategory||null,subcategory:subcategorySelect?.value||room?.selectedSubcategory||null};
+  const cat=categorySelect?.value||room?.selectedCategory||"Tout";
+  const sub=cat==="Tout"?null:(subcategorySelect?.value||room?.selectedSubcategory||null);
+  return {turnDurationSeconds:t,voteDurationSeconds:v,category:cat,subcategory:sub};
 }
 
 function renderComposition(room) {

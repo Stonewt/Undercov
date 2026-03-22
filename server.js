@@ -247,24 +247,47 @@ function buildWordCatalog(raw) {
 
 const wordCatalog = buildWordCatalog(rawWordData);
 
+const ALL_CATEGORIES_KEY = "Tout";
+
 function getCategoryOptions() {
-  return Object.entries(wordCatalog).map(([name, subcats]) => ({
-    name,
-    subcategories: Object.keys(subcats)
-  }));
+  const options = [
+    { name: ALL_CATEGORIES_KEY, subcategories: [] }
+  ];
+  for (const [name, subcats] of Object.entries(wordCatalog)) {
+    options.push({ name, subcategories: Object.keys(subcats) });
+  }
+  return options;
+}
+
+function getAllWordPairs() {
+  const all = [];
+  for (const subcats of Object.values(wordCatalog)) {
+    for (const pairs of Object.values(subcats)) {
+      all.push(...pairs.filter(isValidWordPair));
+    }
+  }
+  return all;
 }
 
 function normalizeCategorySelection(category, subcategory) {
-  const categories = Object.keys(wordCatalog);
+  // Option "Tout" : pas de sous-catégorie
+  if (category === ALL_CATEGORIES_KEY) {
+    return { category: ALL_CATEGORIES_KEY, subcategory: null };
+  }
 
+  const categories = Object.keys(wordCatalog);
   if (categories.length === 0) {
-    return { category: null, subcategory: null };
+    return { category: ALL_CATEGORIES_KEY, subcategory: null };
   }
 
   const selectedCategory =
     typeof category === "string" && wordCatalog[category]
       ? category
-      : categories[0];
+      : ALL_CATEGORIES_KEY;
+
+  if (selectedCategory === ALL_CATEGORIES_KEY) {
+    return { category: ALL_CATEGORIES_KEY, subcategory: null };
+  }
 
   const subcategories = Object.keys(wordCatalog[selectedCategory] || {});
   const selectedSubcategory =
@@ -277,8 +300,11 @@ function normalizeCategorySelection(category, subcategory) {
 }
 
 function getWordPairsForSelection(category, subcategory) {
+  if (category === ALL_CATEGORIES_KEY) {
+    return getAllWordPairs();
+  }
   const selection = normalizeCategorySelection(category, subcategory);
-  if (!selection.category || !selection.subcategory) return [];
+  if (!selection.category || !selection.subcategory) return getAllWordPairs();
   return wordCatalog[selection.category]?.[selection.subcategory] || [];
 }
 
@@ -1395,9 +1421,6 @@ io.on("connection", (socket) => {
 });
 
 // ─── DÉMARRAGE ───────────────────────────────────────────
-app.get("/mentions-legales", (req, res) => res.sendFile(path.join(__dirname, "public", "mentions-legales.html")));
-app.get("/confidentialite", (req, res) => res.sendFile(path.join(__dirname, "public", "confidentialite.html")));
-app.get("/cgu", (req, res) => res.sendFile(path.join(__dirname, "public", "cgu.html")));
 server.listen(PORT, () => {
   console.log(`Serveur lancé sur http://localhost:${PORT}`);
   console.log(`CORS autorisé pour : ${ALLOWED_ORIGIN}`);

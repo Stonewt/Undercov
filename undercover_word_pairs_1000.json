@@ -1,70 +1,59 @@
 {
   "Animaux": {
     "Mammifères": [
-      ["chat", "chien"], ["lion", "tigre"], ["loup", "renard"], ["lapin", "souris"],
-      ["cheval", "zèbre"], ["girafe", "éléphant"], ["ours", "panda"], ["koala", "singe"],
-      ["gorille", "chimpanzé"], ["dauphin", "baleine"], ["requin", "raie"], ["phoque", "otarie"],
-      ["raton laveur", "blaireau"], ["hérisson", "taupe"], ["castor", "loutre"],
+      ["chat", "chien"], ["lion", "tigre"], ["loup", "renard"], ["rat", "souris"],
+      ["cheval", "zèbre"], ["ours", "panda"],
+      ["gorille", "chimpanzé"], ["dauphin", "requin"], ["requin", "orque"], ["phoque", "otarie"],
+      ["raton laveur", "blaireau"], ["hérisson", "porc-épic"], ["castor", "ornithorynque"],
       ["lynx", "guépard"], ["léopard", "jaguar"], ["rhinocéros", "hippopotame"],
       ["chameau", "dromadaire"], ["lama", "alpaga"], ["bison", "buffle"], ["cerf", "chevreuil"],
       ["sanglier", "cochon"], ["mouton", "chèvre"], ["vache", "taureau"], ["âne", "mulet"],
       ["écureuil", "tamia"], ["hamster", "cochon d'Inde"], ["furet", "belette"],
-      ["mangouste", "suricate"], ["hyène", "chacal"], ["coyote", "dingo"], ["renne", "élan"],
-      ["orque", "narval"], ["morse", "dugong"], ["tapir", "fourmilier"], ["pangolin", "tatou"],
-      ["opossum", "wombat"], ["kangourou", "wallaby"], ["babouin", "mandrill"],
-      ["macaque", "gibbon"], ["orang-outan", "bonobo"], ["martre", "zibeline"],
-      ["vison", "putois"], ["baleine bleue", "cachalot"], ["béluga", "rorqual"],
-      ["lièvre", "lapin de garenne"], ["glouton", "carcajou"], ["genette", "civette"],
-      ["serval", "ocelot"], ["puma", "cougar"], ["loup gris", "loup arctique"],
+      ["hyène", "chacal"], ["renne", "élan"],
+      ["espadon", "narval"], ["pangolin", "tatou"],
+      ["kangourou", "wallaby"],
+      ["orang-outan", "bonobo"], 
+      ["baleine bleue", "cachalot"],
+      ["lièvre", "lapin"],
+      ["puma", "cougar"], ["loup gris", "loup arctique"],
       ["renard arctique", "renard roux"], ["ours polaire", "ours brun"],
-      ["élan", "orignal"], ["caribou", "wapiti"], ["impala", "gazelle"], ["gnou", "springbok"],
-      ["oryx", "addax"], ["zébu", "yak"], ["buffle d'Afrique", "bison d'Europe"],
-      ["capybara", "ragondin"], ["marmotte", "spermophile"], ["gerbille", "mulot"],
-      ["campagnol", "rat musqué"], ["musaraigne", "tenrec"], ["daman", "aardvark"],
-      ["lémur", "loris"], ["galago", "tarsier"], ["paresseux", "fourmilier géant"]
+      ["caribou", "wapiti"], ["buffle d'Afrique", "bison d'Europe"],
+      ["capybara", "ragondin"]
+    
+      
     ],
     "Oiseaux": [
       ["aigle", "faucon"], ["perroquet", "perruche"], ["canard", "cygne"], ["pingouin", "manchot"],
       ["paon", "faisan"], ["chouette", "hibou"], ["corbeau", "corneille"], ["moineau", "mésange"],
       ["rouge-gorge", "merle"], ["hirondelle", "martinet"], ["cigogne", "héron"],
-      ["flamant", "pélican"], ["toucan", "calao"], ["colibri", "martin-pêcheur"],
-      ["pic-vert", "geai"], ["pie", "étourneau"], ["alouette", "rossignol"],
-      ["caille", "perdrix"], ["dindon", "pintade"], ["autruche", "émeu"],
-      ["kiwi", "casoar"], ["macareux", "guillemot"], ["albatros", "pétrel"],
-      ["fou de Bassan", "cormoran"], ["spatule", "ibis"], ["grue", "outarde"],
-      ["bécasse", "bécassine"], ["mouette", "goéland"], ["pigeon", "tourterelle"],
-      ["bouvreuil", "verdier"], ["chardonneret", "serin"], ["pinson", "linotte"],
-      ["roitelet", "troglodyte"], ["fauvette", "pouillot"], ["gobemouche", "bergeronnette"],
-      ["râle", "grèbe"], ["foulque", "gallinule"], ["butor", "bihoreau"],
-      ["aigrette", "garde-bœufs"], ["buse", "bondrée"], ["grand-duc", "effraie"],
-      ["cacatoès", "conure"], ["inséparable", "calopsitte"], ["ara", "amazone"],
-      ["lori", "loricule"], ["perroquet gris", "gris du Gabon"]
+      ["flamant", "pélican"], ["colibri", "martin-pêcheur"],
+      ["alouette", "rossignol"],
+      ["caille", "perdrix"], ["dindon", "pintade"], ["autruche", "flamant rose"],
+      ["mouette", "goéland"], ["colombe", "tourterelle"],
+      ["perroquet gris", "gris du Gabon"]
     ],
     "Reptiles & Amphibiens": [
-      ["crocodile", "alligator"], ["tortue", "tortue marine"], ["serpent", "python"],
+      ["crocodile", "alligator"], ["tortue", "tortue marine"], ["cobra", "python"],
       ["cobra", "mamba"], ["lézard", "gecko"], ["caméléon", "iguane"],
-      ["varan", "moniteur du Nil"], ["grenouille", "crapaud"], ["salamandre", "triton"],
-      ["axolotl", "ambystome"], ["anaconda", "boa"], ["vipère", "couleuvre"],
+      ["grenouille", "crapaud"], ["salamandre", "triton"],
+      ["anaconda", "boa"], ["vipère", "couleuvre"],
       ["dragon de Komodo", "varan de Savannah"], ["caïman", "gavial"],
-      ["crotale", "mocassin d'eau"], ["python royal", "python de Birmanie"],
-      ["gecko léopard", "gecko tokay"], ["agame barbu", "agame de l'atlas"],
-      ["basilic", "anole"], ["scinque", "orvet"], ["rainette", "dendrobate"],
-      ["xenope", "grenouille tomate"], ["crapaud buffle", "crapaud calamite"],
-      ["tortue grecque", "tortue Hermann"], ["tortue léopard", "tortue de Floride"]
+      ["gecko léopard", "gecko tokay"]
+      
     ],
     "Insectes & Invertébrés": [
       ["abeille", "guêpe"], ["papillon", "libellule"], ["fourmi", "termite"],
       ["araignée", "scorpion"], ["scarabée", "hanneton"], ["coccinelle", "mante religieuse"],
       ["moustique", "mouche"], ["criquet", "sauterelle"], ["ver de terre", "limace"],
-      ["escargot", "pieuvre"], ["poulpe", "calmar"], ["crabe", "homard"],
+      ["escargot", "bulot"], ["poulpe", "calamar"], ["crabe", "homard"],
       ["crevette", "langouste"], ["méduse", "anémone de mer"], ["étoile de mer", "oursin"],
       ["moule", "huître"], ["mille-pattes", "cloporte"], ["puce", "pou"],
-      ["punaise", "cigale"], ["grillon", "blatte"], ["lucane", "carabe"],
-      ["cétoine", "bousier"], ["bourdon", "xylocope"], ["frelon", "vespula"],
-      ["araignée loup", "araignée sauteuse"], ["veuve noire", "recluse brune"],
-      ["tarentule", "mygale"], ["scorpion empereur", "scorpion des bois"],
-      ["scolopendre", "iule"], ["palourde", "couteau"], ["coquille Saint-Jacques", "pétoncle"],
-      ["bernard l'ermite", "crabe des cocotiers"]
+      ["punaise", "tique"], ["cafard", "blatte"],
+      ["frelon", "bourdon"],
+      ["veuve noire", "recluse brune"],
+      ["tarentule", "mygale"],
+      ["palourde", "couteau"], ["coquille Saint-Jacques", "pétoncle"],
+      ["bernard l'ermite", "crabe"]
     ]
   },
   "Nourriture": {

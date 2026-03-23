@@ -1292,6 +1292,11 @@ socket.on("gameStarted",({word})=>{
   resetVoteSelection();
   wordText.textContent=word||"Tu n'as pas de mot.";
 
+  // Animation révélation
+  wordText.classList.remove("word-reveal", "word-hidden");
+  void wordText.offsetWidth; // force reflow
+  wordText.classList.add("word-reveal");
+
   // Ajouter bouton cacher/montrer sur PC
   let toggleBtn = document.getElementById("wordToggleBtn");
   if (!toggleBtn) {
@@ -1305,7 +1310,6 @@ socket.on("gameStarted",({word})=>{
     });
     secretCard.appendChild(toggleBtn);
   }
-  // Réinitialiser l'état caché à chaque nouvelle partie
   wordText.classList.remove("word-hidden");
   toggleBtn.textContent = "👁 Cacher mon mot";
 

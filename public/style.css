@@ -1288,10 +1288,20 @@ button:disabled { opacity: 0.42; cursor: not-allowed; box-shadow: none; }
 
   .mob-panel-chat {
     display: flex !important; flex-direction: column;
-    height: calc(100dvh - 64px - 50px - 20px); max-height: 100%;
+    height: calc(100svh - 64px - 50px - 20px);
+    max-height: 100%;
   }
 
   .mob-panel-chat .messages { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+  .mob-panel-chat .row {
+    flex-shrink: 0;
+    position: sticky;
+    bottom: 0;
+    background: rgba(8,14,30,0.98);
+    padding: 8px 0 4px;
+    z-index: 10;
+  }
 
   .mob-panel-word {
     display: flex !important; flex-direction: column;

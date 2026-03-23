@@ -37,8 +37,7 @@
       ["cobra", "mamba"], ["lézard", "gecko"], ["caméléon", "iguane"],
       ["grenouille", "crapaud"], ["salamandre", "triton"],
       ["anaconda", "boa"], ["vipère", "couleuvre"],
-      ["dragon de Komodo", "varan de Savannah"], ["caïman", "gavial"],
-      
+      ["dragon de Komodo", "varan de Savannah"], ["caïman", "gavial"]      
       
     ],
     "Insectes & Invertébrés": [
@@ -108,7 +107,7 @@
       ["thym", "romarin"],["curcuma", "curry"],
       ["cannelle", "cardamome"], ["vanille", "fève tonka"],
       ["durian", "jackfruit"],
-      ["tamarillo", "physalis"], ["kaki", "nèfle"], ["coing", "grenade"],
+      ["tamarillo", "physalis"], ["kaki", "nèfle"], ["coing", "grenade"]
       
     ],
     "Boissons": [

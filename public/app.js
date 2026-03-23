@@ -214,13 +214,6 @@ function resetVoteSelection() {
 function isMobile() { return window.innerWidth <= 820; }
 
 // ─── MOBILE : construction dynamique des panels ──────────
-/*
-  Architecture mobile :
-  - #mobileTabBar  : barre d'onglets (dans .page-center, au-dessus de #mobileArea)
-  - #mobileArea    : zone de contenu mobile (remplace le game-layout sur mobile)
-  Le game-layout (desktop) est caché sur mobile via CSS.
-*/
-
 function getMobileTabs(room) {
   if (!room) return [];
   const isHost = room.hostPlayerId === myPlayerId;
@@ -234,7 +227,6 @@ function getMobileTabs(room) {
     ];
     return [{ id:"mob-waiting-players", label:"👥 Attente" }];
   }
-  // En jeu
   const tabs = [
     { id:"mob-word",    label:"🔤 Mot"     },
     { id:"mob-chat",    label:"💬 Chat"    },
@@ -252,9 +244,8 @@ function buildMobileTabs(room) {
   const tabs = getMobileTabs(room);
   const validIds = tabs.map(t => t.id);
 
-  // Choisir l'onglet actif par défaut selon la phase
   let defaultTab = validIds[0] || null;
-  if (room.gameOver)             defaultTab = "mob-result";
+  if (room.gameOver)              defaultTab = "mob-result";
   else if (room.phase==="voting") defaultTab = "mob-vote";
   else if (room.started)          defaultTab = "mob-chat";
   else                            defaultTab = "mob-waiting-players";
@@ -263,7 +254,6 @@ function buildMobileTabs(room) {
     mobileActiveTab = defaultTab;
   }
 
-  // Construire la barre d'onglets
   tabBar.innerHTML = "";
   tabs.forEach(tab => {
     const btn = document.createElement("button");
@@ -282,7 +272,6 @@ function buildMobileTabs(room) {
   tabBar.style.display = "flex";
   mobArea.style.display = "block";
 
-  // Rendre le contenu
   mobArea.innerHTML = "";
   switch (mobileActiveTab) {
     case "mob-waiting-players": renderMobWaitingPlayers(room, mobArea); break;
@@ -312,10 +301,8 @@ function renderMobWaitingPlayers(room, area) {
     : "L'hôte va bientôt lancer la partie…";
   box.appendChild(sub);
 
-  // Bonhommes
   appendDolls(box, room, "Composition prévue");
 
-  // Infos config
   const meta = document.createElement("div");
   meta.className = "waiting-meta";
   meta.style.margin = "14px 0";
@@ -327,7 +314,6 @@ function renderMobWaitingPlayers(room, area) {
   `;
   box.appendChild(meta);
 
-  // Liste joueurs
   appendLabel(box, "Joueurs");
   const ul = document.createElement("ul");
   ul.className = "players-list-mobile";
@@ -343,7 +329,6 @@ function renderMobWaitingPlayers(room, area) {
   });
   box.appendChild(ul);
 
-  // Bouton lancer (hôte)
   if (isHost) {
     const btn = mkBigBtn("Lancer la partie", "#22c55e", "#16a34a");
     btn.style.marginTop = "18px";
@@ -363,7 +348,6 @@ function renderMobConfig(area) {
   const room = currentRoom;
   const n = room.players.length;
 
-  // Undercovers
   box.appendChild(mkField("Undercovers", () => {
     const inp = document.createElement("input");
     inp.type="number"; inp.min="1"; inp.step="1";
@@ -376,7 +360,6 @@ function renderMobConfig(area) {
     return inp;
   }));
 
-  // Mr White
   box.appendChild(mkField("Mr White (0 ou 1)", () => {
     const inp = document.createElement("input");
     inp.type="number"; inp.min="0"; inp.max="1"; inp.step="1";
@@ -389,7 +372,6 @@ function renderMobConfig(area) {
     return inp;
   }));
 
-  // Durée tour
   const turnVal = document.createElement("span");
   turnVal.textContent = turnDurationInput?.value || "30";
   box.appendChild(mkField(`Durée du tour : ${turnVal.textContent} s`, () => {
@@ -404,7 +386,6 @@ function renderMobConfig(area) {
     return inp;
   }));
 
-  // Durée vote
   box.appendChild(mkField(`Durée du vote : ${voteDurationInput?.value||"30"} s`, () => {
     const inp = document.createElement("input");
     inp.type="range"; inp.min="15"; inp.max="45"; inp.step="1";
@@ -416,7 +397,6 @@ function renderMobConfig(area) {
     return inp;
   }));
 
-  // Catégorie
   if (room.categoryOptions?.length) {
     box.appendChild(mkField("Catégorie", () => {
       const sel = document.createElement("select");
@@ -435,7 +415,7 @@ function renderMobConfig(area) {
 
     const selCat = categorySelect?.value || room.selectedCategory;
     const catObj = room.categoryOptions.find(c=>c.name===selCat)||room.categoryOptions[0];
-    if (catObj?.subcategories?.length) {
+    if (catObj?.subcategories?.length && selCat !== "Tout") {
       box.appendChild(mkField("Sous-catégorie", () => {
         const sel = document.createElement("select");
         sel.style.cssText = "width:100%;background:rgba(255,255,255,.9);color:#111;border-radius:10px;padding:10px 12px;font-size:16px;border:none;";
@@ -452,7 +432,6 @@ function renderMobConfig(area) {
     }
   }
 
-  // Résumé composition + bonhommes
   if (compositionSummary?.textContent) {
     const sum = document.createElement("p");
     sum.style.cssText = "font-size:12px;color:#fdba74;font-weight:600;margin:12px 0;";
@@ -461,7 +440,6 @@ function renderMobConfig(area) {
   }
   appendDolls(box, room, "Composition");
 
-  // Bouton lancer
   const btn = mkBigBtn("Lancer la partie", "#22c55e", "#16a34a");
   btn.style.marginTop = "18px";
   btn.addEventListener("click", doStartGame);
@@ -503,9 +481,8 @@ function renderMobWord(area) {
 // ── Chat ─────────────────────────────────────────────────
 function renderMobChat(room, area) {
   const box = mkPanel();
-  box.style.cssText += "display:flex;flex-direction:column;height:100%;";
+  box.className = "mob-panel-chat";
 
-  // Phase + speaker
   const ph = document.createElement("p");
   ph.style.cssText = "font-size:13px;font-weight:700;opacity:.80;margin:0 0 3px;font-family:'Syne',sans-serif;flex-shrink:0;";
   ph.textContent = phaseInfo?.textContent || "";
@@ -516,10 +493,8 @@ function renderMobChat(room, area) {
   sp.textContent = speakerInfo?.textContent || "";
   box.appendChild(sp);
 
-  // Messages
   const msgs = document.createElement("div");
   msgs.className = "messages";
-  msgs.style.cssText = "flex:1 1 auto;min-height:0;margin-bottom:10px;overflow-y:auto;-webkit-overflow-scrolling:touch;";
   (room.messages||[]).forEach(msg => {
     const div = document.createElement("div");
     div.className = "message" + (!msg.playerId ? " system" : "");
@@ -530,16 +505,17 @@ function renderMobChat(room, area) {
   box.appendChild(msgs);
   setTimeout(() => { msgs.scrollTop = msgs.scrollHeight; }, 0);
 
-  // Input
   const me = room.players.find(p => p.id === myPlayerId);
   const isMyTurn = room.phase==="speaking" && room.currentSpeakerId===myPlayerId && me && !me.eliminated;
 
   const row = document.createElement("div");
-  row.className = "row"; row.style.flexShrink = "0";
+  row.className = "row";
 
   const inp = document.createElement("input");
-  inp.maxLength=24; inp.placeholder=isMyTurn?"Ton mot…":"Ce n'est pas ton tour";
-  inp.disabled=!isMyTurn; inp.style.fontSize="16px";
+  inp.maxLength=24;
+  inp.placeholder=isMyTurn?"Ton mot…":"Ce n'est pas ton tour";
+  inp.disabled=!isMyTurn;
+  inp.style.fontSize="16px";
   inp.autocomplete="off";
 
   const sendB = document.createElement("button");
@@ -556,7 +532,6 @@ function renderMobChat(room, area) {
     if (!text) return;
     socket.emit("sendTurnMessage", { text }, (res) => {
       if (!res?.ok) return setStatus(res?.error||"Impossible d'envoyer", true);
-      // Le chatInput desktop est aussi mis à jour
       chatInput.value=""; sendChatBtn.disabled=true;
       playClickSound("success"); setStatus("Mot envoyé");
     });
@@ -668,7 +643,6 @@ function renderMobVote(room, area) {
       if (!res?.ok) return setStatus(res?.error||"Impossible de voter", true);
       voteAlreadySent=true; confirmB.disabled=true;
       infoText.textContent=`Vote confirmé contre ${selectedVoteTargetName}.`;
-      // Sync le vrai confirmVoteBtn desktop
       voteAlreadySent=true; if(confirmVoteBtn) confirmVoteBtn.disabled=true;
       playClickSound("vote"); setStatus("Vote envoyé", true);
     });
@@ -706,14 +680,12 @@ function renderMobResult(room, area) {
   }
 
   if (room.hostPlayerId===myPlayerId) {
-    const btn=mkBigBtn("Rejouer", "#3b82f6", "#2563eb");
+    const btn=mkBigBtn("⚙ Configurer & Rejouer", "#22c55e", "#16a34a");
     btn.style.marginTop="18px";
     btn.addEventListener("click", () => {
-      const composition=currentRoom?getSelectedComposition(currentRoom):null;
-      const settings=currentRoom?getSelectedSettings(currentRoom):null;
-      socket.emit("restartGame",{composition,settings},(res)=>{
+      socket.emit("returnToLobby", {}, (res) => {
         if (!res?.ok) return setStatus(res?.error||"Impossible", true);
-        playClickSound("success"); setStatus("Nouvelle partie !");
+        playClickSound("success"); setStatus("Retour au lobby !");
       });
     });
     box.appendChild(btn);
@@ -806,7 +778,11 @@ function resetUI() {
   if(chatInput) chatInput.value="";
   if(categorySelect) categorySelect.innerHTML="";
   if(subcategorySelect) subcategorySelect.innerHTML="";
-  if(endCard) { endCard.dataset.renderedRound=""; endCard.dataset.renderedWinner=""; }
+  // FIX : réinitialiser le gameId pour éviter le bug d'écran de fin
+  if(endCard) { endCard.dataset.renderedGameId=""; }
+
+  // Supprimer le bouton returnToLobby s'il existe
+  document.getElementById("returnToLobbyBtn")?.remove();
 
   // Reset zone mobile
   const tabBar=document.getElementById("mobileTabBar");
@@ -852,16 +828,12 @@ function renderPlayers(room) {
 }
 
 function getDisplayCounts(room) {
-  // En jeu : composition réelle assignée par le serveur
   if (room.started) return room.roleComposition || {};
-  // En lobby : composition prévue depuis les inputs (peu importe le nb de joueurs actuels)
   const n = room.players.length;
   let u = 1, m = 0;
   if (undercoverCountInput) u = Math.max(1, parseInt(undercoverCountInput.value, 10) || 1);
   if (mrWhiteCountInput)    m = Math.max(0, Math.min(1, parseInt(mrWhiteCountInput.value, 10) || 0));
-  // À 3 joueurs ou moins : composition fixe
   if (n <= 3) return { civil: 2, undercover: 1, mrwhite: 0 };
-  // Clamp pour éviter les valeurs impossibles
   u = Math.min(u, Math.max(1, n - m - 1));
   let c = n - u - m;
   if (c < 1) { u = Math.max(1, n - m - 1); c = n - u - m; }
@@ -884,7 +856,6 @@ function fillRoleDolls(container, room) {
 function renderRoleDolls(room) {
   fillRoleDolls(roleDolls, room);
   fillRoleDolls(waitingRoleDolls, room);
-  // Bonhommes hôte dans le panel centre (sous le timer)
   const hw = document.getElementById("roleDollsHostWrap");
   const hc = document.getElementById("roleDollsHost");
   if (hw && hc) {
@@ -896,6 +867,7 @@ function renderRoleDolls(room) {
     if (show) fillRoleDolls(hc, room);
   }
 }
+
 function renderMessages(room) {
   messagesList.innerHTML="";
   (room.messages||[]).forEach(msg=>{
@@ -962,10 +934,13 @@ function getMyOutcome(room) {
 
 function renderEndGame(room) {
   if(!room.gameOver) { endCard.classList.add("hidden"); return; }
+  // FIX : utiliser gameId unique pour éviter d'afficher le mauvais écran de fin
   const already=endCard.dataset.renderedGameId===String(room.gameId);
   endCard.classList.remove("hidden");
   endTitle.textContent=getMyOutcome(room)||"Fin de partie";
-  winnerText.textContent=room.winner==="aucun"?"La partie a été interrompue : aucun indice n'a été donné pendant la manche.":`Équipe gagnante : ${room.winner}`;
+  winnerText.textContent=room.winner==="aucun"
+    ?"La partie a été interrompue."
+    :`Équipe gagnante : ${room.winner}`;
   if(!already) {
     revealList.innerHTML="";
     (room.reveal||[]).forEach((player,i)=>{
@@ -1073,7 +1048,6 @@ function renderComposition(room) {
   else { undercoverCountInput.disabled=false; mrWhiteCountInput.disabled=false; undercoverCountInput.min="1"; undercoverCountInput.max=String(n-1); mrWhiteCountInput.min="0"; mrWhiteCountInput.max="1"; compositionHelp.textContent="Choisissez la composition, les durées et la catégorie."; }
   const vals=clampCompositionValues(room); const sets=getSelectedSettings(room);
   compositionSummary.textContent=`${vals.civilCount} civil(s) • ${vals.undercoverCount} undercover(s)${vals.mrwhiteCount?" • 1 Mr White":""} • Tours ${sets.turnDurationSeconds}s • Vote ${sets.voteDurationSeconds}s`;
-  // Mettre à jour les bonhommes dans le panel centre
   renderRoleDolls(room);
 }
 window.renderComposition=renderComposition;
@@ -1116,7 +1090,6 @@ function renderRoom(room) {
       :room.phase==="voting"?`Vote en cours (${room.voteCount}/${room.players.filter(p=>!p.eliminated).length})`:"";
   }
 
-  // Desktop
   renderPlayers(room);
   renderComposition(room);
   renderChat(room);
@@ -1126,33 +1099,34 @@ function renderRoom(room) {
 
   const isHost=room.hostPlayerId===myPlayerId;
   if(!room.started&&isHost) startBtn.classList.remove("hidden");
+
+  // Bouton "Configurer & Rejouer" pour l'hôte en fin de partie
   if(room.gameOver&&isHost) {
-  restartBtn.classList.add("hidden");
-  // Afficher bouton retour lobby
-  let lobbyBtn = document.getElementById("returnToLobbyBtn");
-  if(!lobbyBtn) {
-    lobbyBtn = document.createElement("button");
-    lobbyBtn.id = "returnToLobbyBtn";
-    lobbyBtn.textContent = "⚙ Configurer & Rejouer";
-    lobbyBtn.style.background = "linear-gradient(180deg,#22c55e,#16a34a)";
-    lobbyBtn.addEventListener("click", () => {
-      socket.emit("returnToLobby", {}, (res) => {
-        if(!res?.ok) return setStatus(res?.error||"Impossible", true);
+    restartBtn.classList.add("hidden");
+    let lobbyBtn = document.getElementById("returnToLobbyBtn");
+    if(!lobbyBtn) {
+      lobbyBtn = document.createElement("button");
+      lobbyBtn.id = "returnToLobbyBtn";
+      lobbyBtn.textContent = "⚙ Configurer & Rejouer";
+      lobbyBtn.style.background = "linear-gradient(180deg,#22c55e,#16a34a)";
+      lobbyBtn.addEventListener("click", () => {
+        socket.emit("returnToLobby", {}, (res) => {
+          if(!res?.ok) return setStatus(res?.error||"Impossible", true);
+          playClickSound("success"); setStatus("Retour au lobby !");
+        });
       });
-    });
-    document.querySelector(".room-actions-bottom")?.appendChild(lobbyBtn);
+      document.querySelector(".room-actions-bottom")?.appendChild(lobbyBtn);
+    }
+    lobbyBtn.classList.remove("hidden");
+  } else {
+    document.getElementById("returnToLobbyBtn")?.classList.add("hidden");
   }
-  lobbyBtn.classList.remove("hidden");
-} else {
-  document.getElementById("returnToLobbyBtn")?.classList.add("hidden");
-}
+
   if(room.started&&!room.gameOver) secretCard.classList.remove("hidden");
   renderVoteButtons(room);
   renderEndGame(room);
 
-  // Mobile
   if(isMobile()) {
-    // Auto-switch onglet selon la phase
     if(room.gameOver) mobileActiveTab="mob-result";
     else if(room.phase==="voting" && mobileActiveTab!=="mob-vote") mobileActiveTab="mob-vote";
     else if(room.started && !["mob-word","mob-chat","mob-players","mob-vote"].includes(mobileActiveTab)) mobileActiveTab="mob-chat";
@@ -1294,6 +1268,8 @@ socket.on("roomUpdated",(room)=>{
 socket.on("gameStarted",({word})=>{
   secretCard.classList.remove("hidden");
   endCard.classList.add("hidden");
+  // FIX : réinitialiser le gameId quand une nouvelle partie commence
+  if(endCard) endCard.dataset.renderedGameId="";
   waitingCard.classList.add("hidden");
   resetVoteSelection();
   wordText.textContent=word||"Tu n'as pas de mot.";

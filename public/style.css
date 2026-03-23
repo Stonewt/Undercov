@@ -602,8 +602,10 @@ body::after {
   min-height: 0;
   display: grid;
   grid-template-columns: 22vw 1fr;
+  grid-template-rows: 1fr;
   gap: 1.4vw;
   margin: 0 auto;
+  overflow: hidden;
 }
 
 .panel { min-height: 0; }
@@ -614,9 +616,15 @@ body::after {
   gap: 1vh;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.08) transparent;
+  max-height: 100%;
 }
+
+.panel-left::-webkit-scrollbar { width: 4px; }
+.panel-left::-webkit-scrollbar-track { background: transparent; }
+.panel-left::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.10); border-radius: 999px; }
 
 .panel-center { min-height: 0; }
 
@@ -1064,7 +1072,7 @@ button:disabled { opacity: 0.42; cursor: not-allowed; box-shadow: none; }
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 8px auto 0;
+  margin: 12px auto 0;
   background: rgba(255,255,255,0.07);
   border: 1px solid rgba(255,255,255,0.12);
   color: rgba(255,255,255,0.65);

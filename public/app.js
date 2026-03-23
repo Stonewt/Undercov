@@ -458,18 +458,36 @@ function renderMobWord(area) {
   lbl.textContent = "Ton mot secret";
   box.appendChild(lbl);
 
+  const hasWord = wordText?.textContent && wordText.textContent !== "Tu n'as pas de mot.";
+  let wordHidden = false;
+
   const w = document.createElement("p");
   w.style.cssText = `font-family:'Syne',sans-serif;font-size:42px;font-weight:800;letter-spacing:1px;
     color:#fff;text-align:center;padding:32px 24px;border-radius:20px;
     background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);
-    text-shadow:0 0 40px rgba(255,255,255,0.20);margin:0;width:100%;
-    animation:wordReveal .5s cubic-bezier(.22,1,.36,1);`;
+    margin:0;width:100%;
+    animation:wordReveal 1.2s cubic-bezier(.22,1,.36,1) forwards;
+    cursor:pointer;user-select:none;transition:filter 0.4s ease;`;
   w.textContent = wordText?.textContent || "—";
   box.appendChild(w);
 
+  // Bouton cacher/montrer
+  const toggleBtn = document.createElement("button");
+  toggleBtn.style.cssText = `display:flex;align-items:center;gap:6px;margin:12px auto 0;
+    background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);
+    color:rgba(255,255,255,0.65);font-size:12px;font-weight:600;
+    padding:6px 14px;border-radius:999px;cursor:pointer;
+    transition:all 0.15s ease;box-shadow:none;width:auto;min-height:auto;`;
+  toggleBtn.textContent = "👁 Cacher mon mot";
+  toggleBtn.addEventListener("click", () => {
+    wordHidden = !wordHidden;
+    w.style.filter = wordHidden ? "blur(12px)" : "blur(0px)";
+    toggleBtn.textContent = wordHidden ? "👁 Afficher mon mot" : "👁 Cacher mon mot";
+  });
+  box.appendChild(toggleBtn);
+
   const hint = document.createElement("p");
-  hint.style.cssText = "text-align:center;font-size:13px;opacity:.50;margin-top:20px;line-height:1.5;max-width:280px;";
-  const hasWord = wordText?.textContent && wordText.textContent !== "Tu n'as pas de mot.";
+  hint.style.cssText = "text-align:center;font-size:13px;opacity:.50;margin-top:16px;line-height:1.5;max-width:280px;";
   hint.textContent = hasWord
     ? "Donne des indices sans dire ce mot !"
     : "Tu es Mr White. Observe et bluff !";
@@ -1273,6 +1291,24 @@ socket.on("gameStarted",({word})=>{
   waitingCard.classList.add("hidden");
   resetVoteSelection();
   wordText.textContent=word||"Tu n'as pas de mot.";
+
+  // Ajouter bouton cacher/montrer sur PC
+  let toggleBtn = document.getElementById("wordToggleBtn");
+  if (!toggleBtn) {
+    toggleBtn = document.createElement("button");
+    toggleBtn.id = "wordToggleBtn";
+    toggleBtn.className = "word-toggle-btn";
+    toggleBtn.textContent = "👁 Cacher mon mot";
+    toggleBtn.addEventListener("click", () => {
+      const hidden = wordText.classList.toggle("word-hidden");
+      toggleBtn.textContent = hidden ? "👁 Afficher mon mot" : "👁 Cacher mon mot";
+    });
+    secretCard.appendChild(toggleBtn);
+  }
+  // Réinitialiser l'état caché à chaque nouvelle partie
+  wordText.classList.remove("word-hidden");
+  toggleBtn.textContent = "👁 Cacher mon mot";
+
   playClickSound("success"); setStatus("La partie commence");
   mobileActiveTab="mob-word";
   if(isMobile()&&currentRoom) buildMobileTabs(currentRoom);

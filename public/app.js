@@ -348,7 +348,7 @@ function renderMobConfig(area) {
   const room = currentRoom;
   const n = room.players.length;
 
-  box.appendChild(mkField("Undercovers", () => {
+  box.appendChild(mkField("Intrus", () => {
     const inp = document.createElement("input");
     inp.type="number"; inp.min="1"; inp.step="1";
     inp.value = undercoverCountInput?.value || "1";
@@ -681,7 +681,7 @@ function renderMobResult(room, area) {
 
   const sub=document.createElement("p");
   sub.style.cssText="text-align:center;font-size:15px;opacity:.80;margin-bottom:16px;";
-  sub.textContent=room.winner==="aucun"?"La partie a été interrompue.":`Équipe gagnante : ${room.winner}`;
+  sub.textContent=room.winner==="aucun"?"La partie a été interrompue.":`Équipe gagnante : ${room.winner === "undercover" ? "les intrus" : room.winner}`;
   box.appendChild(sub);
 
   if (room.reveal) {
@@ -689,7 +689,7 @@ function renderMobResult(room, area) {
     ul.style.cssText="list-style:none;margin:0;padding:0;display:grid;gap:8px;";
     room.reveal.forEach((player,i) => {
       const li=document.createElement("li"); li.className="reveal-item"; li.style.animationDelay=`${i*120}ms`;
-      const badge=document.createElement("span"); badge.className=`reveal-role-badge ${player.role}`; badge.textContent=player.role;
+      const badge=document.createElement("span"); badge.className=`reveal-role-badge ${player.role}`; badge.textContent=translateRole(player.role);
       const text=document.createElement("span"); text.className="reveal-main-text";
       text.textContent=`${player.name} • ${player.word||"aucun mot"}`;
       li.appendChild(badge); li.appendChild(text); ul.appendChild(li);
@@ -751,6 +751,14 @@ function appendDolls(parent, room, label) {
   const row=document.createElement("div"); row.className="role-dolls";
   fillRoleDolls(row, room);
   wrap.appendChild(t); wrap.appendChild(row); parent.appendChild(wrap);
+}
+
+
+function translateRole(role) {
+  if (role === "undercover") return "intrus";
+  if (role === "civil") return "civil";
+  if (role === "mrwhite") return "Mr White";
+  return role;
 }
 
 // ─── RESET UI ────────────────────────────────────────────
@@ -958,12 +966,12 @@ function renderEndGame(room) {
   endTitle.textContent=getMyOutcome(room)||"Fin de partie";
   winnerText.textContent=room.winner==="aucun"
     ?"La partie a été interrompue."
-    :`Équipe gagnante : ${room.winner}`;
+    :`Équipe gagnante : ${room.winner === "undercover" ? "les intrus" : room.winner}`;
   if(!already) {
     revealList.innerHTML="";
     (room.reveal||[]).forEach((player,i)=>{
       const li=document.createElement("li"); li.className="reveal-item"; li.style.animationDelay=`${i*120}ms`;
-      const badge=document.createElement("span"); badge.className=`reveal-role-badge ${player.role}`; badge.textContent=player.role;
+      const badge=document.createElement("span"); badge.className=`reveal-role-badge ${player.role}`; badge.textContent=translateRole(player.role);
       const text=document.createElement("span"); text.className="reveal-main-text"; text.textContent=`${player.name} • ${player.word||"aucun mot"}`;
       li.appendChild(badge); li.appendChild(text); revealList.appendChild(li);
     });
@@ -1065,7 +1073,7 @@ function renderComposition(room) {
   if(n<=3) { undercoverCountInput.disabled=true; mrWhiteCountInput.disabled=true; undercoverCountInput.value="1"; mrWhiteCountInput.value="0"; compositionHelp.textContent="À 3 joueurs : composition fixe."; }
   else { undercoverCountInput.disabled=false; mrWhiteCountInput.disabled=false; undercoverCountInput.min="1"; undercoverCountInput.max=String(n-1); mrWhiteCountInput.min="0"; mrWhiteCountInput.max="1"; compositionHelp.textContent="Choisissez la composition, les durées et la catégorie."; }
   const vals=clampCompositionValues(room); const sets=getSelectedSettings(room);
-  compositionSummary.textContent=`${vals.civilCount} civil(s) • ${vals.undercoverCount} undercover(s)${vals.mrwhiteCount?" • 1 Mr White":""} • Tours ${sets.turnDurationSeconds}s • Vote ${sets.voteDurationSeconds}s`;
+  compositionSummary.textContent=`${vals.civilCount} civil(s) • ${vals.undercoverCount} intrus${vals.mrwhiteCount?" • 1 Mr White":""} • Tours ${sets.turnDurationSeconds}s • Vote ${sets.voteDurationSeconds}s`;
   renderRoleDolls(room);
 }
 window.renderComposition=renderComposition;
@@ -1083,6 +1091,9 @@ function renderRoom(room) {
   handlePresenceSounds(room);
   currentRoom=room; window.currentRoom=room;
   myRoomCode=room.code; localStorage.setItem("roomCode",room.code);
+
+  // Stocker les options de catégorie globalement pour l'UI publique
+  if (room.categoryOptions) window._categoryOptions = room.categoryOptions;
 
   lobby.classList.remove("hidden");
   leaveWrap.classList.remove("hidden");
@@ -1155,7 +1166,196 @@ function renderRoom(room) {
 }
 window.renderRoom=renderRoom;
 
-// ─── LANDING TABS ────────────────────────────────────────
+// ─── ROOMS PUBLIQUES ────────────────────────────────────
+let currentPublicRooms = [];
+let publicCategoryFilter = "";
+let publicMaxPlayersFilter = "";
+
+function initLandingModeTabs() {
+  const tabs = document.querySelectorAll(".landing-mode-tab");
+  const privatePanel = document.getElementById("privateModePanel");
+  const publicPanel = document.getElementById("publicModePanel");
+  if (!tabs.length || !privatePanel || !publicPanel) return;
+
+  tabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      tabs.forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      const mode = tab.dataset.mode;
+      privatePanel.style.display = mode === "private" ? "" : "none";
+      publicPanel.style.display = mode === "public" ? "" : "none";
+      if (mode === "public") {
+        fetchPublicRooms();
+        initPublicCategoryFilter();
+      }
+    });
+  });
+}
+
+function initPublicCategoryFilter() {
+  const sel = document.getElementById("publicCategoryFilter");
+  if (!sel || sel.options.length > 1) return;
+  sel.innerHTML = '<option value="">Toutes catégories</option>';
+  const opts = Array.isArray(window._categoryOptions) ? window._categoryOptions : [];
+  opts.forEach(cat => {
+    const o = document.createElement("option");
+    o.value = cat.name; o.textContent = cat.name;
+    sel.appendChild(o);
+  });
+  sel.addEventListener("change", () => {
+    publicCategoryFilter = sel.value;
+    renderPublicRooms();
+  });
+
+  const maxSel = document.getElementById("publicMaxPlayersFilter");
+  if (maxSel) {
+    maxSel.addEventListener("change", () => {
+      publicMaxPlayersFilter = maxSel.value;
+      renderPublicRooms();
+    });
+  }
+}
+
+function fetchPublicRooms() {
+  socket.emit("getPublicRooms", {}, (res) => {
+    if (res?.ok) {
+      currentPublicRooms = res.rooms || [];
+      renderPublicRooms();
+    }
+  });
+}
+
+function renderPublicRooms() {
+  const list = document.getElementById("publicRoomsList");
+  if (!list) return;
+
+  let rooms = currentPublicRooms;
+  if (publicCategoryFilter) rooms = rooms.filter(r => r.selectedCategory === publicCategoryFilter);
+  if (publicMaxPlayersFilter) rooms = rooms.filter(r => r.maxPlayers === parseInt(publicMaxPlayersFilter));
+
+  list.innerHTML = "";
+  if (!rooms.length) {
+    list.innerHTML = `<div class="public-rooms-empty"><p>Aucune salle disponible</p><p style="font-size:12px;opacity:.5;">Crée la première !</p></div>`;
+    return;
+  }
+
+  rooms.forEach(room => {
+    const isFull = room.playerCount >= room.maxPlayers;
+    const card = document.createElement("div");
+    card.className = "public-room-card";
+    card.innerHTML = `
+      <div class="public-room-info">
+        <div class="public-room-title">${room.selectedCategory || "Toutes catégories"}${room.selectedSubcategory ? " · " + room.selectedSubcategory : ""}</div>
+        <div class="public-room-meta">
+          <span class="public-room-players ${isFull ? "full" : "available"}">
+            ${room.playerCount}/${room.maxPlayers} joueurs
+          </span>
+          <span>Tour ${room.turnDurationSeconds}s</span>
+          <span>Vote ${room.voteDurationSeconds}s</span>
+        </div>
+      </div>
+      <button class="public-room-join-btn" ${isFull ? "disabled" : ""}>${isFull ? "Pleine" : "Rejoindre"}</button>
+    `;
+    if (!isFull) {
+      card.querySelector(".public-room-join-btn").addEventListener("click", () => {
+        const name = nameInput?.value.trim();
+        if (!name) return setStatus("Entre un pseudo d'abord", true);
+        socket.emit("joinPublicRoom", { code: room.code, name }, (res) => {
+          if (!res?.ok) return setStatus(res?.error || "Impossible de rejoindre", true);
+          saveSession(res.playerId, res.playerToken, res.room.code);
+          renderRoom(res.room);
+          updateResumeUI(true); playClickSound("join"); setStatus("Room rejointe !");
+        });
+      });
+    }
+    list.appendChild(card);
+  });
+}
+
+function initPublicCreateConfig() {
+  const createPublicBtn = document.getElementById("createPublicBtn");
+  const configPanel = document.getElementById("publicCreateConfig");
+  const confirmBtn = document.getElementById("confirmPublicCreateBtn");
+  const catSel = document.getElementById("publicCategorySelect");
+  const subSel = document.getElementById("publicSubcategorySelect");
+  const subBlock = document.getElementById("publicSubcategoryBlock");
+  const turnSlider = document.getElementById("publicTurnDuration");
+  const voteSlider = document.getElementById("publicVoteDuration");
+  const turnVal = document.getElementById("publicTurnVal");
+  const voteVal = document.getElementById("publicVoteVal");
+
+  if (!createPublicBtn || !configPanel) return;
+
+  // Peupler la catégorie
+  if (catSel) {
+    catSel.innerHTML = "";
+    const opts = Array.isArray(window._categoryOptions) ? window._categoryOptions : [];
+    opts.forEach(cat => {
+      const o = document.createElement("option");
+      o.value = cat.name; o.textContent = cat.name;
+      catSel.appendChild(o);
+    });
+    catSel.addEventListener("change", () => {
+      const cat = window._categoryOptions?.find(c => c.name === catSel.value);
+      if (subSel && subBlock) {
+        if (!cat || !cat.subcategories?.length || catSel.value === "Tout") {
+          subBlock.style.display = "none";
+        } else {
+          subBlock.style.display = "";
+          subSel.innerHTML = "";
+          cat.subcategories.forEach(s => {
+            const o = document.createElement("option"); o.value = s; o.textContent = s;
+            subSel.appendChild(o);
+          });
+        }
+      }
+    });
+    catSel.dispatchEvent(new Event("change"));
+  }
+
+  if (turnSlider && turnVal) turnSlider.addEventListener("input", () => { turnVal.textContent = turnSlider.value; });
+  if (voteSlider && voteVal) voteSlider.addEventListener("input", () => { voteVal.textContent = voteSlider.value; });
+
+  // Toggle config
+  createPublicBtn.addEventListener("click", () => {
+    const visible = configPanel.style.display !== "none";
+    configPanel.style.display = visible ? "none" : "";
+  });
+
+  if (confirmBtn) {
+    confirmBtn.addEventListener("click", () => {
+      const name = nameInput?.value.trim();
+      if (!name) return setStatus("Entre un pseudo d'abord", true);
+      const maxPlayers = parseInt(document.getElementById("publicMaxPlayers")?.value || "6");
+      const category = catSel?.value || "Tout";
+      const subcategory = category === "Tout" ? null : (subSel?.value || null);
+      const turnDurationSeconds = parseInt(turnSlider?.value || "30");
+      const voteDurationSeconds = parseInt(voteSlider?.value || "30");
+
+      socket.emit("createRoom", {
+        name,
+        isPublic: true,
+        maxPlayers
+      }, (res) => {
+        if (!res?.ok) return setStatus(res?.error || "Impossible de créer", true);
+        saveSession(res.playerId, res.playerToken, res.room.code);
+        // Appliquer les settings après création
+        socket.emit("updateRoomSettings", {
+          category, subcategory, turnDurationSeconds, voteDurationSeconds
+        }, () => {});
+        renderRoom(res.room);
+        updateResumeUI(true); playClickSound("success"); setStatus("Room publique créée !");
+        configPanel.style.display = "none";
+      });
+    });
+  }
+}
+
+// Socket : mise à jour temps réel des rooms publiques
+socket.on("publicRoomsUpdated", (rooms) => {
+  currentPublicRooms = rooms || [];
+  renderPublicRooms();
+});
 function initMobileTabs() {
   const mobileTabs=document.getElementById("mobileTabs");
   const loginCard=document.getElementById("roomSetupCard");
@@ -1326,7 +1526,7 @@ socket.on("sessionResumed",({word})=>{
 socket.on("voteResult",(result)=>{
   resetVoteSelection();
   if(result.tie) setStatus("Égalité : personne n'est éliminé.",true);
-  else setStatus(`${result.eliminated.name} est éliminé (${result.eliminated.role}).`,true);
+  else setStatus(`${result.eliminated.name} est éliminé (${translateRole(result.eliminated.role)}).`,true);
   playClickSound("vote");
 });
 
@@ -1334,10 +1534,20 @@ socket.on("voteResult",(result)=>{
 window.addEventListener("load",()=>{
   const intro=document.getElementById("introOverlay");
   const scene=document.getElementById("introScene");
-  if(!intro||!scene) { initMobileTabs(); return; }
+  if(!intro||!scene) {
+    initMobileTabs();
+    initLandingModeTabs();
+    initPublicCreateConfig();
+    return;
+  }
   setTimeout(()=>{
     scene.classList.add("intro-hidden");
-    setTimeout(()=>{ intro.remove(); initMobileTabs(); },900);
+    setTimeout(()=>{
+      intro.remove();
+      initMobileTabs();
+      initLandingModeTabs();
+      initPublicCreateConfig();
+    },900);
   },2300);
 });
 

@@ -5,34 +5,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 
   <!-- SEO -->
-  <title>Undercover — Jeu en ligne gratuit entre amis</title>
-  <meta name="description" content="Joue à Undercover en ligne gratuitement avec tes amis. Chaque joueur reçoit un mot secret. Trouve qui est l'infiltré ! Jeu multijoueur sans inscription." />
-  <meta name="keywords" content="undercover jeu en ligne, undercover gratuit, undercover multijoueur, jeu undercover entre amis, jouer undercover en ligne" />
-  <meta name="author" content="Undercover Games" />
+  <title>L'Intrus — Jeu en ligne gratuit entre amis</title>
+  <meta name="description" content="Joue à L'Intrus en ligne gratuitement avec tes amis. Chaque joueur reçoit un mot secret. Trouve qui est l'infiltré ! Jeu multijoueur sans inscription." />
+  <meta name="keywords" content="l'intrus jeu en ligne, l'intrus gratuit, l'intrus multijoueur, jeu l'intrus entre amis, jouer l'intrus en ligne" />
+  <meta name="author" content="L'Intrus Games" />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://www.jouerundercover.fr" />
 
   <!-- Open Graph -->
-  <meta property="og:title" content="Undercover — Jeu en ligne gratuit entre amis" />
-  <meta property="og:description" content="Joue à Undercover en ligne gratuitement avec tes amis. Trouve qui est l'infiltré !" />
+  <meta property="og:title" content="L'Intrus — Jeu en ligne gratuit entre amis" />
+  <meta property="og:description" content="Joue à L'Intrus en ligne gratuitement avec tes amis. Trouve qui est l'infiltré !" />
   <meta property="og:url" content="https://www.jouerundercover.fr" />
   <meta property="og:type" content="website" />
-  <meta property="og:image" content="https://www.jouerundercover.fr/og-image.png" />
-  <meta property="og:image:width" content="1200" />
-  <meta property="og:image:height" content="630" />
-  <meta name="thumbnail" content="https://www.jouerundercover.fr/og-image.png" />
+  <meta property="og:image" content="https://www.jouerundercover.fr/favicon.svg" />
 
   <!-- AdSense -->
   <meta name="google-adsense-account" content="ca-pub-9008802243897755">
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9008802243897755" crossorigin="anonymous"></script>
 
   <!-- Google Analytics -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-0H6Q8W5XTM"></script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
-    gtag('config', 'G-0H6Q8W5XTM');
+    gtag('config', 'G-XXXXXXXXXX');
   </script>
 
   <!-- Favicon -->
@@ -51,9 +48,9 @@
   {
     "@context": "https://schema.org",
     "@type": "WebApplication",
-    "name": "Undercover Jeu en Ligne",
+    "name": "L'Intrus Jeu en Ligne",
     "url": "https://www.jouerundercover.fr",
-    "description": "Joue à Undercover en ligne gratuitement avec tes amis. Jeu de déduction multijoueur sans inscription.",
+    "description": "Joue à L'Intrus en ligne gratuitement avec tes amis. Jeu de déduction multijoueur sans inscription.",
     "applicationCategory": "GameApplication",
     "operatingSystem": "Web",
     "offers": {
@@ -117,11 +114,10 @@
           </svg>
         </div>
         <div class="wordmark">
-          <span class="word-under">UNDER</span>
-          <span class="word-cover">COVER</span>
+          <span class="word-under">L'IN</span><span class="word-cover">TRUS</span>
         </div>
         <div class="sep"></div>
-        <div class="tagline">Qui ment parmi vous ?</div>
+        <div class="tagline">Qui est l'intrus parmi vous ?</div>
       </div>
     </div>
   </div>
@@ -166,7 +162,7 @@
           <ellipse cx="93" cy="31" rx="2.5" ry="2.5" fill="rgba(255,255,255,0.40)"/>
         </svg>
         <h1 class="brand-logo">
-          <span class="brand-under">UNDER</span><span class="brand-cover">COVER</span>
+          <span class="brand-under">L'IN</span><span class="brand-cover">TRUS</span>
         </h1>
       </div>
 
@@ -219,28 +215,106 @@
           </div>
 
           <div class="landing-cards">
+
+            <!-- Onglets Privé / Public / Règles -->
             <section class="login-card" id="roomSetupCard">
               <div class="start-content start-content-full">
-                <h2>Se connecter à une salle</h2>
-                <p class="start-subtitle">Crée une room ou rejoins-en une avec un code.</p>
 
-                <div class="form-block hidden" id="resumeBlock">
-                  <button id="resumeBtn" class="big-btn" style="background:linear-gradient(180deg,#22c55e,#16a34a);box-shadow:0 5px 0 rgba(0,0,0,.28),0 8px 18px rgba(34,197,94,.28);">↩ Reprendre ma partie</button>
-                </div>
-                <div class="separator hidden" id="resumeSeparator">ou</div>
-
+                <!-- Pseudo global en haut -->
                 <div class="form-block">
                   <label for="nameInput">Pseudo</label>
                   <input id="nameInput" maxlength="20" placeholder="Ton pseudo" autocomplete="off" />
                 </div>
-                <div class="form-block">
-                  <button id="createBtn" class="big-btn">Créer une room</button>
+
+                <!-- Onglets -->
+                <div class="landing-mode-tabs">
+                  <button class="landing-mode-tab active" data-mode="private">🔒 Privé</button>
+                  <button class="landing-mode-tab" data-mode="public">🌐 Public</button>
                 </div>
-                <div class="separator">ou</div>
-                <div class="join-row">
-                  <input id="roomInput" placeholder="Code room" maxlength="8" autocomplete="off" style="text-transform:uppercase" />
-                  <button id="joinBtn" class="big-btn">Rejoindre</button>
+
+                <!-- PANEL PRIVÉ -->
+                <div id="privateModePanel">
+                  <div class="form-block hidden" id="resumeBlock">
+                    <button id="resumeBtn" class="big-btn" style="background:linear-gradient(180deg,#22c55e,#16a34a);box-shadow:0 5px 0 rgba(0,0,0,.28),0 8px 18px rgba(34,197,94,.28);">↩ Reprendre ma partie</button>
+                  </div>
+                  <div class="separator hidden" id="resumeSeparator">ou</div>
+
+                  <div class="form-block">
+                    <button id="createBtn" class="big-btn">Créer une room privée</button>
+                  </div>
+                  <div class="separator">ou</div>
+                  <div class="join-row">
+                    <input id="roomInput" placeholder="Code room" maxlength="8" autocomplete="off" style="text-transform:uppercase" />
+                    <button id="joinBtn" class="big-btn">Rejoindre</button>
+                  </div>
                 </div>
+
+                <!-- PANEL PUBLIC -->
+                <div id="publicModePanel" style="display:none;">
+                  <div class="public-filter-bar">
+                    <div class="form-block">
+                      <label for="publicCategoryFilter">Catégorie</label>
+                      <select id="publicCategoryFilter"></select>
+                    </div>
+                    <div class="form-block">
+                      <label for="publicMaxPlayersFilter">Joueurs max</label>
+                      <select id="publicMaxPlayersFilter">
+                        <option value="">Tous</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                        <option value="8">8</option>
+                        <option value="10">10</option>
+                        <option value="12">12</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div id="publicRoomsList" class="public-rooms-list">
+                    <div class="public-rooms-empty">
+                      <p>Aucune salle disponible</p>
+                      <p style="font-size:12px;opacity:.5;">Crée la première !</p>
+                    </div>
+                  </div>
+
+                  <div class="separator">ou</div>
+                  <div class="form-block">
+                    <button id="createPublicBtn" class="big-btn" style="background:linear-gradient(180deg,#e07a20,#b85a10);box-shadow:0 4px 0 rgba(0,0,0,.26),0 6px 14px rgba(224,122,32,.28);">🌐 Créer une room publique</button>
+                  </div>
+
+                  <!-- Config room publique (masquée par défaut) -->
+                  <div id="publicCreateConfig" style="display:none;" class="public-create-config">
+                    <div class="form-block">
+                      <label for="publicMaxPlayers">Nombre de joueurs max</label>
+                      <select id="publicMaxPlayers">
+                        <option value="4">4 joueurs</option>
+                        <option value="5">5 joueurs</option>
+                        <option value="6" selected>6 joueurs</option>
+                        <option value="8">8 joueurs</option>
+                        <option value="10">10 joueurs</option>
+                        <option value="12">12 joueurs</option>
+                      </select>
+                    </div>
+                    <div class="form-block">
+                      <label for="publicCategorySelect">Catégorie</label>
+                      <select id="publicCategorySelect"></select>
+                    </div>
+                    <div class="form-block" id="publicSubcategoryBlock">
+                      <label for="publicSubcategorySelect">Sous-catégorie</label>
+                      <select id="publicSubcategorySelect"></select>
+                    </div>
+                    <div class="form-block">
+                      <label for="publicTurnDuration">Durée du tour : <span id="publicTurnVal">30</span> s</label>
+                      <input id="publicTurnDuration" type="range" min="15" max="45" step="1" value="30" class="duration-slider"/>
+                    </div>
+                    <div class="form-block">
+                      <label for="publicVoteDuration">Durée du vote : <span id="publicVoteVal">30</span> s</label>
+                      <input id="publicVoteDuration" type="range" min="15" max="45" step="1" value="30" class="duration-slider"/>
+                    </div>
+                    <button id="confirmPublicCreateBtn" class="big-btn" style="background:linear-gradient(180deg,#e07a20,#b85a10);box-shadow:0 4px 0 rgba(0,0,0,.26),0 6px 14px rgba(224,122,32,.28);">Créer la room publique</button>
+                  </div>
+                </div>
+
               </div>
             </section>
 
@@ -249,13 +323,13 @@
               <ul>
                 <li>Chaque joueur reçoit un rôle secret.</li>
                 <li>Les civils partagent le même mot.</li>
-                <li>Les undercovers ont un mot proche mais différent.</li>
+                <li>Les intrus ont un mot proche mais différent.</li>
                 <li>Mr White n'a aucun mot.</li>
                 <li>À tour de rôle, chacun donne un seul mot comme indice.</li>
                 <li>Tu ne peux pas écrire exactement ton mot secret.</li>
                 <li>Ensuite, tout le monde vote contre un joueur.</li>
                 <li>Les civils gagnent si tous les intrus sont éliminés.</li>
-                <li>Les undercovers gagnent s'ils deviennent au moins aussi nombreux que les civils.</li>
+                <li>Les intrus gagnent s'ils deviennent au moins aussi nombreux que les civils.</li>
                 <li>Mr White gagne s'il ne reste plus qu'un seul autre joueur vivant face à lui.</li>
                 <li>Si personne ne donne d'indice pendant toute une manche, la partie s'arrête.</li>
               </ul>
@@ -269,7 +343,7 @@
 
           <!-- SEO footer : dans la zone scrollable de l'accueil uniquement -->
           <footer style="padding:32px 20px 40px;color:rgba(255,255,255,0.30);font-size:13px;line-height:1.7;text-align:center;">
-            <p><strong style="color:rgba(255,255,255,0.45);">Undercover jeu en ligne gratuit</strong> — Joue à Undercover directement depuis ton navigateur, sans inscription. Crée une room, partage le code à tes amis et découvrez qui est l'infiltré parmi vous. Disponible sur mobile et ordinateur.</p>
+            <p><strong style="color:rgba(255,255,255,0.45);">L'Intrus jeu en ligne gratuit</strong> — Joue à L'Intrus directement depuis ton navigateur, sans inscription. Crée une room, partage le code à tes amis et découvrez qui est l'infiltré parmi vous. Disponible sur mobile et ordinateur.</p>
             <p style="margin-top:10px;font-size:12px;">
               <a href="/mentions-legales" style="color:rgba(255,255,255,0.30);text-decoration:none;margin:0 8px;">Mentions légales</a>
               <a href="/confidentialite" style="color:rgba(255,255,255,0.30);text-decoration:none;margin:0 8px;">Confidentialité</a>
@@ -298,7 +372,7 @@
             <h2>Configuration</h2>
             <p id="compositionHelp"></p>
             <div class="form-block">
-              <label for="undercoverCountInput">Undercovers</label>
+              <label for="undercoverCountInput">Intrus</label>
               <input id="undercoverCountInput" type="number" min="1" step="1" value="1" />
             </div>
             <div class="form-block">

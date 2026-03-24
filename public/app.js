@@ -50,6 +50,7 @@ const turnDurationInput    = document.getElementById("turnDurationInput");
 const voteDurationInput    = document.getElementById("voteDurationInput");
 const categorySelect       = document.getElementById("categorySelect");
 const subcategorySelect    = document.getElementById("subcategorySelect");
+const wordsPerTurnInput    = document.getElementById("wordsPerTurnInput");
 const chatCard         = document.getElementById("chatCard");
 const messagesList     = document.getElementById("messagesList");
 const chatInput        = document.getElementById("chatInput");
@@ -457,6 +458,26 @@ function renderMobConfig(area) {
     sum.textContent = compositionSummary.textContent;
     box.appendChild(sum);
   }
+
+  // Mots par tour
+  box.appendChild(mkField("Mots par joueur par tour", () => {
+    const sel = document.createElement("select");
+    sel.style.cssText = "width:100%;background:rgba(255,255,255,.9);color:#111;border-radius:10px;padding:10px 12px;font-size:16px;border:none;";
+    [1,2,3,4].forEach(n => {
+      const o=document.createElement("option"); o.value=n; o.textContent=`${n} mot${n>1?"s":""}`;
+      if(n===(room.wordsPerTurn||1)) o.selected=true;
+      sel.appendChild(o);
+    });
+    if (!isPublic) {
+      sel.addEventListener("change", () => {
+        if (wordsPerTurnInput) { wordsPerTurnInput.value=sel.value; renderComposition(room); }
+      });
+    } else {
+      sel.disabled=true;
+    }
+    return sel;
+  }));
+
   appendDolls(box, room, "Composition");
 
   const btn = mkBigBtn("Lancer la partie", "#22c55e", "#16a34a");
@@ -930,9 +951,21 @@ function renderChat(room) {
   renderRoleDolls(room); renderMessages(room);
   const me=room.players.find(p=>p.id===myPlayerId);
   const isMyTurn=room.phase==="speaking"&&room.currentSpeakerId===myPlayerId&&me&&!me.eliminated;
-  chatInput.disabled=!isMyTurn;
-  sendChatBtn.disabled=!isMyTurn||!normalizeSingleWordInput(chatInput.value);
-  chatHelp.textContent=room.phase==="voting"?"Vote en cours.":isMyTurn?"Entre un seul mot. Tu ne peux pas écrire ton mot secret.":"Ce n'est pas ton tour.";
+  const wordsPerTurn=room.wordsPerTurn||1;
+
+  // Compter mots déjà envoyés ce tour
+  const wordsSent=(room.messages||[]).filter(
+    m=>m.round===room.round&&m.playerId===myPlayerId&&m.turnIndex===room.currentSpeakerIndex
+  ).length;
+  const wordsLeft=wordsPerTurn-wordsSent;
+
+  chatInput.disabled=!isMyTurn||wordsLeft<=0;
+  sendChatBtn.disabled=!isMyTurn||!normalizeSingleWordInput(chatInput.value)||wordsLeft<=0;
+
+  if(room.phase==="voting") chatHelp.textContent="Vote en cours.";
+  else if(isMyTurn && wordsPerTurn>1) chatHelp.textContent=`Mot ${wordsSent+1}/${wordsPerTurn} — Entre un mot. Tu ne peux pas écrire ton mot secret.`;
+  else if(isMyTurn) chatHelp.textContent="Entre un seul mot. Tu ne peux pas écrire ton mot secret.";
+  else chatHelp.textContent="Ce n'est pas ton tour.";
 }
 
 function renderWaitingRoom(room) {
@@ -1077,7 +1110,8 @@ function getSelectedSettings(room) {
   if(voteDurationInput) voteDurationInput.value=String(v);
   const cat=categorySelect?.value||room?.selectedCategory||"Tout";
   const sub=cat==="Tout"?null:(subcategorySelect?.value||room?.selectedSubcategory||null);
-  return {turnDurationSeconds:t,voteDurationSeconds:v,category:cat,subcategory:sub};
+  const wordsPerTurn=Math.max(1,Math.min(4,parseInt(wordsPerTurnInput?.value||room?.wordsPerTurn||1)||1));
+  return {turnDurationSeconds:t,voteDurationSeconds:v,category:cat,subcategory:sub,wordsPerTurn};
 }
 
 function renderComposition(room) {
@@ -1120,8 +1154,13 @@ function renderComposition(room) {
     compositionCard.style.opacity=""; compositionCard.style.pointerEvents="";
   }
 
+  // Sync wordsPerTurn
+  if(wordsPerTurnInput && !isPublic) wordsPerTurnInput.value=String(room.wordsPerTurn||1);
+  if(isPublic && wordsPerTurnInput) { wordsPerTurnInput.value=String(room.wordsPerTurn||1); wordsPerTurnInput.disabled=true; }
+  else if(wordsPerTurnInput) wordsPerTurnInput.disabled=false;
+
   const vals=clampCompositionValues(room); const sets=getSelectedSettings(room);
-  compositionSummary.textContent=`${vals.civilCount} Civil(s) • ${vals.undercoverCount} Intrus${vals.mrwhiteCount?" • 1 Le Mystère":""} • Tours ${sets.turnDurationSeconds}s • Vote ${sets.voteDurationSeconds}s`;
+  compositionSummary.textContent=`${vals.civilCount} Civil(s) • ${vals.undercoverCount} Intrus${vals.mrwhiteCount?" • 1 Le Mystère":""} • Tours ${sets.turnDurationSeconds}s • Vote ${sets.voteDurationSeconds}s • ${sets.wordsPerTurn} mot(s)/tour`;
   renderRoleDolls(room);
 }
 window.renderComposition=renderComposition;
@@ -1163,8 +1202,19 @@ function renderRoom(room) {
   if(!room.started) { speakerInfo.textContent="La partie n'a pas encore commencé"; }
   else {
     const spk=room.players.find(p=>p.id===room.currentSpeakerId);
-    speakerInfo.textContent=room.phase==="speaking"&&spk?`${spk.name} réfléchit`
-      :room.phase==="voting"?`Vote en cours (${room.voteCount}/${room.players.filter(p=>!p.eliminated).length})`:"";
+    const wordsPerTurn=room.wordsPerTurn||1;
+    const wordsSent=(room.messages||[]).filter(
+      m=>m.round===room.round&&m.playerId===room.currentSpeakerId&&m.turnIndex===room.currentSpeakerIndex
+    ).length;
+    if(room.phase==="speaking"&&spk) {
+      speakerInfo.textContent=wordsPerTurn>1
+        ?`${spk.name} réfléchit (${wordsSent}/${wordsPerTurn} mots)`
+        :`${spk.name} réfléchit`;
+    } else if(room.phase==="voting") {
+      speakerInfo.textContent=`Vote en cours (${room.voteCount}/${room.players.filter(p=>!p.eliminated).length})`;
+    } else {
+      speakerInfo.textContent="";
+    }
   }
 
   renderPlayers(room);
@@ -1463,6 +1513,8 @@ function initPublicCreateConfig() {
       const turnDurationSeconds = parseInt(turnSlider?.value || "30");
       const voteDurationSeconds = parseInt(voteSlider?.value || "30");
 
+      const wordsPerTurn = parseInt(document.getElementById("publicWordsPerTurn")?.value || "1");
+
       socket.emit("createRoom", {
         name,
         isPublic: true,
@@ -1472,7 +1524,8 @@ function initPublicCreateConfig() {
         category,
         subcategory,
         turnDurationSeconds,
-        voteDurationSeconds
+        voteDurationSeconds,
+        wordsPerTurn
       }, (res) => {
         if (!res?.ok) return setStatus(res?.error || "Impossible de créer", true);
         saveSession(res.playerId, res.playerToken, res.room.code);
@@ -1616,6 +1669,7 @@ if(turnDurationInput)    turnDurationInput.addEventListener("input",()=>{ turnDu
 if(voteDurationInput)    voteDurationInput.addEventListener("input",()=>{ voteDurationInput.value=String(clampSeconds(voteDurationInput.value,30)); if(currentRoom) renderComposition(currentRoom); });
 if(categorySelect)       categorySelect.addEventListener("change",()=>{ if(!currentRoom) return; populateSubcategorySelect(currentRoom,categorySelect.value); renderComposition(currentRoom); });
 if(subcategorySelect)    subcategorySelect.addEventListener("change",()=>{ if(currentRoom) renderComposition(currentRoom); });
+if(wordsPerTurnInput)    wordsPerTurnInput.addEventListener("change",()=>{ if(currentRoom) renderComposition(currentRoom); });
 
 // ─── SOCKET EVENTS ───────────────────────────────────────
 socket.on("roomUpdated",(room)=>{

@@ -346,6 +346,16 @@
                       <input id="publicVoteDuration" type="range" min="15" max="45" step="1" value="30" class="duration-slider"/>
                     </div>
 
+                    <div class="form-block">
+                      <label for="publicWordsPerTurn">Mots par joueur par tour</label>
+                      <select id="publicWordsPerTurn">
+                        <option value="1" selected>1 mot</option>
+                        <option value="2">2 mots</option>
+                        <option value="3">3 mots</option>
+                        <option value="4">4 mots</option>
+                      </select>
+                    </div>
+
                     <p id="publicConfigSummary" style="font-size:12px;color:#fdba74;font-weight:600;margin:4px 0 8px;"></p>
 
                     <button id="confirmPublicCreateBtn" class="big-btn" style="background:linear-gradient(180deg,#e07a20,#b85a10);box-shadow:0 4px 0 rgba(0,0,0,.26),0 6px 14px rgba(224,122,32,.28);">Créer la room publique</button>
@@ -423,6 +433,15 @@
             <div class="form-block">
               <label for="voteDurationInput">Durée du vote : <span id="voteDurationDisplay">30</span> s</label>
               <input id="voteDurationInput" type="range" min="15" max="45" step="1" value="30" class="duration-slider" />
+            </div>
+            <div class="form-block">
+              <label for="wordsPerTurnInput">Mots par joueur par tour</label>
+              <select id="wordsPerTurnInput">
+                <option value="1" selected>1 mot</option>
+                <option value="2">2 mots</option>
+                <option value="3">3 mots</option>
+                <option value="4">4 mots</option>
+              </select>
             </div>
             <div class="form-block">
               <label for="categorySelect">Catégorie</label>

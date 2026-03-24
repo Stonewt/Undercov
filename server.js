@@ -116,6 +116,9 @@ if (!columnExists("rooms", "public_undercover_count")) {
 if (!columnExists("rooms", "public_mrwhite_count")) {
   db.exec(`ALTER TABLE rooms ADD COLUMN public_mrwhite_count INTEGER`);
 }
+if (!columnExists("rooms", "words_per_turn")) {
+  db.exec(`ALTER TABLE rooms ADD COLUMN words_per_turn INTEGER NOT NULL DEFAULT 1`);
+}
 
 // ─── NETTOYAGE DES ROOMS MORTES ──────────────────────────
 function cleanupStaleRooms() {
@@ -450,11 +453,14 @@ function normalizeGameSettings(settings = {}, room = null) {
     room?.vote_duration_ms ? Math.round(room.vote_duration_ms / 1000) : 30
   );
 
+  const wordsPerTurn = Math.max(1, Math.min(4, parseInt(settings.wordsPerTurn || room?.words_per_turn || 1) || 1));
+
   return {
     turnDurationMs: turnSeconds * 1000,
     voteDurationMs: voteSeconds * 1000,
     category: selection.category,
-    subcategory: selection.subcategory
+    subcategory: selection.subcategory,
+    wordsPerTurn
   };
 }
 
@@ -482,6 +488,7 @@ function updateRoom(code, patch) {
         selected_subcategory = ?,
         game_over = ?,
         winner = ?,
+        words_per_turn = ?,
         updated_at = ?
     WHERE code = ?
   `).run(
@@ -501,6 +508,7 @@ function updateRoom(code, patch) {
     next.selected_subcategory,
     next.game_over,
     next.winner,
+    next.words_per_turn ?? 1,
     next.updated_at,
     code
   );
@@ -600,6 +608,7 @@ function buildPublicRoom(code) {
     voteDurationMs: room.vote_duration_ms || DEFAULT_VOTE_DURATION_MS,
     turnDurationSeconds: Math.round((room.turn_duration_ms || DEFAULT_TURN_DURATION_MS) / 1000),
     voteDurationSeconds: Math.round((room.vote_duration_ms || DEFAULT_VOTE_DURATION_MS) / 1000),
+    wordsPerTurn: room.words_per_turn || 1,
     selectedCategory: room.selected_category,
     selectedSubcategory: room.selected_subcategory,
     categoryOptions,
@@ -659,6 +668,7 @@ function getPublicRoomsList() {
       voteDurationSeconds: Math.round((room.vote_duration_ms || DEFAULT_VOTE_DURATION_MS) / 1000),
       undercoverCount: room.public_undercover_count || 1,
       mrwhiteCount: room.public_mrwhite_count || 0,
+      wordsPerTurn: room.words_per_turn || 1,
     };
   }).filter(Boolean);
 }
@@ -717,7 +727,6 @@ function pushSystemMessage(roomCode, text) {
 function roundHasAtLeastOnePlayerMessage(roomCode) {
   const room = getRoom(roomCode);
   if (!room) return false;
-
   const messages = safeJsonParse(room.messages, []);
   return messages.some((msg) => msg.round === room.round && msg.playerId);
 }
@@ -852,6 +861,7 @@ function assignRoles(roomCode, composition, settings = {}) {
     vote_duration_ms: normalizedSettings.voteDurationMs,
     selected_category: normalizedSettings.category,
     selected_subcategory: normalizedSettings.subcategory,
+    words_per_turn: normalizedSettings.wordsPerTurn || 1,
     game_over: 0,
     winner: null
   });
@@ -1027,14 +1037,17 @@ function handleTurnTimeout(roomCode) {
   if (!currentSpeakerId) return;
 
   const currentPlayer = db.prepare("SELECT * FROM players WHERE id = ?").get(currentSpeakerId);
-
   const messages = safeJsonParse(room.messages, []);
-  const alreadySentThisTurn = messages.some(
-    (msg) => msg.round === room.round && msg.playerId === currentSpeakerId
-  );
+  const wordsPerTurn = room.words_per_turn || 1;
 
-  if (currentPlayer && !alreadySentThisTurn) {
+  const wordsSentThisTurn = messages.filter(
+    (msg) => msg.round === room.round && msg.playerId === currentSpeakerId && msg.turnIndex === room.current_speaker_index
+  ).length;
+
+  if (currentPlayer && wordsSentThisTurn === 0) {
     pushSystemMessage(roomCode, `${currentPlayer.name} n'a rien envoyé.`);
+  } else if (currentPlayer && wordsSentThisTurn < wordsPerTurn) {
+    pushSystemMessage(roomCode, `${currentPlayer.name} n'a envoyé que ${wordsSentThisTurn}/${wordsPerTurn} mot(s).`);
   }
 
   emitRoom(roomCode);
@@ -1250,7 +1263,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("createRoom", ({ name, isPublic = false, maxPlayers = 12, undercoverCount, mrwhiteCount, category, subcategory, turnDurationSeconds, voteDurationSeconds }, callback) => {
+  socket.on("createRoom", ({ name, isPublic = false, maxPlayers = 12, undercoverCount, mrwhiteCount, category, subcategory, turnDurationSeconds, voteDurationSeconds, wordsPerTurn = 1 }, callback) => {
     // Rate limit : max 5 créations de room par minute par socket
     if (!checkSocketRate(socket.id, "createRoom", 5)) {
       return callback({ ok: false, error: "Trop de requêtes, attends un moment" });
@@ -1273,6 +1286,7 @@ io.on("connection", (socket) => {
         subcategory: subcategory || null,
         turnDurationSeconds: turnDurationSeconds || 30,
         voteDurationSeconds: voteDurationSeconds || 30,
+        wordsPerTurn: wordsPerTurn || 1,
       });
 
       db.prepare(`
@@ -1281,8 +1295,8 @@ io.on("connection", (socket) => {
           speaking_order, votes, messages, turn_ends_at, vote_ends_at,
           turn_duration_ms, vote_duration_ms, selected_category, selected_subcategory,
           game_over, winner, is_public, max_players, public_undercover_count, public_mrwhite_count,
-          created_at, updated_at
-        ) VALUES (?, ?, 0, 'lobby', 0, 0, '[]', '{}', '[]', NULL, NULL, ?, ?, ?, ?, 0, NULL, ?, ?, ?, ?, ?, ?)
+          words_per_turn, created_at, updated_at
+        ) VALUES (?, ?, 0, 'lobby', 0, 0, '[]', '{}', '[]', NULL, NULL, ?, ?, ?, ?, 0, NULL, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         code, playerId,
         settings.turnDurationMs, settings.voteDurationMs,
@@ -1290,6 +1304,7 @@ io.on("connection", (socket) => {
         isPublic ? 1 : 0, clampedMax,
         undercoverCount ? parseInt(undercoverCount) : null,
         mrwhiteCount ? parseInt(mrwhiteCount) : null,
+        settings.wordsPerTurn,
         createdAt, createdAt
       );
 
@@ -1570,12 +1585,15 @@ io.on("connection", (socket) => {
     }
 
     const messages = safeJsonParse(room.messages, []);
-    const alreadySentThisTurn = messages.some(
-      (msg) => msg.round === room.round && msg.playerId === player.id
-    );
+    const wordsPerTurn = room.words_per_turn || 1;
 
-    if (alreadySentThisTurn) {
-      return callback({ ok: false, error: "Tu as déjà envoyé ton indice pour ce tour" });
+    // Compter combien de mots ce joueur a déjà envoyé ce tour
+    const wordsSentThisTurn = messages.filter(
+      (msg) => msg.round === room.round && msg.playerId === player.id && msg.turnIndex === room.current_speaker_index
+    ).length;
+
+    if (wordsSentThisTurn >= wordsPerTurn) {
+      return callback({ ok: false, error: `Tu as déjà envoyé tes ${wordsPerTurn} mot(s) pour ce tour` });
     }
 
     messages.push({
@@ -1584,6 +1602,7 @@ io.on("connection", (socket) => {
       playerName: player.name,
       text: cleanText,
       round: room.round,
+      turnIndex: room.current_speaker_index,
       createdAt: nowIso()
     });
 
@@ -1591,7 +1610,10 @@ io.on("connection", (socket) => {
     emitRoom(room.code);
     callback({ ok: true });
 
-    advanceTurn(room.code);
+    // Avancer le tour seulement si le joueur a envoyé tous ses mots
+    if (wordsSentThisTurn + 1 >= wordsPerTurn) {
+      advanceTurn(room.code);
+    }
   });
 
   socket.on("votePlayer", ({ targetId }, callback) => {

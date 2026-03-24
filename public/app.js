@@ -1169,6 +1169,7 @@ window.renderRoom=renderRoom;
 // ─── ROOMS PUBLIQUES ────────────────────────────────────
 let currentPublicRooms = [];
 let publicCategoryFilter = "";
+let publicSubcategoryFilter = "";
 let publicMaxPlayersFilter = "";
 
 function initLandingModeTabs() {
@@ -1194,18 +1195,46 @@ function initLandingModeTabs() {
 
 function initPublicCategoryFilter() {
   const sel = document.getElementById("publicCategoryFilter");
-  if (!sel || sel.options.length > 1) return;
-  sel.innerHTML = '<option value="">Toutes catégories</option>';
+  const subSel = document.getElementById("publicSubcategoryFilter");
+  const subBlock = document.getElementById("publicSubcategoryFilterBlock");
+  if (!sel) return;
+
+  // Peupler catégories
   const opts = Array.isArray(window._categoryOptions) ? window._categoryOptions : [];
-  opts.forEach(cat => {
+  sel.innerHTML = '<option value="">Toutes</option>';
+  opts.filter(o => o.name !== "Tout").forEach(cat => {
     const o = document.createElement("option");
     o.value = cat.name; o.textContent = cat.name;
     sel.appendChild(o);
   });
+
   sel.addEventListener("change", () => {
     publicCategoryFilter = sel.value;
+    // Peupler sous-catégories
+    if (subSel && subBlock) {
+      const cat = opts.find(c => c.name === sel.value);
+      if (!sel.value || !cat?.subcategories?.length) {
+        subBlock.style.display = "none";
+        subSel.innerHTML = '<option value="">Toutes</option>';
+        publicSubcategoryFilter = "";
+      } else {
+        subBlock.style.display = "";
+        subSel.innerHTML = '<option value="">Toutes</option>';
+        cat.subcategories.forEach(s => {
+          const o = document.createElement("option"); o.value = s; o.textContent = s;
+          subSel.appendChild(o);
+        });
+      }
+    }
     renderPublicRooms();
   });
+
+  if (subSel) {
+    subSel.addEventListener("change", () => {
+      publicSubcategoryFilter = subSel.value;
+      renderPublicRooms();
+    });
+  }
 
   const maxSel = document.getElementById("publicMaxPlayersFilter");
   if (maxSel) {
@@ -1214,6 +1243,9 @@ function initPublicCategoryFilter() {
       renderPublicRooms();
     });
   }
+
+  // Masquer sous-catégorie filtre par défaut
+  if (subBlock) subBlock.style.display = "none";
 }
 
 function fetchPublicRooms() {
@@ -1231,6 +1263,7 @@ function renderPublicRooms() {
 
   let rooms = currentPublicRooms;
   if (publicCategoryFilter) rooms = rooms.filter(r => r.selectedCategory === publicCategoryFilter);
+  if (publicSubcategoryFilter) rooms = rooms.filter(r => r.selectedSubcategory === publicSubcategoryFilter);
   if (publicMaxPlayersFilter) rooms = rooms.filter(r => r.maxPlayers === parseInt(publicMaxPlayersFilter));
 
   list.innerHTML = "";
@@ -1246,7 +1279,7 @@ function renderPublicRooms() {
     const civilCount = room.maxPlayers - (room.undercoverCount || 1) - (room.mrwhiteCount || 0);
     card.innerHTML = `
       <div class="public-room-info">
-        <div class="public-room-title">${room.selectedCategory || "Toutes catégories"}${room.selectedSubcategory ? " · " + room.selectedSubcategory : ""}</div>
+        <div class="public-room-title">${room.selectedCategory || "Toutes catégories"}${room.selectedSubcategory && room.selectedSubcategory !== "Général" ? " · " + room.selectedSubcategory : ""}</div>
         <div class="public-room-meta">
           <span class="public-room-players ${isFull ? "full" : "available"}">
             ${room.playerCount}/${room.maxPlayers} joueurs
@@ -1294,9 +1327,17 @@ function initPublicCreateConfig() {
   function updateSummary() {
     if (!summary) return;
     const max = parseInt(maxPlayersSel?.value || "6");
+    if (max <= 3) {
+      summary.textContent = "2 Civil(s) · 1 Intrus · 0 Mystère (composition fixe à 3 joueurs)";
+      summary.style.color = "#fdba74";
+      if (undercoverInp) { undercoverInp.value = "1"; undercoverInp.disabled = true; }
+      if (mrwhiteInp) { mrwhiteInp.value = "0"; mrwhiteInp.disabled = true; }
+      return;
+    }
+    if (undercoverInp) undercoverInp.disabled = false;
+    if (mrwhiteInp) mrwhiteInp.disabled = false;
     let u = parseInt(undercoverInp?.value || "1");
     let m = parseInt(mrwhiteInp?.value || "0");
-    // Clamp
     u = Math.max(1, Math.min(u, max - m - 1));
     const c = max - u - m;
     if (c < 1) {
@@ -1396,6 +1437,11 @@ function initPublicCreateConfig() {
     });
   }
 }
+
+// Charger les categoryOptions au démarrage
+socket.emit("getCategoryOptions", {}, (res) => {
+  if (res?.ok) window._categoryOptions = res.options;
+});
 
 // Socket : mise à jour temps réel des rooms publiques
 socket.on("publicRoomsUpdated", (rooms) => {

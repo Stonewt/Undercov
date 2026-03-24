@@ -1333,8 +1333,8 @@ button:disabled { opacity: 0.42; cursor: not-allowed; box-shadow: none; }
 /* ===== FILTRE ROOMS PUBLIQUES ===== */
 .public-filter-bar {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
   margin-bottom: 12px;
 }
 

@@ -260,13 +260,18 @@ function buildWordCatalog(raw) {
 const wordCatalog = buildWordCatalog(rawWordData);
 
 const ALL_CATEGORIES_KEY = "Tout";
+const GENERAL_SUBCATEGORY_KEY = "Général";
 
 function getCategoryOptions() {
   const options = [
     { name: ALL_CATEGORIES_KEY, subcategories: [] }
   ];
   for (const [name, subcats] of Object.entries(wordCatalog)) {
-    options.push({ name, subcategories: Object.keys(subcats) });
+    // Ajouter "Général" en première position (pioche dans toutes les sous-catégories)
+    options.push({
+      name,
+      subcategories: [GENERAL_SUBCATEGORY_KEY, ...Object.keys(subcats)]
+    });
   }
   return options;
 }
@@ -282,7 +287,6 @@ function getAllWordPairs() {
 }
 
 function normalizeCategorySelection(category, subcategory) {
-  // Option "Tout" : pas de sous-catégorie
   if (category === ALL_CATEGORIES_KEY) {
     return { category: ALL_CATEGORIES_KEY, subcategory: null };
   }
@@ -301,12 +305,17 @@ function normalizeCategorySelection(category, subcategory) {
     return { category: ALL_CATEGORIES_KEY, subcategory: null };
   }
 
+  // "Général" = pas de sous-catégorie spécifique
+  if (!subcategory || subcategory === GENERAL_SUBCATEGORY_KEY) {
+    return { category: selectedCategory, subcategory: GENERAL_SUBCATEGORY_KEY };
+  }
+
   const subcategories = Object.keys(wordCatalog[selectedCategory] || {});
   const selectedSubcategory =
     typeof subcategory === "string" &&
     wordCatalog[selectedCategory]?.[subcategory]
       ? subcategory
-      : subcategories[0] || null;
+      : GENERAL_SUBCATEGORY_KEY;
 
   return { category: selectedCategory, subcategory: selectedSubcategory };
 }
@@ -314,6 +323,16 @@ function normalizeCategorySelection(category, subcategory) {
 function getWordPairsForSelection(category, subcategory) {
   if (category === ALL_CATEGORIES_KEY) {
     return getAllWordPairs();
+  }
+  // "Général" = toutes les sous-catégories de la catégorie
+  if (!subcategory || subcategory === GENERAL_SUBCATEGORY_KEY) {
+    const subcats = wordCatalog[category];
+    if (!subcats) return getAllWordPairs();
+    const all = [];
+    for (const pairs of Object.values(subcats)) {
+      all.push(...pairs.filter(isValidWordPair));
+    }
+    return all;
   }
   const selection = normalizeCategorySelection(category, subcategory);
   if (!selection.category || !selection.subcategory) return getAllWordPairs();
@@ -1479,6 +1498,10 @@ io.on("connection", (socket) => {
   });
 
   // ─── ROOMS PUBLIQUES ─────────────────────────────────────
+  socket.on("getCategoryOptions", (_, callback) => {
+    callback?.({ ok: true, options: getCategoryOptions() });
+  });
+
   socket.on("getPublicRooms", (_, callback) => {
     callback?.({ ok: true, rooms: getPublicRoomsList() });
   });
@@ -1497,6 +1520,7 @@ io.on("connection", (socket) => {
     try {
       removeSocketFromPreviousRoom(socket);
       const cleanName = sanitizeName(name);
+      
       const players = getPlayersByRoom(roomCode);
       if (players.filter(p => p.connected).length >= (room.max_players || 12)) {
         return callback?.({ ok: false, error: "La room est pleine" });

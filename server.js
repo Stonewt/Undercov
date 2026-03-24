@@ -1626,7 +1626,7 @@ io.on("connection", (socket) => {
     if (!player) return;
     handlePlayerDeparture(player.id, player.room_code);
   });
-);
+});
 
 // ─── DÉMARRAGE ───────────────────────────────────────────
 app.get("/mentions-legales", (req, res) => res.sendFile(path.join(__dirname, "public", "mentions-legales.html")));

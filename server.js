@@ -1491,7 +1491,9 @@ io.on("connection", (socket) => {
     } catch {
       callback?.({ ok: false, error: "Impossible de rejoindre" });
     }
-  }); ({ text }, callback) => {
+  });
+
+  socket.on("sendTurnMessage", ({ text }, callback) => {
     // Rate limit : max 10 messages par minute par socket
     if (!checkSocketRate(socket.id, "sendTurnMessage", 10)) {
       return callback({ ok: false, error: "Trop de requêtes, attends un moment" });

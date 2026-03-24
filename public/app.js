@@ -347,6 +347,15 @@ function renderMobConfig(area) {
   if (!currentRoom) { area.appendChild(box); return; }
   const room = currentRoom;
   const n = room.players.length;
+  const isPublic = Boolean(room.isPublic);
+
+  // Si room publique : afficher config en lecture seule
+  if (isPublic) {
+    const lockMsg = document.createElement("p");
+    lockMsg.style.cssText = "font-size:13px;color:#fdba74;opacity:.8;margin-bottom:12px;padding:10px;background:rgba(224,122,32,0.10);border-radius:10px;border:1px solid rgba(224,122,32,0.25);";
+    lockMsg.textContent = "🔒 Configuration verrouillée — room publique";
+    box.appendChild(lockMsg);
+  }
 
   box.appendChild(mkField("Intrus", () => {
     const inp = document.createElement("input");
@@ -356,7 +365,7 @@ function renderMobConfig(area) {
     inp.addEventListener("input", () => {
       if (undercoverCountInput) { undercoverCountInput.value = inp.value; renderComposition(room); }
     });
-    if (n<=3) inp.disabled=true;
+    if (n<=3 || isPublic) inp.disabled=true;
     return inp;
   }));
 
@@ -368,7 +377,7 @@ function renderMobConfig(area) {
     inp.addEventListener("input", () => {
       if (mrWhiteCountInput) { mrWhiteCountInput.value = inp.value; renderComposition(room); }
     });
-    if (n<=3) inp.disabled=true;
+    if (n<=3 || isPublic) inp.disabled=true;
     return inp;
   }));
 
@@ -383,6 +392,7 @@ function renderMobConfig(area) {
       if (turnDurationInput) { turnDurationInput.value=inp.value; renderComposition(room); }
       inp.previousElementSibling && (inp.previousElementSibling.textContent = `Durée du tour : ${inp.value} s`);
     });
+    if (isPublic) inp.disabled=true;
     return inp;
   }));
 
@@ -394,6 +404,7 @@ function renderMobConfig(area) {
     inp.addEventListener("input", () => {
       if (voteDurationInput) { voteDurationInput.value=inp.value; renderComposition(room); }
     });
+    if (isPublic) inp.disabled=true;
     return inp;
   }));
 
@@ -406,10 +417,14 @@ function renderMobConfig(area) {
         if (cat.name===(categorySelect?.value||room.selectedCategory)) o.selected=true;
         sel.appendChild(o);
       });
-      sel.addEventListener("change", () => {
-        if (categorySelect) { categorySelect.value=sel.value; populateSubcategorySelect(room, sel.value); renderComposition(room); }
-        buildMobileTabs(room);
-      });
+      if (!isPublic) {
+        sel.addEventListener("change", () => {
+          if (categorySelect) { categorySelect.value=sel.value; populateSubcategorySelect(room, sel.value); renderComposition(room); }
+          buildMobileTabs(room);
+        });
+      } else {
+        sel.disabled=true;
+      }
       return sel;
     }));
 
@@ -424,9 +439,13 @@ function renderMobConfig(area) {
           if (name===(subcategorySelect?.value||room.selectedSubcategory)) o.selected=true;
           sel.appendChild(o);
         });
-        sel.addEventListener("change", () => {
-          if (subcategorySelect) { subcategorySelect.value=sel.value; renderComposition(room); }
-        });
+        if (!isPublic) {
+          sel.addEventListener("change", () => {
+            if (subcategorySelect) { subcategorySelect.value=sel.value; renderComposition(room); }
+          });
+        } else {
+          sel.disabled=true;
+        }
         return sel;
       }));
     }
@@ -1067,11 +1086,40 @@ function renderComposition(room) {
   if(!(!room.started&&!room.gameOver&&isHost)) { compositionCard.classList.add("hidden"); return; }
   compositionCard.classList.remove("hidden");
   const n=room.players.length;
+  const isPublic=Boolean(room.isPublic);
+
   if(turnDurationInput!==document.activeElement) turnDurationInput.value=String(clampSeconds(turnDurationInput.value,room.turnDurationSeconds||30));
   if(voteDurationInput!==document.activeElement) voteDurationInput.value=String(clampSeconds(voteDurationInput.value,room.voteDurationSeconds||30));
   populateCategorySelect(room);
-  if(n<=3) { undercoverCountInput.disabled=true; mrWhiteCountInput.disabled=true; undercoverCountInput.value="1"; mrWhiteCountInput.value="0"; compositionHelp.textContent="À 3 joueurs : composition fixe."; }
-  else { undercoverCountInput.disabled=false; mrWhiteCountInput.disabled=false; undercoverCountInput.min="1"; undercoverCountInput.max=String(n-1); mrWhiteCountInput.min="0"; mrWhiteCountInput.max="1"; compositionHelp.textContent="Choisissez la composition, les durées et la catégorie."; }
+
+  if(isPublic) {
+    // Room publique : tout est verrouillé, config non modifiable
+    undercoverCountInput.disabled=true;
+    mrWhiteCountInput.disabled=true;
+    turnDurationInput.disabled=true;
+    voteDurationInput.disabled=true;
+    categorySelect.disabled=true;
+    subcategorySelect.disabled=true;
+    compositionHelp.textContent="Configuration verrouillée — room publique.";
+    compositionCard.style.opacity="0.6";
+    compositionCard.style.pointerEvents="none";
+  } else if(n<=3) {
+    undercoverCountInput.disabled=true; mrWhiteCountInput.disabled=true;
+    undercoverCountInput.value="1"; mrWhiteCountInput.value="0";
+    turnDurationInput.disabled=false; voteDurationInput.disabled=false;
+    categorySelect.disabled=false; subcategorySelect.disabled=false;
+    compositionHelp.textContent="À 3 joueurs : composition fixe.";
+    compositionCard.style.opacity=""; compositionCard.style.pointerEvents="";
+  } else {
+    undercoverCountInput.disabled=false; mrWhiteCountInput.disabled=false;
+    undercoverCountInput.min="1"; undercoverCountInput.max=String(n-1);
+    mrWhiteCountInput.min="0"; mrWhiteCountInput.max="1";
+    turnDurationInput.disabled=false; voteDurationInput.disabled=false;
+    categorySelect.disabled=false; subcategorySelect.disabled=false;
+    compositionHelp.textContent="Choisissez la composition, les durées et la catégorie.";
+    compositionCard.style.opacity=""; compositionCard.style.pointerEvents="";
+  }
+
   const vals=clampCompositionValues(room); const sets=getSelectedSettings(room);
   compositionSummary.textContent=`${vals.civilCount} Civil(s) • ${vals.undercoverCount} Intrus${vals.mrwhiteCount?" • 1 Le Mystère":""} • Tours ${sets.turnDurationSeconds}s • Vote ${sets.voteDurationSeconds}s`;
   renderRoleDolls(room);

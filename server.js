@@ -1520,7 +1520,6 @@ io.on("connection", (socket) => {
     try {
       removeSocketFromPreviousRoom(socket);
       const cleanName = sanitizeName(name);
-      
       const players = getPlayersByRoom(roomCode);
       if (players.filter(p => p.connected).length >= (room.max_players || 12)) {
         return callback?.({ ok: false, error: "La room est pleine" });

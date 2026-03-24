@@ -20,18 +20,16 @@
   <meta property="og:image" content="https://www.intrusonline.fr/favicon.svg" />
 
   <!-- AdSense -->
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9008802243897755"
-    crossorigin="anonymous"></script>
   <meta name="google-adsense-account" content="ca-pub-9008802243897755">
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9008802243897755" crossorigin="anonymous"></script>
 
   <!-- Google Analytics -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-0H6Q8W5XTM"></script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
-    gtag('config', 'G-0H6Q8W5XTM');
+    gtag('config', 'G-XXXXXXXXXX');
   </script>
 
   <!-- Favicon -->
@@ -286,33 +284,58 @@
 
                   <!-- Config room publique (masquée par défaut) -->
                   <div id="publicCreateConfig" style="display:none;" class="public-create-config">
+
                     <div class="form-block">
                       <label for="publicMaxPlayers">Nombre de joueurs max</label>
                       <select id="publicMaxPlayers">
+                        <option value="3">3 joueurs</option>
                         <option value="4">4 joueurs</option>
                         <option value="5">5 joueurs</option>
                         <option value="6" selected>6 joueurs</option>
+                        <option value="7">7 joueurs</option>
                         <option value="8">8 joueurs</option>
+                        <option value="9">9 joueurs</option>
                         <option value="10">10 joueurs</option>
+                        <option value="11">11 joueurs</option>
                         <option value="12">12 joueurs</option>
                       </select>
                     </div>
+
+                    <div class="form-block">
+                      <label for="publicUndercoverCount">Intrus</label>
+                      <input id="publicUndercoverCount" type="number" min="1" max="5" step="1" value="1" />
+                    </div>
+
+                    <div class="form-block">
+                      <label for="publicMrWhiteCount">Le Mystère</label>
+                      <select id="publicMrWhiteCount">
+                        <option value="0" selected>0</option>
+                        <option value="1">1</option>
+                      </select>
+                    </div>
+
                     <div class="form-block">
                       <label for="publicCategorySelect">Catégorie</label>
                       <select id="publicCategorySelect"></select>
                     </div>
+
                     <div class="form-block" id="publicSubcategoryBlock">
                       <label for="publicSubcategorySelect">Sous-catégorie</label>
                       <select id="publicSubcategorySelect"></select>
                     </div>
+
                     <div class="form-block">
                       <label for="publicTurnDuration">Durée du tour : <span id="publicTurnVal">30</span> s</label>
                       <input id="publicTurnDuration" type="range" min="15" max="45" step="1" value="30" class="duration-slider"/>
                     </div>
+
                     <div class="form-block">
                       <label for="publicVoteDuration">Durée du vote : <span id="publicVoteVal">30</span> s</label>
                       <input id="publicVoteDuration" type="range" min="15" max="45" step="1" value="30" class="duration-slider"/>
                     </div>
+
+                    <p id="publicConfigSummary" style="font-size:12px;color:#fdba74;font-weight:600;margin:4px 0 8px;"></p>
+
                     <button id="confirmPublicCreateBtn" class="big-btn" style="background:linear-gradient(180deg,#e07a20,#b85a10);box-shadow:0 4px 0 rgba(0,0,0,.26),0 6px 14px rgba(224,122,32,.28);">Créer la room publique</button>
                   </div>
                 </div>

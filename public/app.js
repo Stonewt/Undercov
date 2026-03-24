@@ -1243,6 +1243,7 @@ function renderPublicRooms() {
     const isFull = room.playerCount >= room.maxPlayers;
     const card = document.createElement("div");
     card.className = "public-room-card";
+    const civilCount = room.maxPlayers - (room.undercoverCount || 1) - (room.mrwhiteCount || 0);
     card.innerHTML = `
       <div class="public-room-info">
         <div class="public-room-title">${room.selectedCategory || "Toutes catégories"}${room.selectedSubcategory ? " · " + room.selectedSubcategory : ""}</div>
@@ -1250,8 +1251,8 @@ function renderPublicRooms() {
           <span class="public-room-players ${isFull ? "full" : "available"}">
             ${room.playerCount}/${room.maxPlayers} joueurs
           </span>
-          <span>Tour ${room.turnDurationSeconds}s</span>
-          <span>Vote ${room.voteDurationSeconds}s</span>
+          <span>${civilCount}C · ${room.undercoverCount || 1}I${room.mrwhiteCount ? " · 1M" : ""}</span>
+          <span>Tour ${room.turnDurationSeconds}s · Vote ${room.voteDurationSeconds}s</span>
         </div>
       </div>
       <button class="public-room-join-btn" ${isFull ? "disabled" : ""}>${isFull ? "Pleine" : "Rejoindre"}</button>
@@ -1283,11 +1284,33 @@ function initPublicCreateConfig() {
   const voteSlider = document.getElementById("publicVoteDuration");
   const turnVal = document.getElementById("publicTurnVal");
   const voteVal = document.getElementById("publicVoteVal");
+  const maxPlayersSel = document.getElementById("publicMaxPlayers");
+  const undercoverInp = document.getElementById("publicUndercoverCount");
+  const mrwhiteInp = document.getElementById("publicMrWhiteCount");
+  const summary = document.getElementById("publicConfigSummary");
 
   if (!createPublicBtn || !configPanel) return;
 
+  function updateSummary() {
+    if (!summary) return;
+    const max = parseInt(maxPlayersSel?.value || "6");
+    let u = parseInt(undercoverInp?.value || "1");
+    let m = parseInt(mrwhiteInp?.value || "0");
+    // Clamp
+    u = Math.max(1, Math.min(u, max - m - 1));
+    const c = max - u - m;
+    if (c < 1) {
+      summary.textContent = "⚠ Composition invalide — trop d'intrus ou de Mystère";
+      summary.style.color = "#ef4444";
+    } else {
+      summary.textContent = `${c} Civil(s) · ${u} Intrus · ${m ? "1 Le Mystère" : "0 Mystère"}`;
+      summary.style.color = "#fdba74";
+    }
+  }
+
   // Peupler la catégorie
-  if (catSel) {
+  function populatePublicCategories() {
+    if (!catSel) return;
     catSel.innerHTML = "";
     const opts = Array.isArray(window._categoryOptions) ? window._categoryOptions : [];
     opts.forEach(cat => {
@@ -1295,6 +1318,10 @@ function initPublicCreateConfig() {
       o.value = cat.name; o.textContent = cat.name;
       catSel.appendChild(o);
     });
+    catSel.dispatchEvent(new Event("change"));
+  }
+
+  if (catSel) {
     catSel.addEventListener("change", () => {
       const cat = window._categoryOptions?.find(c => c.name === catSel.value);
       if (subSel && subBlock) {
@@ -1310,23 +1337,38 @@ function initPublicCreateConfig() {
         }
       }
     });
-    catSel.dispatchEvent(new Event("change"));
   }
 
   if (turnSlider && turnVal) turnSlider.addEventListener("input", () => { turnVal.textContent = turnSlider.value; });
   if (voteSlider && voteVal) voteSlider.addEventListener("input", () => { voteVal.textContent = voteSlider.value; });
+  if (maxPlayersSel) maxPlayersSel.addEventListener("change", updateSummary);
+  if (undercoverInp) undercoverInp.addEventListener("input", updateSummary);
+  if (mrwhiteInp) mrwhiteInp.addEventListener("change", updateSummary);
 
   // Toggle config
   createPublicBtn.addEventListener("click", () => {
     const visible = configPanel.style.display !== "none";
     configPanel.style.display = visible ? "none" : "";
+    if (!visible) {
+      populatePublicCategories();
+      updateSummary();
+    }
   });
 
   if (confirmBtn) {
     confirmBtn.addEventListener("click", () => {
       const name = nameInput?.value.trim();
       if (!name) return setStatus("Entre un pseudo d'abord", true);
-      const maxPlayers = parseInt(document.getElementById("publicMaxPlayers")?.value || "6");
+
+      const maxPlayers = parseInt(maxPlayersSel?.value || "6");
+      let undercoverCount = parseInt(undercoverInp?.value || "1");
+      let mrwhiteCount = parseInt(mrwhiteInp?.value || "0");
+
+      // Valider composition
+      undercoverCount = Math.max(1, Math.min(undercoverCount, maxPlayers - mrwhiteCount - 1));
+      const civilCount = maxPlayers - undercoverCount - mrwhiteCount;
+      if (civilCount < 1) return setStatus("Composition invalide — trop d'intrus", true);
+
       const category = catSel?.value || "Tout";
       const subcategory = category === "Tout" ? null : (subSel?.value || null);
       const turnDurationSeconds = parseInt(turnSlider?.value || "30");
@@ -1335,16 +1377,20 @@ function initPublicCreateConfig() {
       socket.emit("createRoom", {
         name,
         isPublic: true,
-        maxPlayers
+        maxPlayers,
+        undercoverCount,
+        mrwhiteCount,
+        category,
+        subcategory,
+        turnDurationSeconds,
+        voteDurationSeconds
       }, (res) => {
         if (!res?.ok) return setStatus(res?.error || "Impossible de créer", true);
         saveSession(res.playerId, res.playerToken, res.room.code);
-        // Appliquer les settings après création
-        socket.emit("updateRoomSettings", {
-          category, subcategory, turnDurationSeconds, voteDurationSeconds
-        }, () => {});
         renderRoom(res.room);
-        updateResumeUI(true); playClickSound("success"); setStatus("Room publique créée !");
+        updateResumeUI(true);
+        playClickSound("success");
+        setStatus("Room publique créée !");
         configPanel.style.display = "none";
       });
     });

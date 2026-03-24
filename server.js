@@ -110,6 +110,12 @@ if (!columnExists("rooms", "is_public")) {
 if (!columnExists("rooms", "max_players")) {
   db.exec(`ALTER TABLE rooms ADD COLUMN max_players INTEGER NOT NULL DEFAULT 12`);
 }
+if (!columnExists("rooms", "public_undercover_count")) {
+  db.exec(`ALTER TABLE rooms ADD COLUMN public_undercover_count INTEGER`);
+}
+if (!columnExists("rooms", "public_mrwhite_count")) {
+  db.exec(`ALTER TABLE rooms ADD COLUMN public_mrwhite_count INTEGER`);
+}
 
 // ─── NETTOYAGE DES ROOMS MORTES ──────────────────────────
 function cleanupStaleRooms() {
@@ -565,6 +571,8 @@ function buildPublicRoom(code) {
     round: room.round,
     isPublic: Boolean(room.is_public),
     maxPlayers: room.max_players || 12,
+    publicUndercoverCount: room.public_undercover_count || null,
+    publicMrwhiteCount: room.public_mrwhite_count || null,
     currentSpeakerId,
     speakingOrder,
     turnEndsAt: room.turn_ends_at,
@@ -630,6 +638,8 @@ function getPublicRoomsList() {
       selectedSubcategory: room.selected_subcategory,
       turnDurationSeconds: Math.round((room.turn_duration_ms || DEFAULT_TURN_DURATION_MS) / 1000),
       voteDurationSeconds: Math.round((room.vote_duration_ms || DEFAULT_VOTE_DURATION_MS) / 1000),
+      undercoverCount: room.public_undercover_count || 1,
+      mrwhiteCount: room.public_mrwhite_count || 0,
     };
   }).filter(Boolean);
 }
@@ -1221,7 +1231,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("createRoom", ({ name, isPublic = false, maxPlayers = 12 }, callback) => {
+  socket.on("createRoom", ({ name, isPublic = false, maxPlayers = 12, undercoverCount, mrwhiteCount, category, subcategory, turnDurationSeconds, voteDurationSeconds }, callback) => {
     // Rate limit : max 5 créations de room par minute par socket
     if (!checkSocketRate(socket.id, "createRoom", 5)) {
       return callback({ ok: false, error: "Trop de requêtes, attends un moment" });
@@ -1236,21 +1246,31 @@ io.on("connection", (socket) => {
       const playerId = randomString(16);
       const playerToken = randomString(32);
       const createdAt = nowIso();
-      const defaultSettings = normalizeGameSettings({});
       const clampedMax = Math.max(3, Math.min(12, parseInt(maxPlayers) || 12));
+
+      // Appliquer les settings si fournis (room publique configurée)
+      const settings = normalizeGameSettings({
+        category: category || null,
+        subcategory: subcategory || null,
+        turnDurationSeconds: turnDurationSeconds || 30,
+        voteDurationSeconds: voteDurationSeconds || 30,
+      });
 
       db.prepare(`
         INSERT INTO rooms (
           code, host_player_id, started, phase, round, current_speaker_index,
           speaking_order, votes, messages, turn_ends_at, vote_ends_at,
           turn_duration_ms, vote_duration_ms, selected_category, selected_subcategory,
-          game_over, winner, is_public, max_players, created_at, updated_at
-        ) VALUES (?, ?, 0, 'lobby', 0, 0, '[]', '{}', '[]', NULL, NULL, ?, ?, ?, ?, 0, NULL, ?, ?, ?, ?)
+          game_over, winner, is_public, max_players, public_undercover_count, public_mrwhite_count,
+          created_at, updated_at
+        ) VALUES (?, ?, 0, 'lobby', 0, 0, '[]', '{}', '[]', NULL, NULL, ?, ?, ?, ?, 0, NULL, ?, ?, ?, ?, ?, ?)
       `).run(
         code, playerId,
-        defaultSettings.turnDurationMs, defaultSettings.voteDurationMs,
-        defaultSettings.category, defaultSettings.subcategory,
+        settings.turnDurationMs, settings.voteDurationMs,
+        settings.category, settings.subcategory,
         isPublic ? 1 : 0, clampedMax,
+        undercoverCount ? parseInt(undercoverCount) : null,
+        mrwhiteCount ? parseInt(mrwhiteCount) : null,
         createdAt, createdAt
       );
 
@@ -1370,7 +1390,16 @@ io.on("connection", (socket) => {
     const players = getPlayersByRoom(player.room_code);
     if (players.length < 3) return callback({ ok: false, error: "Il faut au moins 3 joueurs" });
 
-    const normalized = normalizeComposition(players.length, composition);
+    // Pour les rooms publiques, utiliser la composition pré-configurée si disponible
+    let finalComposition = composition;
+    if (room.is_public && room.public_undercover_count) {
+      finalComposition = {
+        undercoverCount: room.public_undercover_count,
+        mrwhiteCount: room.public_mrwhite_count || 0
+      };
+    }
+
+    const normalized = normalizeComposition(players.length, finalComposition);
     if (!normalized) return callback({ ok: false, error: "Composition invalide" });
 
     try {
@@ -1597,7 +1626,7 @@ io.on("connection", (socket) => {
     if (!player) return;
     handlePlayerDeparture(player.id, player.room_code);
   });
-});
+);
 
 // ─── DÉMARRAGE ───────────────────────────────────────────
 app.get("/mentions-legales", (req, res) => res.sendFile(path.join(__dirname, "public", "mentions-legales.html")));

@@ -104,6 +104,12 @@ if (!columnExists("rooms", "selected_category")) {
 if (!columnExists("rooms", "selected_subcategory")) {
   db.exec(`ALTER TABLE rooms ADD COLUMN selected_subcategory TEXT`);
 }
+if (!columnExists("rooms", "is_public")) {
+  db.exec(`ALTER TABLE rooms ADD COLUMN is_public INTEGER NOT NULL DEFAULT 0`);
+}
+if (!columnExists("rooms", "max_players")) {
+  db.exec(`ALTER TABLE rooms ADD COLUMN max_players INTEGER NOT NULL DEFAULT 12`);
+}
 
 // ─── NETTOYAGE DES ROOMS MORTES ──────────────────────────
 function cleanupStaleRooms() {
@@ -557,6 +563,8 @@ function buildPublicRoom(code) {
     started: Boolean(room.started),
     phase: room.phase,
     round: room.round,
+    isPublic: Boolean(room.is_public),
+    maxPlayers: room.max_players || 12,
     currentSpeakerId,
     speakingOrder,
     turnEndsAt: room.turn_ends_at,
@@ -598,6 +606,36 @@ function emitRoom(roomCode) {
   const publicRoom = buildPublicRoom(roomCode);
   if (!publicRoom) return;
   io.to(roomCode).emit("roomUpdated", publicRoom);
+  // Si la room est publique, on met à jour la liste pour tout le monde
+  if (publicRoom.isPublic) emitPublicRoomsList();
+}
+
+function getPublicRoomsList() {
+  const rooms = db.prepare(`
+    SELECT code FROM rooms
+    WHERE is_public = 1
+    AND started = 0
+    AND game_over = 0
+  `).all();
+
+  return rooms.map(r => {
+    const room = getRoom(r.code);
+    if (!room) return null;
+    const players = getPlayersByRoom(r.code);
+    return {
+      code: room.code,
+      playerCount: players.filter(p => p.connected).length,
+      maxPlayers: room.max_players || 12,
+      selectedCategory: room.selected_category,
+      selectedSubcategory: room.selected_subcategory,
+      turnDurationSeconds: Math.round((room.turn_duration_ms || DEFAULT_TURN_DURATION_MS) / 1000),
+      voteDurationSeconds: Math.round((room.vote_duration_ms || DEFAULT_VOTE_DURATION_MS) / 1000),
+    };
+  }).filter(Boolean);
+}
+
+function emitPublicRoomsList() {
+  io.emit("publicRoomsUpdated", getPublicRoomsList());
 }
 
 function clearTurnTimer(roomCode) {
@@ -1183,7 +1221,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("createRoom", ({ name }, callback) => {
+  socket.on("createRoom", ({ name, isPublic = false, maxPlayers = 12 }, callback) => {
     // Rate limit : max 5 créations de room par minute par socket
     if (!checkSocketRate(socket.id, "createRoom", 5)) {
       return callback({ ok: false, error: "Trop de requêtes, attends un moment" });
@@ -1199,18 +1237,20 @@ io.on("connection", (socket) => {
       const playerToken = randomString(32);
       const createdAt = nowIso();
       const defaultSettings = normalizeGameSettings({});
+      const clampedMax = Math.max(3, Math.min(12, parseInt(maxPlayers) || 12));
 
       db.prepare(`
         INSERT INTO rooms (
           code, host_player_id, started, phase, round, current_speaker_index,
           speaking_order, votes, messages, turn_ends_at, vote_ends_at,
           turn_duration_ms, vote_duration_ms, selected_category, selected_subcategory,
-          game_over, winner, created_at, updated_at
-        ) VALUES (?, ?, 0, 'lobby', 0, 0, '[]', '{}', '[]', NULL, NULL, ?, ?, ?, ?, 0, NULL, ?, ?)
+          game_over, winner, is_public, max_players, created_at, updated_at
+        ) VALUES (?, ?, 0, 'lobby', 0, 0, '[]', '{}', '[]', NULL, NULL, ?, ?, ?, ?, 0, NULL, ?, ?, ?, ?)
       `).run(
         code, playerId,
         defaultSettings.turnDurationMs, defaultSettings.voteDurationMs,
         defaultSettings.category, defaultSettings.subcategory,
+        isPublic ? 1 : 0, clampedMax,
         createdAt, createdAt
       );
 
@@ -1222,6 +1262,7 @@ io.on("connection", (socket) => {
       `).run(playerId, code, sanitizeName(name), playerToken, socket.id, createdAt, createdAt);
 
       socket.join(code);
+      if (isPublic) emitPublicRoomsList();
 
       callback({ ok: true, room: buildPublicRoom(code), playerToken, playerId });
     } catch {
@@ -1291,7 +1332,7 @@ io.on("connection", (socket) => {
       }
 
       const players = getPlayersByRoom(roomCode);
-      if (players.length >= 12) return callback({ ok: false, error: "La room est pleine" });
+      if (players.length >= (room.max_players || 12)) return callback({ ok: false, error: "La room est pleine" });
 
       const playerId = randomString(16);
       const newPlayerToken = randomString(32);
@@ -1408,7 +1449,49 @@ io.on("connection", (socket) => {
     callback?.({ ok: true });
   });
 
-  socket.on("sendTurnMessage", ({ text }, callback) => {
+  // ─── ROOMS PUBLIQUES ─────────────────────────────────────
+  socket.on("getPublicRooms", (_, callback) => {
+    callback?.({ ok: true, rooms: getPublicRoomsList() });
+  });
+
+  socket.on("joinPublicRoom", ({ code, name }, callback) => {
+    if (!checkSocketRate(socket.id, "joinPublicRoom", 10)) {
+      return callback?.({ ok: false, error: "Trop de requêtes" });
+    }
+    // Déléguer au joinRoom existant
+    const roomCode = String(code || "").toUpperCase().trim();
+    const room = getRoom(roomCode);
+    if (!room) return callback?.({ ok: false, error: "Room introuvable" });
+    if (!room.is_public) return callback?.({ ok: false, error: "Room non publique" });
+    if (room.started && !room.game_over) return callback?.({ ok: false, error: "La partie est déjà en cours" });
+
+    try {
+      removeSocketFromPreviousRoom(socket);
+      const cleanName = sanitizeName(name);
+      const players = getPlayersByRoom(roomCode);
+      if (players.filter(p => p.connected).length >= (room.max_players || 12)) {
+        return callback?.({ ok: false, error: "La room est pleine" });
+      }
+
+      const playerId = randomString(16);
+      const playerToken = randomString(32);
+      const createdAt = nowIso();
+
+      db.prepare(`
+        INSERT INTO players (
+          id, room_code, name, player_token, connected, eliminated,
+          role, word, socket_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, 1, 0, NULL, NULL, ?, ?, ?)
+      `).run(playerId, roomCode, cleanName, playerToken, socket.id, createdAt, createdAt);
+
+      socket.join(roomCode);
+      emitRoom(roomCode);
+
+      callback?.({ ok: true, room: buildPublicRoom(roomCode), playerToken, playerId });
+    } catch {
+      callback?.({ ok: false, error: "Impossible de rejoindre" });
+    }
+  }); ({ text }, callback) => {
     // Rate limit : max 10 messages par minute par socket
     if (!checkSocketRate(socket.id, "sendTurnMessage", 10)) {
       return callback({ ok: false, error: "Trop de requêtes, attends un moment" });
@@ -1518,6 +1601,7 @@ io.on("connection", (socket) => {
 app.get("/mentions-legales", (req, res) => res.sendFile(path.join(__dirname, "public", "mentions-legales.html")));
 app.get("/confidentialite", (req, res) => res.sendFile(path.join(__dirname, "public", "confidentialite.html")));
 app.get("/cgu", (req, res) => res.sendFile(path.join(__dirname, "public", "cgu.html")));
+
 server.listen(PORT, () => {
   console.log(`Serveur lancé sur http://localhost:${PORT}`);
   console.log(`CORS autorisé pour : ${ALLOWED_ORIGIN}`);

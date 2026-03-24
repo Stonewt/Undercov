@@ -360,7 +360,7 @@ function renderMobConfig(area) {
     return inp;
   }));
 
-  box.appendChild(mkField("Mr White (0 ou 1)", () => {
+  box.appendChild(mkField("Le Mystère (0 ou 1)", () => {
     const inp = document.createElement("input");
     inp.type="number"; inp.min="0"; inp.max="1"; inp.step="1";
     inp.value = mrWhiteCountInput?.value || "0";
@@ -490,7 +490,7 @@ function renderMobWord(area) {
   hint.style.cssText = "text-align:center;font-size:13px;opacity:.50;margin-top:16px;line-height:1.5;max-width:280px;";
   hint.textContent = hasWord
     ? "Donne des indices sans dire ce mot !"
-    : "Tu es Mr White. Observe et bluff !";
+    : "Tu es Le Mystère. Observe et bluff !";
   box.appendChild(hint);
 
   area.appendChild(box);
@@ -755,9 +755,9 @@ function appendDolls(parent, room, label) {
 
 
 function translateRole(role) {
-  if (role === "undercover") return "intrus";
-  if (role === "civil") return "civil";
-  if (role === "mrwhite") return "Mr White";
+  if (role === "undercover") return "Intrus";
+  if (role === "civil") return "Civil";
+  if (role === "mrwhite") return "Le Mystère";
   return role;
 }
 
@@ -1073,7 +1073,7 @@ function renderComposition(room) {
   if(n<=3) { undercoverCountInput.disabled=true; mrWhiteCountInput.disabled=true; undercoverCountInput.value="1"; mrWhiteCountInput.value="0"; compositionHelp.textContent="À 3 joueurs : composition fixe."; }
   else { undercoverCountInput.disabled=false; mrWhiteCountInput.disabled=false; undercoverCountInput.min="1"; undercoverCountInput.max=String(n-1); mrWhiteCountInput.min="0"; mrWhiteCountInput.max="1"; compositionHelp.textContent="Choisissez la composition, les durées et la catégorie."; }
   const vals=clampCompositionValues(room); const sets=getSelectedSettings(room);
-  compositionSummary.textContent=`${vals.civilCount} civil(s) • ${vals.undercoverCount} intrus${vals.mrwhiteCount?" • 1 Mr White":""} • Tours ${sets.turnDurationSeconds}s • Vote ${sets.voteDurationSeconds}s`;
+  compositionSummary.textContent=`${vals.civilCount} Civil(s) • ${vals.undercoverCount} Intrus${vals.mrwhiteCount?" • 1 Le Mystère":""} • Tours ${sets.turnDurationSeconds}s • Vote ${sets.voteDurationSeconds}s`;
   renderRoleDolls(room);
 }
 window.renderComposition=renderComposition;
@@ -1526,7 +1526,7 @@ socket.on("sessionResumed",({word})=>{
 socket.on("voteResult",(result)=>{
   resetVoteSelection();
   if(result.tie) setStatus("Égalité : personne n'est éliminé.",true);
-  else setStatus(`${result.eliminated.name} est éliminé (${translateRole(result.eliminated.role)}).`,true);
+  else setStatus(`${result.eliminated.name} est éliminé · ${translateRole(result.eliminated.role)}`,true);
   playClickSound("vote");
 });
 

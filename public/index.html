@@ -24,12 +24,12 @@
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9008802243897755" crossorigin="anonymous"></script>
 
   <!-- Google Analytics -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-0H6Q8W5XTM"></script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
-    gtag('config', 'G-0H6Q8W5XTM');
+    gtag('config', 'G-XXXXXXXXXX');
   </script>
 
   <!-- Favicon -->
@@ -378,7 +378,9 @@
                 <li>Les Civils gagnent si tous les Intrus sont éliminés.</li>
                 <li>Les Intrus gagnent s'ils deviennent au moins aussi nombreux que les Civils.</li>
                 <li>Le Mystère gagne s'il ne reste plus qu'un seul autre joueur vivant face à lui.</li>
+                <li>Si Le Mystère est éliminé, il peut deviner le mot des Civils pour gagner.</li>
                 <li>Si personne ne donne d'indice pendant toute une manche, la partie s'arrête.</li>
+                <li>À partir de 4 joueurs, l'hôte peut activer le <strong style="color:#fdba74;">Maître du Jeu</strong> : un joueur désigné choisit lui-même la paire de mots chaque manche et observe la partie sans jouer ni voter.</li>
               </ul>
             </section>
           </div>
@@ -442,6 +444,18 @@
                 <option value="3">3 mots</option>
                 <option value="4">4 mots</option>
               </select>
+            </div>
+            <div class="form-block">
+              <label for="gameMasterModeInput">Maître du Jeu (à partir de 4 joueurs)</label>
+              <select id="gameMasterModeInput">
+                <option value="none" selected>Désactivé</option>
+                <option value="random">Aléatoire chaque manche</option>
+                <option value="fixed">Toujours le même joueur</option>
+              </select>
+            </div>
+            <div class="form-block hidden" id="gameMasterFixedBlock">
+              <label for="gameMasterFixedSelect">Joueur désigné</label>
+              <select id="gameMasterFixedSelect"></select>
             </div>
             <div class="form-block">
               <label for="categorySelect">Catégorie</label>

@@ -51,6 +51,9 @@ const voteDurationInput    = document.getElementById("voteDurationInput");
 const categorySelect       = document.getElementById("categorySelect");
 const subcategorySelect    = document.getElementById("subcategorySelect");
 const wordsPerTurnInput    = document.getElementById("wordsPerTurnInput");
+const gameMasterModeInput  = document.getElementById("gameMasterModeInput");
+const gameMasterFixedSelect = document.getElementById("gameMasterFixedSelect");
+const gameMasterFixedBlock  = document.getElementById("gameMasterFixedBlock");
 const chatCard         = document.getElementById("chatCard");
 const messagesList     = document.getElementById("messagesList");
 const chatInput        = document.getElementById("chatInput");
@@ -884,6 +887,7 @@ function renderPlayers(room) {
     let label=player.name;
     if(player.id===myPlayerId) label+=" (toi)";
     if(player.id===room.hostPlayerId) label+=" 👑";
+    if(player.id===room.gameMasterId && room.phase==="waiting_words") label+=" 🎲 MJ";
     ns.textContent=label; li.appendChild(ns);
     const sub=[];
     if(player.id===room.currentSpeakerId&&room.phase==="speaking"&&!room.gameOver) sub.push("réfléchit");
@@ -1154,6 +1158,23 @@ function renderComposition(room) {
     compositionCard.style.opacity=""; compositionCard.style.pointerEvents="";
   }
 
+  // Sync gameMasterMode
+  if (gameMasterModeInput && !isPublic) {
+    gameMasterModeInput.value = room.gameMasterMode || "none";
+    const showFixed = gameMasterModeInput.value === "fixed";
+    if (gameMasterFixedBlock) gameMasterFixedBlock.classList.toggle("hidden", !showFixed);
+    if (showFixed && gameMasterFixedSelect) {
+      gameMasterFixedSelect.innerHTML = "";
+      room.players.forEach(p => {
+        const o = document.createElement("option");
+        o.value = p.id; o.textContent = p.name;
+        if (p.id === room.gameMasterId) o.selected = true;
+        gameMasterFixedSelect.appendChild(o);
+      });
+    }
+  }
+  if (isPublic && gameMasterModeInput) gameMasterModeInput.disabled = true;
+
   // Sync wordsPerTurn
   if(wordsPerTurnInput && !isPublic) wordsPerTurnInput.value=String(room.wordsPerTurn||1);
   if(isPublic && wordsPerTurnInput) { wordsPerTurnInput.value=String(room.wordsPerTurn||1); wordsPerTurnInput.disabled=true; }
@@ -1214,6 +1235,9 @@ function renderRoom(room) {
       speakerInfo.textContent=`Vote en cours (${room.voteCount}/${room.players.filter(p=>!p.eliminated).length})`;
     } else if(room.phase==="mrwhite_guess") {
       speakerInfo.textContent="Le Mystère tente de deviner le mot...";
+    } else if(room.phase==="waiting_words") {
+      const master = room.players.find(p=>p.id===room.gameMasterId);
+      speakerInfo.textContent=master ? `${master.name} choisit les mots de la manche...` : "En attente des mots...";
     } else {
       speakerInfo.textContent="";
     }
@@ -1672,6 +1696,17 @@ if(voteDurationInput)    voteDurationInput.addEventListener("input",()=>{ voteDu
 if(categorySelect)       categorySelect.addEventListener("change",()=>{ if(!currentRoom) return; populateSubcategorySelect(currentRoom,categorySelect.value); renderComposition(currentRoom); });
 if(subcategorySelect)    subcategorySelect.addEventListener("change",()=>{ if(currentRoom) renderComposition(currentRoom); });
 if(wordsPerTurnInput)    wordsPerTurnInput.addEventListener("change",()=>{ if(currentRoom) renderComposition(currentRoom); });
+if(gameMasterModeInput)  gameMasterModeInput.addEventListener("change",()=>{
+  if(!currentRoom) return;
+  const mode = gameMasterModeInput.value;
+  const showFixed = mode === "fixed";
+  if(gameMasterFixedBlock) gameMasterFixedBlock.classList.toggle("hidden", !showFixed);
+  socket.emit("updateGameMasterMode", { mode, fixedPlayerId: gameMasterFixedSelect?.value || null }, () => {});
+});
+if(gameMasterFixedSelect) gameMasterFixedSelect.addEventListener("change",()=>{
+  if(!currentRoom) return;
+  socket.emit("updateGameMasterMode", { mode: "fixed", fixedPlayerId: gameMasterFixedSelect.value }, () => {});
+});
 
 // ─── SOCKET EVENTS ───────────────────────────────────────
 socket.on("roomUpdated",(room)=>{
@@ -1717,6 +1752,69 @@ socket.on("gameStarted",({word})=>{
 socket.on("sessionResumed",({word})=>{
   secretCard.classList.remove("hidden");
   wordText.textContent=word||"Tu n'as pas de mot.";
+});
+
+// ─── MAÎTRE DU JEU ──────────────────────────────────────
+socket.on("gameMasterPrompt", ({ round }) => {
+  const existing = document.getElementById("gameMasterOverlay");
+  if (existing) existing.remove();
+
+  const overlay = document.createElement("div");
+  overlay.id = "gameMasterOverlay";
+  overlay.style.cssText = `
+    position:fixed;inset:0;z-index:9999;
+    background:rgba(5,9,20,0.93);
+    display:flex;align-items:center;justify-content:center;
+    padding:20px;box-sizing:border-box;
+  `;
+
+  const box = document.createElement("div");
+  box.style.cssText = `
+    background:#0d1530;border:1px solid rgba(224,122,32,0.4);
+    border-radius:20px;padding:32px 28px;max-width:440px;width:100%;
+    text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.5);
+  `;
+
+  box.innerHTML = `
+    <div style="font-size:36px;margin-bottom:12px;">👑</div>
+    <h2 style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:#fdba74;margin:0 0 8px;">Vous êtes le Maître du Jeu</h2>
+    <p style="font-size:14px;color:rgba(255,255,255,0.60);margin:0 0 22px;line-height:1.5;">Manche ${round} — Choisissez la paire de mots. Les Civils recevront le premier mot, les Intrus le second.</p>
+    <div class="form-block" style="margin-bottom:12px;text-align:left;">
+      <label style="display:block;font-size:13px;opacity:.75;margin-bottom:6px;">Mot des Civils</label>
+      <input id="gmCivilWord" maxlength="24" placeholder="Ex: Chat" autocomplete="off"
+        style="width:100%;background:rgba(255,255,255,0.92);color:#111;border:none;border-radius:12px;padding:12px 14px;font-size:16px;box-sizing:border-box;"/>
+    </div>
+    <div class="form-block" style="margin-bottom:20px;text-align:left;">
+      <label style="display:block;font-size:13px;opacity:.75;margin-bottom:6px;">Mot des Intrus</label>
+      <input id="gmIntrusWord" maxlength="24" placeholder="Ex: Chien" autocomplete="off"
+        style="width:100%;background:rgba(255,255,255,0.92);color:#111;border:none;border-radius:12px;padding:12px 14px;font-size:16px;box-sizing:border-box;"/>
+    </div>
+    <p id="gmError" style="font-size:13px;color:#ef4444;min-height:18px;margin:0 0 12px;"></p>
+    <button id="gmSubmitBtn" style="width:100%;background:linear-gradient(180deg,#e07a20,#b85a10);color:white;border:none;border-radius:14px;padding:14px;font-size:16px;font-weight:700;cursor:pointer;">
+      Lancer la manche
+    </button>
+  `;
+
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  const submit = () => {
+    const civil = box.querySelector("#gmCivilWord")?.value.trim();
+    const intrus = box.querySelector("#gmIntrusWord")?.value.trim();
+    const err = box.querySelector("#gmError");
+    if (!civil || !intrus) { if(err) err.textContent = "Les deux mots sont requis."; return; }
+    if (civil.toLowerCase() === intrus.toLowerCase()) { if(err) err.textContent = "Les deux mots doivent être différents."; return; }
+    socket.emit("submitGameMasterWords", { civilWord: civil, intrusWord: intrus }, (res) => {
+      if (!res?.ok) { if(err) err.textContent = res?.error || "Erreur"; return; }
+      overlay.remove();
+      playClickSound("success");
+      setStatus("Manche lancée !");
+    });
+  };
+
+  box.querySelector("#gmSubmitBtn")?.addEventListener("click", submit);
+  box.querySelector("#gmIntrusWord")?.addEventListener("keydown", e => { if(e.key==="Enter") submit(); });
+  setTimeout(() => box.querySelector("#gmCivilWord")?.focus(), 100);
 });
 
 socket.on("mysteryGuessPrompt", ({ message }) => {
@@ -1793,7 +1891,7 @@ socket.on("mysteryGuessPrompt", ({ message }) => {
   setTimeout(() => inp2?.focus(), 100);
 });
 
-socket.on("voteResult", (result) => {
+socket.on("voteResult",(result)=>{
   resetVoteSelection();
   if(result.tie) setStatus("Égalité : personne n'est éliminé.",true);
   else setStatus(`${result.eliminated.name} est éliminé · ${translateRole(result.eliminated.role)}`,true);

@@ -119,6 +119,15 @@ if (!columnExists("rooms", "public_mrwhite_count")) {
 if (!columnExists("rooms", "words_per_turn")) {
   db.exec(`ALTER TABLE rooms ADD COLUMN words_per_turn INTEGER NOT NULL DEFAULT 1`);
 }
+if (!columnExists("rooms", "game_master_mode")) {
+  db.exec(`ALTER TABLE rooms ADD COLUMN game_master_mode TEXT NOT NULL DEFAULT 'none'`);
+}
+if (!columnExists("rooms", "game_master_id")) {
+  db.exec(`ALTER TABLE rooms ADD COLUMN game_master_id TEXT`);
+}
+if (!columnExists("rooms", "pending_words")) {
+  db.exec(`ALTER TABLE rooms ADD COLUMN pending_words TEXT`);
+}
 
 // ─── NETTOYAGE DES ROOMS MORTES ──────────────────────────
 function cleanupStaleRooms() {
@@ -558,7 +567,7 @@ function updatePlayer(id, patch) {
 }
 
 function getAlivePlayers(roomCode) {
-  return getPlayersByRoom(roomCode).filter((p) => !p.eliminated);
+  return getPlayersByRoom(roomCode).filter((p) => !p.eliminated && p.role !== "gamemaster");
 }
 
 function buildSpeakingOrderFromAlive(roomCode) {
@@ -624,11 +633,9 @@ function buildPublicRoom(code) {
     turnDurationSeconds: Math.round((room.turn_duration_ms || DEFAULT_TURN_DURATION_MS) / 1000),
     voteDurationSeconds: Math.round((room.vote_duration_ms || DEFAULT_VOTE_DURATION_MS) / 1000),
     wordsPerTurn: room.words_per_turn || 1,
+    gameMasterMode: room.game_master_mode || "none",
+    gameMasterId: room.game_master_id || null,
     selectedCategory: room.selected_category,
-    selectedSubcategory: room.selected_subcategory,
-    categoryOptions,
-    roleComposition,
-    gameOver: Boolean(room.game_over),
     winner: room.winner,
     gameId: `${room.code}-${room.round}-${room.winner || "ongoing"}`,
     messages,
@@ -829,12 +836,72 @@ function assignRoles(roomCode, composition, settings = {}) {
   const room = getRoom(roomCode);
   if (!room) throw new Error("Room introuvable");
 
-  const players = shuffle(getPlayersByRoom(roomCode));
-  const normalized = normalizeComposition(players.length, composition);
+  const allPlayers = shuffle(getPlayersByRoom(roomCode));
+  const gameMasterMode = room.game_master_mode || "none";
 
+  // Désigner le MJ si activé
+  let gameMasterId = null;
+  let playersInGame = allPlayers;
+
+  if (gameMasterMode !== "none" && allPlayers.length >= 4) {
+    if (gameMasterMode === "fixed" && room.game_master_id) {
+      // Toujours le même joueur
+      gameMasterId = room.game_master_id;
+    } else {
+      // Aléatoire chaque manche
+      gameMasterId = allPlayers[Math.floor(Math.random() * allPlayers.length)].id;
+    }
+    // Exclure le MJ du jeu
+    playersInGame = allPlayers.filter(p => p.id !== gameMasterId);
+  }
+
+  const normalized = normalizeComposition(playersInGame.length, composition);
   if (!normalized) throw new Error("Composition invalide");
 
   const normalizedSettings = normalizeGameSettings(settings, room);
+
+  // Si MJ activé → on attend qu'il entre les mots (phase "waiting_words")
+  // Sinon on génère les mots automatiquement
+  let civilWord, undercoverWord;
+
+  if (gameMasterId) {
+    // Mettre la room en attente des mots du MJ
+    updateRoom(roomCode, {
+      started: 1,
+      phase: "waiting_words",
+      round: room.started ? room.round + 1 : 1,
+      current_speaker_index: 0,
+      speaking_order: JSON.stringify([]),
+      votes: JSON.stringify({}),
+      messages: JSON.stringify([]),
+      turn_ends_at: null,
+      vote_ends_at: null,
+      turn_duration_ms: normalizedSettings.turnDurationMs,
+      vote_duration_ms: normalizedSettings.voteDurationMs,
+      selected_category: normalizedSettings.category,
+      selected_subcategory: normalizedSettings.subcategory,
+      words_per_turn: normalizedSettings.wordsPerTurn || 1,
+      game_master_id: gameMasterId,
+      pending_words: JSON.stringify({ composition, settings }),
+      game_over: 0,
+      winner: null
+    });
+
+    // Notifier le MJ
+    const masterPlayer = db.prepare("SELECT * FROM players WHERE id = ?").get(gameMasterId);
+    if (masterPlayer?.socket_id) {
+      io.to(masterPlayer.socket_id).emit("gameMasterPrompt", {
+        playerId: gameMasterId,
+        round: room.started ? room.round + 1 : 1
+      });
+    }
+
+    // Reset rôles de tous les joueurs
+    allPlayers.forEach(p => updatePlayer(p.id, { eliminated: 0, role: null, word: null }));
+    return;
+  }
+
+  // Pas de MJ → générer les mots normalement
   const availablePairs = getWordPairsForSelection(
     normalizedSettings.category,
     normalizedSettings.subcategory
@@ -845,20 +912,25 @@ function assignRoles(roomCode, composition, settings = {}) {
   }
 
   const pair = availablePairs[Math.floor(Math.random() * availablePairs.length)];
-  const [civilWord, undercoverWord] = Math.random() < 0.5 ? pair : [pair[1], pair[0]];
+  [civilWord, undercoverWord] = Math.random() < 0.5 ? pair : [pair[1], pair[0]];
 
-  players.forEach((player, index) => {
+  _assignRolesWithWords(roomCode, playersInGame, gameMasterId, normalized, normalizedSettings, civilWord, undercoverWord, room.started ? room.round + 1 : 1, room.started ? 0 : 0);
+}
+
+function _assignRolesWithWords(roomCode, playersInGame, gameMasterId, normalized, normalizedSettings, civilWord, undercoverWord, round, currentSpeakerIndex) {
+  const allPlayers = getPlayersByRoom(roomCode);
+
+  // Assigner rôle MJ
+  if (gameMasterId) {
+    updatePlayer(gameMasterId, { eliminated: 0, role: "gamemaster", word: null });
+  }
+
+  // Assigner rôles aux joueurs actifs
+  playersInGame.forEach((player, index) => {
     let role = "civil";
     let word = civilWord;
-
-    if (index < normalized.undercoverCount) {
-      role = "undercover";
-      word = undercoverWord;
-    } else if (index < normalized.undercoverCount + normalized.mrwhiteCount) {
-      role = "mrwhite";
-      word = null;
-    }
-
+    if (index < normalized.undercoverCount) { role = "undercover"; word = undercoverWord; }
+    else if (index < normalized.undercoverCount + normalized.mrwhiteCount) { role = "mrwhite"; word = null; }
     updatePlayer(player.id, { eliminated: 0, role, word });
   });
 
@@ -867,31 +939,86 @@ function assignRoles(roomCode, composition, settings = {}) {
   updateRoom(roomCode, {
     started: 1,
     phase: "speaking",
-    round: 1,
-    current_speaker_index: 0,
+    round,
+    current_speaker_index: currentSpeakerIndex,
     speaking_order: JSON.stringify(speakingOrder),
     votes: JSON.stringify({}),
     messages: JSON.stringify([]),
     turn_ends_at: null,
     vote_ends_at: null,
-    turn_duration_ms: normalizedSettings.turnDurationMs,
-    vote_duration_ms: normalizedSettings.voteDurationMs,
-    selected_category: normalizedSettings.category,
-    selected_subcategory: normalizedSettings.subcategory,
-    words_per_turn: normalizedSettings.wordsPerTurn || 1,
+    pending_words: null,
     game_over: 0,
     winner: null
   });
 
   scheduleTurnTimer(roomCode);
+
+  // Envoyer les mots secrets à chaque joueur
+  const updated = getPlayersByRoom(roomCode);
+  updated.forEach(p => {
+    if (p.socket_id && p.role !== "gamemaster") {
+      io.to(p.socket_id).emit("gameStarted", { word: p.word });
+    }
+  });
 }
 
 function startNewRound(roomCode) {
   const room = getRoom(roomCode);
   if (!room) return;
 
-  const speakingOrder = buildSpeakingOrderFromAlive(roomCode);
+  const gameMasterMode = room.game_master_mode || "none";
+  const allPlayers = getPlayersByRoom(roomCode);
 
+  if (gameMasterMode !== "none" && allPlayers.length >= 4) {
+    // Désigner nouveau MJ si mode aléatoire
+    let newMasterId = room.game_master_id;
+    if (gameMasterMode === "random") {
+      const eligible = allPlayers.filter(p => !p.eliminated);
+      newMasterId = eligible[Math.floor(Math.random() * eligible.length)]?.id || newMasterId;
+    }
+
+    const pendingStr = room.pending_words;
+    const pending = pendingStr ? safeJsonParse(pendingStr, {}) : {};
+    const playersInGame = allPlayers.filter(p => p.id !== newMasterId && !p.eliminated);
+    const normalized = normalizeComposition(playersInGame.length, pending.composition || {});
+    const normalizedSettings = normalizeGameSettings(pending.settings || {}, room);
+
+    if (!normalized) {
+      // Fallback sans MJ
+      const speakingOrder = buildSpeakingOrderFromAlive(roomCode);
+      updateRoom(roomCode, { phase: "speaking", round: room.round + 1, current_speaker_index: 0, speaking_order: JSON.stringify(speakingOrder), votes: JSON.stringify({}), messages: JSON.stringify([]), turn_ends_at: null, vote_ends_at: null });
+      scheduleTurnTimer(roomCode);
+      return;
+    }
+
+    updateRoom(roomCode, {
+      phase: "waiting_words",
+      round: room.round + 1,
+      current_speaker_index: 0,
+      speaking_order: JSON.stringify([]),
+      votes: JSON.stringify({}),
+      messages: JSON.stringify([]),
+      turn_ends_at: null,
+      vote_ends_at: null,
+      game_master_id: newMasterId,
+      pending_words: JSON.stringify({ composition: pending.composition, settings: pending.settings })
+    });
+
+    // Notifier le MJ
+    const masterPlayer = db.prepare("SELECT * FROM players WHERE id = ?").get(newMasterId);
+    if (masterPlayer?.socket_id) {
+      io.to(masterPlayer.socket_id).emit("gameMasterPrompt", {
+        playerId: newMasterId,
+        round: room.round + 1
+      });
+    }
+
+    // Reset rôles
+    allPlayers.forEach(p => { if (!p.eliminated) updatePlayer(p.id, { role: null, word: null }); });
+    return;
+  }
+
+  const speakingOrder = buildSpeakingOrderFromAlive(roomCode);
   updateRoom(roomCode, {
     phase: "speaking",
     round: room.round + 1,
@@ -902,7 +1029,6 @@ function startNewRound(roomCode) {
     turn_ends_at: null,
     vote_ends_at: null
   });
-
   scheduleTurnTimer(roomCode);
 }
 
@@ -1119,9 +1245,8 @@ function finishVotingNow(roomCode) {
 function everyoneAliveHasVoted(roomCode) {
   const room = getRoom(roomCode);
   if (!room) return false;
-
   const votes = safeJsonParse(room.votes, {});
-  const alive = getAlivePlayers(roomCode);
+  const alive = getAlivePlayers(roomCode).filter(p => p.role !== "gamemaster");
   return Object.keys(votes).length >= alive.length;
 }
 
@@ -1604,7 +1729,59 @@ io.on("connection", (socket) => {
     }
   });
 
-  // ─── DEVINETTE LE MYSTÈRE ────────────────────────────────
+  // ─── MAÎTRE DU JEU ───────────────────────────────────────
+  socket.on("updateGameMasterMode", ({ mode, fixedPlayerId }, callback) => {
+    const player = requirePlayer(socket, callback);
+    if (!player) return;
+    const room = getRoom(player.room_code);
+    if (!room) return callback?.({ ok: false, error: "Room introuvable" });
+    if (!isHost(player, room)) return callback?.({ ok: false, error: "Seul l'hôte peut configurer" });
+    const validModes = ["none", "random", "fixed"];
+    if (!validModes.includes(mode)) return callback?.({ ok: false, error: "Mode invalide" });
+    updateRoom(room.code, {
+      game_master_mode: mode,
+      game_master_id: mode === "fixed" && fixedPlayerId ? fixedPlayerId : null
+    });
+    emitRoom(room.code);
+    callback?.({ ok: true });
+  });
+
+  socket.on("submitGameMasterWords", ({ civilWord, intrusWord }, callback) => {
+    const player = requirePlayer(socket, callback);
+    if (!player) return;
+    const room = getRoom(player.room_code);
+    if (!room) return callback?.({ ok: false, error: "Room introuvable" });
+    if (room.phase !== "waiting_words") return callback?.({ ok: false, error: "Pas le bon moment" });
+    if (room.game_master_id !== player.id) return callback?.({ ok: false, error: "Tu n'es pas le Maître du Jeu" });
+
+    const cleanCivil = sanitizeName(civilWord || "").slice(0, 24);
+    const cleanIntrus = sanitizeName(intrusWord || "").slice(0, 24);
+    if (!cleanCivil || !cleanIntrus) return callback?.({ ok: false, error: "Les deux mots sont requis" });
+    if (normalizeWord(cleanCivil) === normalizeWord(cleanIntrus)) return callback?.({ ok: false, error: "Les deux mots doivent être différents" });
+
+    const pending = safeJsonParse(room.pending_words, {});
+    const allPlayers = getPlayersByRoom(room.code);
+    const playersInGame = allPlayers.filter(p => p.id !== room.game_master_id);
+    const normalized = normalizeComposition(playersInGame.length, pending.composition || {});
+    const normalizedSettings = normalizeGameSettings(pending.settings || {}, room);
+
+    if (!normalized) return callback?.({ ok: false, error: "Composition invalide" });
+
+    _assignRolesWithWords(
+      room.code,
+      shuffle(playersInGame),
+      room.game_master_id,
+      normalized,
+      normalizedSettings,
+      cleanCivil,
+      cleanIntrus,
+      room.round,
+      0
+    );
+
+    emitRoom(room.code);
+    callback?.({ ok: true });
+  });
   socket.on("guessMysteryWord", ({ guess }, callback) => {
     const player = requirePlayer(socket, callback);
     if (!player) return;

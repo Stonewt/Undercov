@@ -1212,6 +1212,8 @@ function renderRoom(room) {
         :`${spk.name} réfléchit`;
     } else if(room.phase==="voting") {
       speakerInfo.textContent=`Vote en cours (${room.voteCount}/${room.players.filter(p=>!p.eliminated).length})`;
+    } else if(room.phase==="mrwhite_guess") {
+      speakerInfo.textContent="Le Mystère tente de deviner le mot...";
     } else {
       speakerInfo.textContent="";
     }
@@ -1717,7 +1719,81 @@ socket.on("sessionResumed",({word})=>{
   wordText.textContent=word||"Tu n'as pas de mot.";
 });
 
-socket.on("voteResult",(result)=>{
+socket.on("mysteryGuessPrompt", ({ message }) => {
+  // Afficher une popup de devinette pour Le Mystère
+  const existing = document.getElementById("mysteryGuessOverlay");
+  if (existing) existing.remove();
+
+  const overlay = document.createElement("div");
+  overlay.id = "mysteryGuessOverlay";
+  overlay.style.cssText = `
+    position:fixed;inset:0;z-index:9999;
+    background:rgba(5,9,20,0.92);
+    display:flex;align-items:center;justify-content:center;
+    padding:20px;box-sizing:border-box;
+  `;
+
+  const box = document.createElement("div");
+  box.style.cssText = `
+    background:#0d1530;border:1px solid rgba(248,250,252,0.25);
+    border-radius:20px;padding:32px 28px;max-width:420px;width:100%;
+    text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.5);
+  `;
+
+  box.innerHTML = `
+    <div style="font-size:36px;margin-bottom:12px;">🔮</div>
+    <h2 style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:#f1f5f9;margin:0 0 10px;">Vous êtes Le Mystère !</h2>
+    <p style="font-size:15px;color:rgba(255,255,255,0.65);margin:0 0 20px;line-height:1.5;">Devinez le mot secret des Civils pour remporter la victoire. Vous avez 30 secondes.</p>
+    <div style="display:flex;gap:10px;">
+      <input id="mysteryGuessInput" maxlength="30" placeholder="Votre mot..." autocomplete="off"
+        style="flex:1;background:rgba(255,255,255,0.9);color:#111;border:none;border-radius:12px;padding:12px 14px;font-size:16px;"/>
+      <button id="mysteryGuessBtn"
+        style="background:linear-gradient(180deg,#f1f5f9,#cbd5e1);color:#111;border:none;border-radius:12px;padding:12px 18px;font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap;">
+        Deviner
+      </button>
+    </div>
+    <p id="mysteryGuessTimer" style="font-size:12px;color:rgba(255,255,255,0.38);margin-top:12px;">30s restantes</p>
+  `;
+
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  // Timer 30s
+  let seconds = 30;
+  const timerEl = box.querySelector("#mysteryGuessTimer");
+  const countdown = setInterval(() => {
+    seconds--;
+    if (timerEl) timerEl.textContent = `${seconds}s restantes`;
+    if (seconds <= 0) {
+      clearInterval(countdown);
+      overlay.remove();
+    }
+  }, 1000);
+
+  const doGuess = () => {
+    const inp = box.querySelector("#mysteryGuessInput");
+    const guess = inp?.value.trim();
+    if (!guess) return;
+    clearInterval(countdown);
+    socket.emit("guessMysteryWord", { guess }, (res) => {
+      overlay.remove();
+      if (res?.correct) {
+        setStatus(`Bravo ! Tu as deviné "${res.word}" — Le Mystère gagne !`, true);
+        playClickSound("reveal");
+      } else {
+        setStatus(`Raté ! Le mot était "${res.word}"`, true);
+      }
+    });
+  };
+
+  const btn = box.querySelector("#mysteryGuessBtn");
+  const inp2 = box.querySelector("#mysteryGuessInput");
+  btn?.addEventListener("click", doGuess);
+  inp2?.addEventListener("keydown", e => { if (e.key === "Enter") doGuess(); });
+  setTimeout(() => inp2?.focus(), 100);
+});
+
+socket.on("voteResult", (result) => {
   resetVoteSelection();
   if(result.tie) setStatus("Égalité : personne n'est éliminé.",true);
   else setStatus(`${result.eliminated.name} est éliminé · ${translateRole(result.eliminated.role)}`,true);

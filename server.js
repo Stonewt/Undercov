@@ -345,7 +345,8 @@ function getWordPairsForSelection(category, subcategory) {
 // ─── TIMERS ──────────────────────────────────────────────
 const roomTurnTimers = new Map();
 const roomVoteTimers = new Map();
-const reconnectTimers = new Map(); // timers d'attente de reconnexion (15s)
+const reconnectTimers = new Map();
+const mysteryGuessTimers = new Map();
 
 function nowIso() {
   return new Date().toISOString();
@@ -388,7 +389,21 @@ function normalizeWord(value) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .trim()
-    .toLowerCase();
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, (_, i) => Array(n + 1).fill(0).map((_, j) => i === 0 ? j : j === 0 ? i : 0));
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i-1] === b[j-1]
+        ? dp[i-1][j-1]
+        : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+    }
+  }
+  return dp[m][n];
 }
 
 function safeJsonParse(value, fallback) {
@@ -697,6 +712,8 @@ function clearAllRoomTimers(roomCode) {
   clearTurnTimer(roomCode);
   clearVoteTimer(roomCode);
   clearReconnectTimer(roomCode);
+  const gt = mysteryGuessTimers.get(roomCode);
+  if (gt) { clearTimeout(gt); mysteryGuessTimers.delete(roomCode); }
 }
 
 function clearReconnectTimer(playerId) {
@@ -1062,6 +1079,33 @@ function finishVotingNow(roomCode) {
 
   const result = eliminateFromVotes(room.code);
   io.to(room.code).emit("voteResult", result);
+
+  // Si Le Mystère est éliminé → lui donner une chance de deviner
+  if (!result.tie && result.eliminated?.role === "mrwhite") {
+    const eliminatedPlayer = db.prepare("SELECT * FROM players WHERE id = ?").get(result.eliminated.id);
+    if (eliminatedPlayer?.socket_id) {
+      // Mettre la room en phase "mrwhite_guess" temporairement
+      updateRoom(room.code, { phase: "mrwhite_guess", turn_ends_at: null, vote_ends_at: null });
+      emitRoom(room.code);
+      // Notifier uniquement Le Mystère
+      io.to(eliminatedPlayer.socket_id).emit("mysteryGuessPrompt", {
+        playerId: eliminatedPlayer.id,
+        message: "Vous êtes Le Mystère ! Devinez le mot des Civils pour gagner."
+      });
+      // Timer de 30s pour deviner, sinon on continue
+      const guessTimer = setTimeout(() => {
+        mysteryGuessTimers.delete(room.code);
+        const freshRoom = getRoom(room.code);
+        if (!freshRoom || freshRoom.phase !== "mrwhite_guess") return;
+        pushSystemMessage(room.code, `${eliminatedPlayer.name} n'a pas deviné à temps.`);
+        if (checkWin(room.code)) { emitRoom(room.code); return; }
+        startNewRound(room.code);
+        emitRoom(room.code);
+      }, 30_000);
+      mysteryGuessTimers.set(room.code, guessTimer);
+      return;
+    }
+  }
 
   if (!result.tie && checkWin(room.code)) {
     emitRoom(room.code);
@@ -1557,6 +1601,45 @@ io.on("connection", (socket) => {
       callback?.({ ok: true, room: buildPublicRoom(roomCode), playerToken, playerId });
     } catch {
       callback?.({ ok: false, error: "Impossible de rejoindre" });
+    }
+  });
+
+  // ─── DEVINETTE LE MYSTÈRE ────────────────────────────────
+  socket.on("guessMysteryWord", ({ guess }, callback) => {
+    const player = requirePlayer(socket, callback);
+    if (!player) return;
+
+    const room = getRoom(player.room_code);
+    if (!room) return callback?.({ ok: false, error: "Room introuvable" });
+    if (room.phase !== "mrwhite_guess") return callback?.({ ok: false, error: "Pas le bon moment" });
+    if (player.role !== "mrwhite") return callback?.({ ok: false, error: "Tu n'es pas Le Mystère" });
+
+    // Annuler le timer de devinette
+    const gt = mysteryGuessTimers.get(room.code);
+    if (gt) { clearTimeout(gt); mysteryGuessTimers.delete(room.code); }
+
+    // Trouver le mot civil
+    const civilPlayer = getPlayersByRoom(room.code).find(p => p.role === "civil");
+    const civilWord = civilPlayer?.word || "";
+
+    const cleanGuess = normalizeWord(guess || "");
+    const cleanWord = normalizeWord(civilWord);
+
+    // Comparaison tolérante (distance de Levenshtein simple)
+    const correct = cleanGuess === cleanWord || levenshtein(cleanGuess, cleanWord) <= 1;
+
+    if (correct) {
+      clearAllRoomTimers(room.code);
+      pushSystemMessage(room.code, `${player.name} (Le Mystère) a deviné le mot "${civilWord}" et remporte la partie !`);
+      updateRoom(room.code, { game_over: 1, phase: "finished", turn_ends_at: null, vote_ends_at: null, winner: "mrwhite" });
+      emitRoom(room.code);
+      callback?.({ ok: true, correct: true, word: civilWord });
+    } else {
+      pushSystemMessage(room.code, `${player.name} (Le Mystère) n'a pas deviné le bon mot.`);
+      callback?.({ ok: true, correct: false, word: civilWord });
+      if (checkWin(room.code)) { emitRoom(room.code); return; }
+      startNewRound(room.code);
+      emitRoom(room.code);
     }
   });
 

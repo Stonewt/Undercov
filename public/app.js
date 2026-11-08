@@ -26,9 +26,10 @@
   const ciqUrl = (code) => `https://ciqual.anses.fr/#/aliments/${encodeURIComponent(code)}`;
   const today = new Date(); const TODAY = keyOf(today);
 
+  let onLSSet = null; // branché par le module Compte pour sauvegarder en ligne
   const LS = {
     get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
-    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* stockage indisponible */ } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* stockage indisponible */ } onLSSet?.(k); },
     clear() { try { Object.keys(localStorage).filter(k => k.startsWith("g-")).forEach(k => localStorage.removeItem(k)); } catch { /* rien */ } }
   };
 
@@ -197,7 +198,7 @@
     xp += add; xpDay = { [TODAY]: already + add }; // on ne garde que le jour en cours
     LS.set("g-xp", xp); LS.set("g-xpday", xpDay);
     const after = levelOf(xp);
-    if (after.n > before) setTimeout(() => celebrate(`Nouveau grade : ${after.name}`, `Tu passes au grade ${after.n}. Ta rigueur paie, continue comme ça.`), 400);
+    if (after.n > before) setTimeout(() => celebrate(`Nouveau grade\u00a0: ${after.name}`, `Tu passes au grade ${after.n}. Ta rigueur paie, continue comme ça.`), 400);
     return add;
   }
 
@@ -228,7 +229,7 @@
     { id: "s3", t: "3 jours d'affilée", d: "Une série de 3 jours", test: () => streak() >= 3 },
     { id: "s7", t: "Une semaine pleine", d: "Une série de 7 jours", test: () => streak() >= 7 },
     { id: "s30", t: "Un mois de régularité", d: "Une série de 30 jours", test: () => streak() >= 30 },
-    { id: "chef", t: "Chef fauché", d: "Cuisiner 5 recettes pas chères", test: () => Object.values(days).flat().filter(m => m.recipe).length >= 5 },
+    { id: "chef", t: "Chef malin", d: "Cuisiner 5 recettes pas chères", test: () => Object.values(days).flat().filter(m => m.recipe).length >= 5 },
     { id: "prot3", t: "Protéines au rendez-vous", d: "Objectif de protéines atteint 3 jours", test: () => Object.values(days).filter(l => sum(l).prot >= targets(P()).prot).length >= 3 },
     { id: "defi5", t: "Défis relevés", d: "Réussir 5 défis du jour", test: () => LS.get("g-defis", []).length >= 5 },
     { id: "eau5", t: "Bien hydraté", d: "Objectif d'eau atteint 5 jours", test: () => Object.values(water).filter(n => n >= waterGoal()).length >= 5 },
@@ -610,6 +611,132 @@
     closePhoto();
   });
 
+  // ---------- Compte (Supabase) : facultatif, actif seulement si le serveur l'a configuré ----------
+  // Connexion sans mot de passe (lien par e-mail). Sauvegarde : repas, points, série, badges, eau, séances.
+  // Le profil (poids, taille, âge) et les mesures du corps ne quittent jamais l'appareil.
+  const SB = CFG.supabase && /^https:\/\/[a-z0-9]{20}\.supabase\.co$/.test(CFG.supabase.url || "") ? CFG.supabase : null;
+  const SYNC_KEYS = ["g-days", "g-badges", "g-frozen", "g-freezes", "g-xp", "g-xpday", "g-miles", "g-defis",
+    "g-freeze-at", "g-water", "g-water-xp", "g-train", "g-train-xp"];
+  let sb = null, sbUser = null, pushTimer = null, applyingRemote = false;
+  const accMsg = (t) => { $("accMsg").textContent = t; };
+  const syncLabel = (t) => { $("accSync").textContent = t; };
+  function loadSupabase() {
+    return new Promise((ok, ko) => {
+      if (window.supabase?.createClient) return ok();
+      const s = document.createElement("script");
+      s.src = "/vendor/supabase-2.118.0.js"; s.nonce = NONCE; s.onload = ok; s.onerror = ko;
+      document.head.appendChild(s);
+    });
+  }
+  const snapshot = () => { const o = {}; SYNC_KEYS.forEach(k => { const v = LS.get(k, undefined); if (v !== undefined) o[k] = v; }); return o; };
+  // Fusion prudente entre ce téléphone et la sauvegarde : on ne perd jamais un repas ni un badge.
+  function mergeVal(a, b) {
+    if (a === undefined) return b;
+    if (b === undefined) return a;
+    if (typeof a === "number" && typeof b === "number") return Math.max(a, b);
+    if (typeof a === "string" && typeof b === "string") return a > b ? a : b;
+    if (Array.isArray(a) && Array.isArray(b)) return [...new Set([...a, ...b])].sort((x, y) => (x < y ? -1 : x > y ? 1 : 0));
+    if (a && b && typeof a === "object" && typeof b === "object") {
+      const out = {};
+      for (const d of new Set([...Object.keys(a), ...Object.keys(b)])) {
+        const x = a[d], y = b[d];
+        if (x === undefined) out[d] = y;
+        else if (y === undefined) out[d] = x;
+        else if (Array.isArray(x) && Array.isArray(y)) out[d] = x.length >= y.length ? x : y;
+        else if (typeof x === "number" && typeof y === "number") out[d] = Math.max(x, y);
+        else if (typeof x === "string" && typeof y === "string") out[d] = x < y ? x : y;
+        else out[d] = x;
+      }
+      return out;
+    }
+    return a;
+  }
+  function reloadState() {
+    days = LS.get("g-days", {}); badges = LS.get("g-badges", {}); frozen = LS.get("g-frozen", []);
+    freezes = LS.get("g-freezes", 0); xp = LS.get("g-xp", 0); xpDay = LS.get("g-xpday", {});
+    miles = LS.get("g-miles", []); water = LS.get("g-water", {}); trains = LS.get("g-train", {});
+  }
+  async function pushNow() {
+    clearTimeout(pushTimer);
+    if (!sb || !sbUser) return;
+    const { error } = await sb.from("user_data").upsert({ user_id: sbUser.id, data: snapshot(), updated_at: new Date().toISOString() });
+    syncLabel(error ? "ÉCHEC DE SAUVEGARDE" : "SAUVEGARDÉ");
+  }
+  async function syncAll() {
+    syncLabel("SYNCHRO…");
+    try {
+      const { data, error } = await sb.from("user_data").select("data").eq("user_id", sbUser.id).maybeSingle();
+      if (error) throw error;
+      const remote = data?.data || {}, local = snapshot();
+      applyingRemote = true;
+      for (const k of SYNC_KEYS) { const v = mergeVal(local[k], remote[k]); if (v !== undefined) LS.set(k, v); }
+      applyingRemote = false;
+      reloadState(); renderAll();
+      await pushNow();
+    } catch { applyingRemote = false; syncLabel("ÉCHEC DE SYNCHRO"); }
+  }
+  function renderAccount() {
+    $("accOut").hidden = Boolean(sbUser); $("accIn").hidden = !sbUser;
+    $("accDelConfirm").hidden = true;
+    if (sbUser) $("accWho").textContent = sbUser.email || "ton e-mail"; else syncLabel("");
+  }
+  async function initAccount() {
+    if (!SB) return;
+    $("accountPanel").hidden = false;
+    try { await loadSupabase(); } catch { $("accountPanel").hidden = true; return; }
+    sb = window.supabase.createClient(SB.url, SB.key, {
+      auth: { flowType: "pkce", persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: "g-auth" }
+    });
+    onLSSet = (k) => {
+      if (!sbUser || applyingRemote || !SYNC_KEYS.includes(k)) return;
+      clearTimeout(pushTimer); pushTimer = setTimeout(pushNow, 2500);
+    };
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && pushTimer) pushNow(); });
+    sb.auth.onAuthStateChange((event, session) => {
+      setTimeout(async () => {
+        const before = sbUser?.id;
+        sbUser = session?.user || null;
+        renderAccount();
+        if (/[?&]code=/.test(location.search)) history.replaceState(null, "", "/");
+        if (sbUser && sbUser.id !== before) {
+          if (event === "SIGNED_IN") { track("connexion_compte"); toast("Connecté · tes données sont sauvegardées"); }
+          await syncAll();
+        }
+      }, 0);
+    });
+  }
+  $("accSend").addEventListener("click", async () => {
+    const email = $("accEmail").value.trim();
+    if (!/^[^\s@]{1,64}@[^\s@]{1,190}\.[a-z]{2,24}$/i.test(email)) { accMsg("Cette adresse e-mail ne semble pas valide."); return; }
+    if (!sb) return;
+    $("accSend").disabled = true; accMsg("Envoi…");
+    const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + "/", shouldCreateUser: true } });
+    $("accSend").disabled = false;
+    accMsg(error
+      ? (error.status === 429 ? "Trop de demandes. Réessaie dans quelques minutes." : "L'envoi a échoué. Vérifie l'adresse et réessaie.")
+      : "C'est envoyé ! Ouvre le lien reçu par e-mail sur cet appareil, dans ce navigateur.");
+    if (!error) track("demande_lien_connexion");
+  });
+  $("accSyncNow").addEventListener("click", () => { if (sbUser) syncAll(); });
+  $("accLogout").addEventListener("click", async () => { await sb?.auth.signOut({ scope: "local" }); sbUser = null; renderAccount(); toast("Déconnecté. Tes données restent sur ce téléphone."); });
+  $("accDelete").addEventListener("click", () => { $("accDelConfirm").hidden = false; });
+  $("accDelNo").addEventListener("click", () => { $("accDelConfirm").hidden = true; });
+  $("accDelYes").addEventListener("click", async () => {
+    const { data } = await sb.auth.getSession();
+    const token = data?.session?.access_token;
+    if (!token) { toast("Reconnecte-toi d'abord."); return; }
+    $("accDelYes").disabled = true;
+    const r = await fetch("/api/account/delete", { method: "POST", headers: { authorization: `Bearer ${token}` } }).catch(() => null);
+    $("accDelYes").disabled = false;
+    if (r?.ok) {
+      await sb.auth.signOut({ scope: "local" }).catch(() => {});
+      sbUser = null; renderAccount(); track("compte_supprime"); toast("Compte supprimé.");
+    } else {
+      const j = await r?.json().catch(() => ({}));
+      toast(j?.error || "La suppression a échoué. Réessaie plus tard.");
+    }
+  });
+
   // ---------- Vue Pas cher ----------
   function renderRecipes() {
     const t = targets(P()), s = sum(meals());
@@ -762,7 +889,10 @@
   $("resetBtn").addEventListener("click", () => { $("resetConfirm").hidden = false; $("resetBtn").hidden = true; });
   $("resetNo").addEventListener("click", () => { $("resetConfirm").hidden = true; $("resetBtn").hidden = false; });
   $("resetYes").addEventListener("click", () => {
+    // Effacer cet appareil : on se déconnecte d'abord pour ne pas écraser la sauvegarde en ligne.
+    if (sbUser) { clearTimeout(pushTimer); sb?.auth.signOut({ scope: "local" }).catch(() => {}); sbUser = null; renderAccount(); }
     LS.clear(); profile = null; days = {}; badges = {}; frozen = []; freezes = 0; xp = 0; xpDay = {}; miles = []; measures = [];
+    water = {}; trains = {};
     $("resetConfirm").hidden = true; $("resetBtn").hidden = false;
     show("jour"); openOnboarding(1);
   });
@@ -871,6 +1001,7 @@
   applyFreezes();
   renderAll();
   initMeasure();
+  initAccount();
   loadAd("jour");
   if (!profile) openOnboarding(1);
 })();

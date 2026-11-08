@@ -3,16 +3,30 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Bon'Assiette</title>
-<meta name="description" content="Suis tes calories et tes protéines, et trouve des repas pas chers. Valeurs nutritionnelles issues de la table Ciqual de l'ANSES.">
+<title>Bon'Assiette · Compteur de calories gratuit et français</title>
+<meta name="description" content="Compteur de calories et de protéines gratuit et 100 % français : note tes repas en un geste, suis ton eau et tes séances, trouve des recettes à moins de 2 €. Valeurs de la table Ciqual (ANSES).">
+<link rel="canonical" href="https://www.bonassiette.fr/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Bon'Assiette">
+<meta property="og:locale" content="fr_FR">
+<meta property="og:url" content="https://www.bonassiette.fr/">
+<meta property="og:title" content="Bon'Assiette · Compteur de calories gratuit et français">
+<meta property="og:description" content="Note tes repas en un geste, vois ce qu'il te reste en calories et en protéines, et monte en grade jour après jour.">
+<meta property="og:image" content="https://www.bonassiette.fr/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Bon'Assiette : calories restantes et macros du jour">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#2f6b3c">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="/icon.svg">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<link rel="icon" href="/icon-192.png" type="image/png" sizes="192x192">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="stylesheet" href="/app.css">
 <!--HEAD_EXTRA-->
 <script type="application/json" id="cfg">__CONFIG__</script>
+<script type="application/ld+json" nonce="__NONCE__">{"@context":"https://schema.org","@type":"WebApplication","name":"Bon'Assiette","url":"https://www.bonassiette.fr/","applicationCategory":"HealthApplication","operatingSystem":"Tous (navigateur web)","inLanguage":"fr-FR","description":"Compteur de calories et de protéines gratuit et français, avec recettes à petit prix et valeurs de la table Ciqual (ANSES).","offers":{"@type":"Offer","price":"0","priceCurrency":"EUR"}}</script>
 </head>
 <body>
 <header class="top">
@@ -37,6 +51,7 @@
 </header>
 
 <main class="page">
+  <noscript><div class="panel"><h2>Bon'Assiette, le compteur de calories gratuit et français</h2><p>Note tes repas en un geste, vois ce qu'il te reste en calories, protéines, glucides et lipides, suis ton eau et tes séances, et trouve des recettes à moins de 2 € la portion. Les valeurs viennent de la table Ciqual de l'ANSES. Active JavaScript pour utiliser l'appli.</p></div></noscript>
 
   <!-- AUJOURD'HUI -->
   <section id="view-jour" class="view grid-jour">
@@ -110,7 +125,7 @@
           <div class="chips" id="recent"></div>
         </div>
         <label class="f" for="search">Chercher un plat
-          <input type="search" id="search" placeholder="Kebab, resto U, pâtes, croissant…" autocomplete="off">
+          <input type="search" id="search" placeholder="Pâtes, poulet, sandwich, croissant…" autocomplete="off">
         </label>
         <div class="chips" id="cats" aria-label="Catégories"></div>
         <div class="results" id="results"></div>
@@ -191,6 +206,24 @@
       <button class="primary" id="saveProfile" type="button">Enregistrer</button>
     </div>
     <div class="col-stack">
+      <div class="panel" id="accountPanel" hidden>
+        <div class="row"><h2>Mon compte</h2><span class="num" id="accSync"></span></div>
+        <div id="accOut" class="stack">
+          <p class="small muted">Crée un compte gratuit pour sauvegarder tes repas, tes points et ta série, et les retrouver sur un autre téléphone. Pas de mot de passe : tu reçois un lien de connexion par e-mail. Ton poids et ton tour de taille restent sur ton appareil.</p>
+          <label class="f" for="accEmail">Ton adresse e-mail<input type="email" id="accEmail" autocomplete="email" inputmode="email" maxlength="254" placeholder="toi@exemple.fr"></label>
+          <button class="primary" id="accSend" type="button">Recevoir mon lien de connexion</button>
+          <p class="small muted" id="accMsg" aria-live="polite"></p>
+        </div>
+        <div id="accIn" class="stack" hidden>
+          <p class="small">Connecté avec <strong id="accWho"></strong>. Tes repas, tes points et ta série sont sauvegardés automatiquement.</p>
+          <div class="grid2"><button class="ghost" id="accSyncNow" type="button">Synchroniser</button><button class="ghost" id="accLogout" type="button">Se déconnecter</button></div>
+          <button class="linkbtn" id="accDelete" type="button">Supprimer mon compte</button>
+          <div id="accDelConfirm" class="confirm" hidden>
+            <p class="small">Ton compte et tes données sauvegardées en ligne seront supprimés définitivement. Ce qui est sur ce téléphone reste.</p>
+            <div class="grid2"><button class="ghost" id="accDelNo" type="button">Annuler</button><button class="danger" id="accDelYes" type="button">Supprimer</button></div>
+          </div>
+        </div>
+      </div>
       <div class="panel" id="installPanel">
         <h3>Mets Bon'Assiette sur ton écran d'accueil</h3>
         <p class="small muted">Sur iPhone : bouton Partager, puis « Sur l'écran d'accueil ». Sur Android : menu ⋮, puis « Installer l'application ».</p>
@@ -198,7 +231,7 @@
       </div>
       <div class="panel">
         <h3>Tes données</h3>
-        <p class="small muted">Tout reste dans ce navigateur. Rien n'est envoyé à un serveur.</p>
+        <p class="small muted" id="dataNote">Tout reste dans ce navigateur. Rien n'est envoyé à un serveur, sauf si tu crées un compte.</p>
         <button class="ghost" id="cookiesBtn" type="button" hidden>Gérer les cookies</button>
         <button class="ghost" id="resetBtn" type="button">Effacer toutes mes données</button>
         <div id="resetConfirm" class="confirm" hidden>
@@ -315,8 +348,9 @@
       <p class="eyebrow">Bienvenue</p>
       <h2 id="onbTitle" class="onb-title">Mange mieux, sans te ruiner.</h2>
       <ul class="onb-list">
-        <li><strong>Note tes repas en un geste.</strong> Kebab, resto U, pâtes : les plats étudiants sont déjà là.</li>
+        <li><strong>Note tes repas en un geste.</strong> Plats maison, sandwich, fast-food, cantine : les repas de tous les jours sont déjà là.</li>
         <li><strong>Vois ce qu'il te reste</strong> en calories et en protéines, calculé pour toi.</li>
+        <li><strong>Gagne des points et monte en grade</strong> en notant tes repas, ton eau et tes séances.</li>
         <li><strong>Trouve des repas à moins de 2 €</strong> avec la liste de courses.</li>
       </ul>
       <p class="small muted">Valeurs issues de la table Ciqual de l'ANSES. Tes données restent sur ton téléphone.</p>

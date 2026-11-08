@@ -26,6 +26,13 @@ const ADS_SOURCES = [
 const GA_SOURCES = ["https://www.googletagmanager.com", "https://*.google-analytics.com", "https://*.analytics.google.com"];
 const THIRD = [...(ADS_ON ? ADS_SOURCES : []), ...(GA_ON ? GA_SOURCES : [])];
 
+// Comptes utilisateurs (Supabase) : actifs seulement si les variables Railway sont réglées.
+// SUPABASE_URL et SUPABASE_ANON_KEY sont publiques ; SUPABASE_SERVICE_ROLE_KEY est secrète et ne quitte jamais le serveur.
+const SB_URL = /^https:\/\/[a-z0-9]{20}\.supabase\.co$/.test(process.env.SUPABASE_URL || "") ? process.env.SUPABASE_URL : "";
+const SB_ANON = /^[A-Za-z0-9._-]{20,500}$/.test(process.env.SUPABASE_ANON_KEY || "") ? process.env.SUPABASE_ANON_KEY : "";
+const SB_SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const ACCOUNTS_ON = Boolean(SB_URL && SB_ANON);
+
 // La page d'accueil est lue une fois ; un code unique (nonce) y est inséré à chaque affichage.
 const INDEX_HTML = fs.readFileSync(path.join(PUBLIC_DIR, "index.html"), "utf8");
 
@@ -38,7 +45,7 @@ app.set("trust proxy", 1); // Railway place un proxy devant : on lit la vraie IP
 //    sauf l'envoi d'une photo à analyser, sur une seule adresse.
 app.use((req, res, next) => {
   if (req.method === "GET" || req.method === "HEAD") return next();
-  if (req.method === "POST" && req.path === "/api/analyse") return next();
+  if (req.method === "POST" && (req.path === "/api/analyse" || req.path === "/api/account/delete")) return next();
   res.set("Allow", "GET, HEAD").status(405).end();
 });
 
@@ -81,7 +88,7 @@ app.use(
         "style-src": ["'self'", ...(ADS_ON ? ["'unsafe-inline'"] : [])],
         "font-src": ["'self'"],
         "img-src": ["'self'", "data:", ...(THIRD.length ? ["https:"] : [])],
-        "connect-src": ["'self'", ...THIRD],
+        "connect-src": ["'self'", ...THIRD, ...(ACCOUNTS_ON ? [SB_URL] : [])],
         "frame-src": ADS_ON ? ADS_SOURCES : ["'none'"],
         "manifest-src": ["'self'"],
         "worker-src": ["'self'"],
@@ -118,14 +125,19 @@ app.use(
 
 // Analyse photo : réservée aux requêtes venant du site, 6 par jour et par visiteur, photo de 1,5 Mo max.
 app.get("/api/status", (req, res) => res.set("Cache-Control", "no-store").json({ photo: photoEnabled() }));
+// Les envois (POST) ne sont acceptés que s'ils viennent du site lui-même.
+const sameOrigin = (req, res, next) => {
+  const origin = req.get("origin");
+  const site = req.get("sec-fetch-site");
+  if ((origin && origin !== `${req.protocol}://${req.get("host")}`) || (site && site !== "same-origin")) {
+    return res.status(403).json({ error: "Requête refusée." });
+  }
+  next();
+};
 app.post(
   "/api/analyse",
+  sameOrigin,
   (req, res, next) => {
-    const origin = req.get("origin");
-    const site = req.get("sec-fetch-site");
-    if ((origin && origin !== `${req.protocol}://${req.get("host")}`) || (site && site !== "same-origin")) {
-      return res.status(403).json({ error: "Requête refusée." });
-    }
     if (!req.is("application/json")) return res.status(415).json({ error: "Format refusé." });
     next();
   },
@@ -140,9 +152,38 @@ app.post(
   analyseHandler
 );
 
+// Suppression de compte (droit à l'effacement, RGPD) : le visiteur prouve qui il est avec son jeton de connexion,
+// puis le serveur supprime le compte avec la clé secrète. Ses données sauvegardées partent avec (ON DELETE CASCADE).
+app.post(
+  "/api/account/delete",
+  sameOrigin,
+  rateLimit({ windowMs: 60 * 60 * 1000, limit: 5, standardHeaders: "draft-8", legacyHeaders: false,
+    handler: (req, res) => res.status(429).json({ error: "Trop de tentatives. Réessaie dans une heure." }) }),
+  async (req, res) => {
+    if (!ACCOUNTS_ON || !SB_SERVICE) return res.status(503).json({ error: "Les comptes ne sont pas encore activés." });
+    const m = /^Bearer ([A-Za-z0-9._-]{20,4000})$/.exec(req.get("authorization") || "");
+    if (!m) return res.status(401).json({ error: "Connexion requise." });
+    try {
+      const who = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_ANON, authorization: `Bearer ${m[1]}` } });
+      if (!who.ok) return res.status(401).json({ error: "Connexion expirée. Reconnecte-toi." });
+      const { id } = await who.json();
+      if (!/^[0-9a-f-]{36}$/.test(id || "")) return res.status(401).json({ error: "Connexion invalide." });
+      const del = await fetch(`${SB_URL}/auth/v1/admin/users/${id}`, {
+        method: "DELETE", headers: { apikey: SB_SERVICE, authorization: `Bearer ${SB_SERVICE}` }
+      });
+      if (!del.ok) { console.error("suppression compte:", del.status); return res.status(502).json({ error: "La suppression a échoué. Réessaie plus tard." }); }
+      res.set("Cache-Control", "no-store").json({ ok: true });
+    } catch (e) {
+      console.error("suppression compte:", e?.message);
+      res.status(502).json({ error: "La suppression a échoué. Réessaie plus tard." });
+    }
+  }
+);
+
 // 7. Page d'accueil avec son code unique.
 const PUBLIC_CONFIG = JSON.stringify({
-  adsClient: ADS_ON ? CONFIG.adsClient : "", adSlots: ADS_ON ? CONFIG.adSlots : {}, gaId: GA_ON ? CONFIG.gaId : ""
+  adsClient: ADS_ON ? CONFIG.adsClient : "", adSlots: ADS_ON ? CONFIG.adSlots : {}, gaId: GA_ON ? CONFIG.gaId : "",
+  supabase: ACCOUNTS_ON ? { url: SB_URL, key: SB_ANON } : null
 }).replace(/</g, "\\u003c");
 const HEAD_EXTRA = /^ca-pub-\d{10,20}$/.test(CONFIG.adsClient)
   ? `<meta name="google-adsense-account" content="${CONFIG.adsClient}">` : "";

@@ -2,3 +2,6 @@ User-agent: *
 Allow: /
 Disallow: /mentions-legales
 Disallow: /confidentialite
+Disallow: /api/
+
+Sitemap: https://www.bonassiette.fr/sitemap.xml

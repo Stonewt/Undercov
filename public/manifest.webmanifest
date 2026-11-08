@@ -1,7 +1,7 @@
 {
   "name": "Bon'Assiette",
   "short_name": "Bon'Assiette",
-  "description": "Suis ce que tu manges et trouve des repas pas chers.",
+  "description": "Compteur de calories gratuit et français : note tes repas, ton eau et tes séances.",
   "lang": "fr",
   "start_url": "./",
   "scope": "./",
@@ -9,6 +9,8 @@
   "background_color": "#f3f5f1",
   "theme_color": "#2f6b3c",
   "icons": [
-    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ]
 }

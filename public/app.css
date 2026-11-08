@@ -100,7 +100,7 @@ button{font:600 15px var(--body);border-radius:12px;border:1px solid transparent
 .linkbtn{padding:8px;color:var(--accent);font-size:14px}
 .big-cta{width:100%;padding:16px;font-size:16px}
 button:disabled{opacity:.55;cursor:default}
-input[type=number],input[type=text],input[type=search],select{font:400 16px var(--body);color:var(--ink);background:var(--sunk);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
+input[type=number],input[type=text],input[type=search],input[type=email],select{font:400 16px var(--body);color:var(--ink);background:var(--sunk);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
 label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600}
 .fieldset{display:flex;flex-direction:column;gap:8px;font-size:13px;font-weight:600}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -310,3 +310,7 @@ nav.tabs svg{width:22px;height:22px}
 .pitem .pg input{width:80px;text-align:right;padding:8px 10px}
 .pitem .del{padding:2px 0;font:500 12px var(--body);color:var(--muted);text-decoration:underline}
 .pitem .sub{grid-column:1/-1;font:400 12px var(--mono);color:var(--muted)}
+
+/* Compte */
+.stack{display:flex;flex-direction:column;gap:12px}
+#accDelete{align-self:flex-start;color:var(--danger);padding:4px 0}

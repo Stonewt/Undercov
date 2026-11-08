@@ -42,6 +42,7 @@
   <section id="view-jour" class="view grid-jour">
     <div class="col-a">
       <p class="date" id="today"></p>
+      <div class="alert" id="streakAlert" role="status" hidden></div>
       <div class="panel">
         <div class="day">
           <div class="ring" aria-hidden="true">
@@ -55,6 +56,12 @@
           </div>
         </div>
         <p class="small muted" id="goalLine"></p>
+      </div>
+
+      <div class="panel level">
+        <div class="row"><strong id="lvName"></strong><span class="num" id="lvXp"></span></div>
+        <div class="bar xpbar"><i id="lvBar"></i></div>
+        <p class="small muted" id="lvFreeze"></p>
       </div>
 
       <div class="panel defi" id="defi">
@@ -128,6 +135,10 @@
       <div class="row"><h2>Ta semaine</h2><span class="num" id="weekAvg"></span></div>
       <div class="week" id="week"></div>
       <div class="legend"><span><i class="sq sq-ok"></i>Objectif de protéines atteint</span><span><i class="sq sq-soft"></i>Repas notés</span></div>
+    </div>
+    <div class="panel">
+      <h2>Ta semaine en bref</h2>
+      <div class="recap" id="recap"></div>
     </div>
     <div class="panel">
       <div class="row"><h2>Badges</h2><span class="num" id="badgeCount"></span></div>
@@ -257,6 +268,15 @@
   <h3 id="consentTitle">Tu acceptes la mesure d'audience ?</h3>
   <p class="small">Gamelle aimerait utiliser Google Analytics pour compter les visites et améliorer l'appli. Ça dépose des cookies. Tes repas et ton profil ne sont jamais envoyés. <a href="/confidentialite">En savoir plus</a></p>
   <div class="grid2"><button class="ghost" id="consentNo" type="button">Refuser</button><button class="ghost" id="consentYes" type="button">Accepter</button></div>
+</div>
+
+<div class="celebrate" id="celebrate" role="dialog" aria-modal="true" aria-labelledby="celTitle" hidden>
+  <div class="cel-in">
+    <div class="cel-flame" aria-hidden="true">🔥</div>
+    <h2 id="celTitle" class="onb-title"></h2>
+    <p id="celText"></p>
+    <button class="primary big-cta" id="celOk" type="button">Continuer</button>
+  </div>
 </div>
 
 <div class="toast" id="toast" role="status" hidden></div>

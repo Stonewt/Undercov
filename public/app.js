@@ -37,6 +37,11 @@
   let profile = LS.get("g-profile", null);
   let days = LS.get("g-days", {});
   let badges = LS.get("g-badges", {});
+  let frozen = LS.get("g-frozen", []);        // jours couverts par une protection de série
+  let freezes = LS.get("g-freezes", 0);       // protections disponibles (2 au maximum)
+  let xp = LS.get("g-xp", 0);
+  let xpDay = LS.get("g-xpday", {});          // points gagnés par jour (plafond quotidien)
+  let miles = LS.get("g-miles", []);          // paliers de série déjà célébrés
   const kitchen = new Set(["plaques", "micro", "bouilloire"]);
   const meals = () => days[TODAY] || [];
   const saveDays = () => LS.set("g-days", days);
@@ -148,12 +153,74 @@
     { txt: "Noter ton petit-déjeuner", test: (s, t, m) => m.some(x => Number(String(x.time).slice(0, 2)) < 11) }
   ];
   const defiToday = () => DEFIS[Number(TODAY.replaceAll("-", "")) % DEFIS.length];
+  const logged = (k) => (days[k] || []).length > 0;
+  const active = (k) => logged(k) || frozen.includes(k);
   function streak() {
     let n = 0; const d = new Date(today);
-    if (!(days[keyOf(d)] || []).length) d.setDate(d.getDate() - 1);
-    while ((days[keyOf(d)] || []).length) { n++; d.setDate(d.getDate() - 1); }
+    if (!active(keyOf(d))) d.setDate(d.getDate() - 1);
+    while (active(keyOf(d))) { n++; d.setDate(d.getDate() - 1); }
     return n;
   }
+  // Au démarrage : si des jours ont été manqués depuis le dernier repas noté,
+  // les protections de série les couvrent (une protection par jour manqué).
+  function applyFreezes() {
+    const loggedKeys = Object.keys(days).filter(logged).sort();
+    if (!loggedKeys.length || !freezes) return;
+    const last = loggedKeys[loggedKeys.length - 1];
+    const gap = []; const d = new Date(today); d.setDate(d.getDate() - 1);
+    while (keyOf(d) > last && !active(keyOf(d))) { gap.push(keyOf(d)); d.setDate(d.getDate() - 1); }
+    if (gap.length && gap.length <= freezes) {
+      frozen = [...frozen, ...gap]; freezes -= gap.length;
+      LS.set("g-frozen", frozen); LS.set("g-freezes", freezes);
+      setTimeout(() => toast(gap.length > 1 ? `${gap.length} protections ont sauvé ta série` : "Une protection a sauvé ta série"), 600);
+    }
+  }
+
+  // ---------- Points et niveaux ----------
+  const LEVELS = [
+    [0, "Débutant"], [100, "Commis"], [250, "Apprenti"], [500, "Cuisinier"], [900, "Cuistot"],
+    [1400, "Chef de partie"], [2000, "Sous-chef"], [3000, "Chef"], [4500, "Chef étoilé"], [6500, "Grand chef"], [9000, "Légende"]
+  ];
+  function levelOf(x) {
+    let i = 0; while (i + 1 < LEVELS.length && x >= LEVELS[i + 1][0]) i++;
+    const next = LEVELS[i + 1];
+    return { n: i + 1, name: LEVELS[i][1], from: LEVELS[i][0], to: next ? next[0] : null };
+  }
+  const XP_DAY_MAX = 120;
+  function gainXP(amount) {
+    const already = xpDay[TODAY] || 0;
+    const add = Math.max(0, Math.min(amount, XP_DAY_MAX - already));
+    if (!add) return 0;
+    const before = levelOf(xp).n;
+    xp += add; xpDay = { [TODAY]: already + add }; // on ne garde que le jour en cours
+    LS.set("g-xp", xp); LS.set("g-xpday", xpDay);
+    const after = levelOf(xp);
+    if (after.n > before) setTimeout(() => celebrate(`Niveau ${after.n}`, `Tu passes ${after.name}. Continue comme ça.`), 400);
+    return add;
+  }
+
+  // ---------- Paliers de série ----------
+  const MILESTONES = [3, 7, 14, 30, 50, 100, 200, 365];
+  function checkMilestone() {
+    const n = streak();
+    if (n && n % 7 === 0 && !LS.get("g-freeze-at", []).includes(n)) {
+      LS.set("g-freeze-at", [...LS.get("g-freeze-at", []), n]);
+      if (freezes < 2) { freezes++; LS.set("g-freezes", freezes); }
+    }
+    if (MILESTONES.includes(n) && !miles.includes(n)) {
+      miles = [...miles, n]; LS.set("g-miles", miles);
+      gainXP(n >= 30 ? 50 : 25);
+      celebrate(`${n} jours d'affilée`, n % 7 === 0
+        ? "Bravo ! Tu gagnes une protection de série : si tu oublies un jour, ta série est sauvée."
+        : "Bravo, tu tiens ta série. Reviens demain pour la faire grimper.");
+         renderDay();
+    }
+  }
+  function celebrate(title, text) {
+    $("celTitle").textContent = title; $("celText").textContent = text;
+    $("celebrate").hidden = false; $("celOk").focus();
+  }
+  $("celOk").addEventListener("click", () => { $("celebrate").hidden = true; });
   const BADGES = [
     { id: "first", t: "Premier repas", d: "Noter ton premier repas", test: () => Object.values(days).some(l => l.length) },
     { id: "s3", t: "3 jours d'affilée", d: "Une série de 3 jours", test: () => streak() >= 3 },
@@ -181,14 +248,26 @@
     const bar = (k, b, n) => { $(b).style.width = Math.min(100, s[k] / Math.max(1, t[k]) * 100) + "%"; $(n).textContent = `${r0(s[k])} / ${t[k]} g`; };
     bar("prot", "barP", "numP"); bar("gluc", "barG", "numG"); bar("lip", "barL", "numL");
     $("goalLine").textContent = `Objectif « ${GOALS[p.goal].toLowerCase()} » : ${nb(t.kcal)} kcal et ${t.prot} g de protéines par jour.`;
-    $("streakN").textContent = streak();
+    const st = streak();
+    $("streakN").textContent = st;
+    const lv = levelOf(xp);
+    $("lvName").textContent = `Niveau ${lv.n} · ${lv.name}`;
+    $("lvXp").textContent = lv.to ? `${nb(xp - lv.from)} / ${nb(lv.to - lv.from)} XP` : `${nb(xp)} XP`;
+    $("lvBar").style.width = (lv.to ? Math.min(100, (xp - lv.from) / (lv.to - lv.from) * 100) : 100) + "%";
+    $("lvFreeze").textContent = freezes ? `🧊 ${freezes} protection${freezes > 1 ? "s" : ""} de série` : "🧊 Une protection tous les 7 jours de série";
+    const hour = new Date().getHours();
+    const risk = !logged(TODAY) && st > 0;
+    $("streakAlert").hidden = !risk;
+    if (risk) $("streakAlert").innerHTML = hour >= 17
+      ? `<strong>🔥 Ta série de ${st} jour${st > 1 ? "s" : ""} s'arrête à minuit.</strong> Note un repas pour la garder.`
+      : `<strong>🔥 Série de ${st} jour${st > 1 ? "s" : ""}.</strong> Note ton premier repas du jour pour la prolonger.`;
 
     const d = defiToday(), ok = d.test(s, t, list);
     $("defiTxt").textContent = d.txt;
     $("defi").classList.toggle("done", ok);
     $("defiIco").textContent = ok ? "✓" : "!";
     $("defiState").textContent = ok ? "Réussi" : "";
-    if (ok) { const done = LS.get("g-defis", []); if (!done.includes(TODAY)) { done.push(TODAY); LS.set("g-defis", done); toast("Défi du jour réussi"); } }
+    if (ok) { const done = LS.get("g-defis", []); if (!done.includes(TODAY)) { done.push(TODAY); LS.set("g-defis", done); const g = gainXP(20); toast(g ? `Défi du jour réussi · +${g} XP` : "Défi du jour réussi"); } }
 
     $("mealCount").textContent = list.length ? `${list.length} REPAS` : "";
     $("meals").innerHTML = list.length ? list.map((m, i) => `
@@ -224,9 +303,11 @@
     saveDays();
     track(item.recipe ? "recette_mangee" : "repas_ajoute", { nb_jour: days[TODAY].length, serie: streak() });
     const before = Number($("streakN").textContent);
+    const g = gainXP(item.recipe ? 15 : 10);
     renderDay();
     const after = streak();
-    toast(after > before && after > 1 ? `${after} jours d'affilée` : `${item.name} ajouté`);
+    toast(after > before && after > 1 ? `🔥 ${after} jours d'affilée` : `${item.name} ajouté${g ? ` · +${g} XP` : ""}`);
+    checkMilestone();
   }
 
   // Catégories et recherche
@@ -363,6 +444,19 @@
     $("week").innerHTML = cols.join("");
     $("week").querySelectorAll("[data-h]").forEach(el => { el.style.height = Number(el.dataset.h) + "%"; });
     $("weekAvg").textContent = n ? `MOYENNE ${nb(total / n)} KCAL` : "";
+    let daysOk = 0, mealsN = 0, protOk = 0;
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(today); d.setDate(d.getDate() - i);
+      const l = days[keyOf(d)] || [];
+      if (l.length) daysOk++; mealsN += l.length; if (l.length && sum(l).prot >= t.prot) protOk++;
+    }
+    const lv = levelOf(xp);
+    $("recap").innerHTML = `
+      <div class="stat"><b>${daysOk}/7</b><span>jours notés</span></div>
+      <div class="stat"><b>${mealsN}</b><span>repas</span></div>
+      <div class="stat"><b>${protOk}</b><span>jours protéines OK</span></div>
+      <div class="stat"><b>${streak()}</b><span>jours de série</span></div>
+      <p class="small muted full">Niveau ${lv.n} · ${esc(lv.name)} · ${nb(xp)} XP au total.${lv.to ? ` Encore ${nb(lv.to - xp)} XP pour le niveau suivant.` : ""}</p>`;
     const got = BADGES.filter(b => badges[b.id]).length;
     $("badgeCount").textContent = `${got} / ${BADGES.length}`;
     $("badges").innerHTML = BADGES.map(b => `<div class="badge ${badges[b.id] ? "on" : ""}"><span class="bt">${esc(b.t)}</span><span class="bd">${esc(b.d)}</span></div>`).join("");
@@ -373,7 +467,7 @@
   $("resetBtn").addEventListener("click", () => { $("resetConfirm").hidden = false; $("resetBtn").hidden = true; });
   $("resetNo").addEventListener("click", () => { $("resetConfirm").hidden = true; $("resetBtn").hidden = false; });
   $("resetYes").addEventListener("click", () => {
-    LS.clear(); profile = null; days = {}; badges = {};
+    LS.clear(); profile = null; days = {}; badges = {}; frozen = []; freezes = 0; xp = 0; xpDay = {}; miles = [];
     $("resetConfirm").hidden = true; $("resetBtn").hidden = false;
     show("jour"); openOnboarding(1);
   });
@@ -479,6 +573,7 @@
   // ---------- Démarrage ----------
   function renderAll() { renderDay(); }
   $("today").textContent = today.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+  applyFreezes();
   renderAll();
   initMeasure();
   loadAd("jour");

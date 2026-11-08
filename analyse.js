@@ -9,6 +9,10 @@ const MAX_IMAGE_BYTES = 1_500_000;
 
 export const photoEnabled = () => Boolean(process.env.ANTHROPIC_API_KEY);
 
+// Fonction réservée aux abonnés Bon'Assiette+. Tant que le paiement n'existe pas, personne n'y a accès :
+// aucune analyse n'est payée par le site pour un visiteur non abonné.
+const isSubscriber = (_req) => false;
+
 let day = "", countToday = 0;
 function takeGlobalSlot() {
   const d = new Date().toISOString().slice(0, 10);
@@ -79,6 +83,7 @@ function clean(input) {
 }
 
 export async function analyseHandler(req, res) {
+  if (!isSubscriber(req)) return res.status(402).json({ error: "L'analyse photo est réservée aux abonnés Bon'Assiette+." });
   if (!photoEnabled()) return res.status(503).json({ error: "L'analyse photo n'est pas encore activée." });
   const { image, mime } = req.body || {};
   if (typeof image !== "string" || !["image/jpeg", "image/png", "image/webp"].includes(mime)) {
@@ -88,7 +93,7 @@ export async function analyseHandler(req, res) {
     return res.status(400).json({ error: "Photo trop lourde ou illisible." });
   }
   if (!takeGlobalSlot()) {
-    return res.status(429).json({ error: "Trop d'analyses aujourd'hui sur Gamelle. Réessaie demain ou ajoute ton repas à la main." });
+    return res.status(429).json({ error: "Trop d'analyses aujourd'hui sur Bon'Assiette. Réessaie demain ou ajoute ton repas à la main." });
   }
 
   const ctrl = new AbortController();

@@ -1,7 +1,7 @@
-// Gamelle : garde l'appli en cache pour qu'elle s'ouvre même sans réseau.
+// Bon'Assiette : garde l'appli en cache pour qu'elle s'ouvre même sans réseau.
 // Ce fichier remplace aussi l'ancien service worker publicitaire de l'ancien site
 // chez les visiteurs qui l'avaient encore.
-const CACHE = "gamelle-v4";
+const CACHE = "bonassiette-v5";
 const FILES = [
   "/", "/app.css", "/app.js", "/data.js", "/manifest.webmanifest", "/icon.svg",
   "/fonts/bricolage-grotesque-latin-700-normal.woff2", "/fonts/bricolage-grotesque-latin-800-normal.woff2",

@@ -1,7 +1,7 @@
 {
-  "name": "Gamelle",
-  "short_name": "Gamelle",
-  "description": "Suis ce que tu manges et trouve des repas étudiants pas chers.",
+  "name": "Bon'Assiette",
+  "short_name": "Bon'Assiette",
+  "description": "Suis ce que tu manges et trouve des repas pas chers.",
   "lang": "fr",
   "start_url": "./",
   "scope": "./",

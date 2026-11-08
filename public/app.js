@@ -179,8 +179,9 @@
 
   // ---------- Points et niveaux ----------
   const LEVELS = [
-    [0, "Débutant"], [100, "Commis"], [250, "Apprenti"], [500, "Cuisinier"], [900, "Cuistot"],
-    [1400, "Chef de partie"], [2000, "Sous-chef"], [3000, "Chef"], [4500, "Chef étoilé"], [6500, "Grand chef"], [9000, "Légende"]
+    // Grades de la brigade de cuisine. La Toque d'or demande au moins 250 jours au plafond de points.
+    [0, "Plongeur"], [100, "Commis"], [300, "Apprenti"], [700, "Cuistot"], [1300, "Cuisinier"],
+    [2200, "Chef de partie"], [3500, "Sous-chef"], [5500, "Chef de cuisine"], [9000, "Chef étoilé"], [15000, "Grand chef"], [30000, "Toque d'or"]
   ];
   function levelOf(x) {
     let i = 0; while (i + 1 < LEVELS.length && x >= LEVELS[i + 1][0]) i++;
@@ -471,11 +472,22 @@
   });
 
   // ---------- Photo de l'assiette ----------
-  // La photo est réduite sur le téléphone, envoyée au serveur Gamelle qui la fait analyser, puis oubliée.
-  let photo = null, photoRun = 0, photoFocus = null;
+  // La photo est réduite sur le téléphone, envoyée au serveur Bon'Assiette qui la fait analyser, puis oubliée.
+  let photo = null, photoRun = 0, photoFocus = null, photoReady = false;
+  // Réservé aux abonnés Bon'Assiette+ : les autres voient ce que fait la fonction et l'arrivée de l'abonnement.
+  $("photoBtn").addEventListener("click", () => {
+    if (isSubscriber() && photoReady) { $("photoIn").click(); return; }
+    track("premium_interet", { fonction: "photo" });
+    photoFocus = document.activeElement;
+    $("premBg").hidden = false; $("premSheet").hidden = false; $("premOk").focus();
+  });
+  const closePrem = () => { $("premBg").hidden = true; $("premSheet").hidden = true; photoFocus?.focus?.(); };
+  $("premOk").addEventListener("click", closePrem);
+  $("premBg").addEventListener("click", closePrem);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("premSheet").hidden) closePrem(); });
   fetch("/api/status", { cache: "no-store" })
     .then(r => (r.ok ? r.json() : null))
-    .then(s => { if (s?.photo) $("photoWrap").hidden = false; })
+    .then(s => { photoReady = Boolean(s?.photo); })
     .catch(() => {});
   function resizeImage(file) {
     return new Promise((resolve, reject) => {
@@ -796,7 +808,7 @@
 
   // ---------- Mesure d'audience (Google Analytics) ----------
   // Avec la publicité, le message de consentement officiel de Google s'en charge (mode consentement).
-  // Sans publicité, Gamelle affiche son propre bandeau et ne charge Analytics qu'après « Accepter ».
+  // Sans publicité, Bon'Assiette affiche son propre bandeau et ne charge Analytics qu'après « Accepter ».
   window.dataLayer = window.dataLayer || [];
   function gtag() { window.dataLayer.push(arguments); }
   let gaLoaded = false;

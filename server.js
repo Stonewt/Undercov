@@ -1,4 +1,4 @@
-// Gamelle : serveur minimal. Il ne fait qu'envoyer des fichiers publics.
+// Bon'Assiette : serveur minimal. Il ne fait qu'envoyer des fichiers publics.
 // Pas de base de données, pas de compte, pas de formulaire : rien à voler ni à injecter.
 import express from "express";
 import helmet from "helmet";
@@ -185,7 +185,7 @@ app.use((err, req, res, _next) => {
   res.status(err?.status === 403 ? 403 : 500).type("text/plain").send("Erreur");
 });
 
-const server = app.listen(PORT, () => console.log(`Gamelle en ligne sur le port ${PORT}`));
+const server = app.listen(PORT, () => console.log(`Bon'Assiette en ligne sur le port ${PORT}`));
 
 // 13. Délais courts contre les connexions laissées ouvertes exprès (attaque « slowloris »).
 server.headersTimeout = 10_000;

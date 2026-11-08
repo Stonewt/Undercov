@@ -1,4 +1,4 @@
-// Réglages de Gamelle. Ces identifiants ne sont pas secrets (ils apparaissent dans la page).
+// Réglages de Bon'Assiette. Ces identifiants ne sont pas secrets (ils apparaissent dans la page).
 // Ne JAMAIS mettre de clé secrète ici : les secrets vont dans les variables de Railway.
 export default {
   // Google AdSense : identifiant éditeur, par exemple "ca-pub-1234567890123456".

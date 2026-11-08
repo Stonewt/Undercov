@@ -1,8 +1,8 @@
 {
-  "name": "gamelle",
+  "name": "bonassiette",
   "version": "1.0.0",
   "private": true,
-  "description": "Gamelle : suivi des repas et recettes étudiantes pas chères",
+  "description": "Bon'Assiette : suivi des repas et recettes pas chères",
   "type": "module",
   "main": "server.js",
   "scripts": {

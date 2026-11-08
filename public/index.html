@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Gamelle</title>
-<meta name="description" content="Suis tes calories et tes protéines, et trouve des repas étudiants pas chers. Valeurs nutritionnelles issues de la table Ciqual de l'ANSES.">
+<title>Bon'Assiette</title>
+<meta name="description" content="Suis tes calories et tes protéines, et trouve des repas pas chers. Valeurs nutritionnelles issues de la table Ciqual de l'ANSES.">
 <meta name="theme-color" content="#2f6b3c">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
@@ -17,7 +17,7 @@
 <body>
 <header class="top">
   <div class="top-in">
-    <h1 class="brand">Gam<span>elle</span></h1>
+    <h1 class="brand">Bon'<span>Assiette</span></h1>
     <nav class="tabs" aria-label="Sections">
       <div class="in" role="tablist">
         <button role="tab" aria-selected="true" data-v="jour"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>Aujourd'hui</button>
@@ -101,8 +101,8 @@
     <div class="col-b">
       <div class="panel">
         <h2>Ajouter un repas</h2>
-        <div id="photoWrap" hidden>
-          <label class="photo-btn" for="photoIn"><span>📷 Prendre mon assiette en photo</span><small>Calories et macros calculées aliment par aliment</small></label>
+        <div id="photoWrap">
+          <button class="photo-btn" id="photoBtn" type="button"><span>📷 Prendre mon assiette en photo <b class="plus">Bon'Assiette+</b></span><small>Calories et macros calculées aliment par aliment</small></button>
           <input type="file" id="photoIn" accept="image/jpeg,image/png,image/webp,image/heic,image/*" class="sr">
         </div>
         <div id="recentWrap" hidden>
@@ -192,9 +192,9 @@
     </div>
     <div class="col-stack">
       <div class="panel" id="installPanel">
-        <h3>Mets Gamelle sur ton écran d'accueil</h3>
+        <h3>Mets Bon'Assiette sur ton écran d'accueil</h3>
         <p class="small muted">Sur iPhone : bouton Partager, puis « Sur l'écran d'accueil ». Sur Android : menu ⋮, puis « Installer l'application ».</p>
-        <button class="primary" id="installBtn" type="button" hidden>Installer Gamelle</button>
+        <button class="primary" id="installBtn" type="button" hidden>Installer Bon'Assiette</button>
       </div>
       <div class="panel">
         <h3>Tes données</h3>
@@ -214,8 +214,8 @@
     <div class="panel prose">
       <h2>Comment ça marche</h2>
       <ol class="how">
-        <li><strong>Remplis ton profil.</strong> Gamelle calcule combien de calories et de protéines il te faut par jour.</li>
-        <li><strong>Note ce que tu manges.</strong> Cherche le plat, choisis la portion, appuie sur « Ajouter ». Tes plats habituels apparaissent ensuite en un geste. Tu peux aussi prendre ton assiette en photo : Gamelle détaille chaque aliment avec son poids (par exemple 150 g de pâtes, 60 g de béchamel) et tu corriges les grammes si besoin.</li>
+        <li><strong>Remplis ton profil.</strong> Bon'Assiette calcule combien de calories et de protéines il te faut par jour.</li>
+        <li><strong>Note ce que tu manges.</strong> Cherche le plat, choisis la portion, appuie sur « Ajouter ». Tes plats habituels apparaissent ensuite en un geste. Tu peux aussi prendre ton assiette en photo : Bon'Assiette détaille chaque aliment avec son poids (par exemple 150 g de pâtes, 60 g de béchamel) et tu corriges les grammes si besoin.</li>
         <li><strong>Regarde ce qu'il te reste.</strong> Le cercle montre les calories restantes, les barres tes protéines, glucides et lipides.</li>
         <li><strong>Manque d'idées ou de budget ?</strong> L'onglet « Pas cher » propose des recettes à moins de 2 € la portion, avec la liste de courses.</li>
         <li><strong>Bois et bouge.</strong> Coche tes verres d'eau et note tes séances d'entraînement.</li>
@@ -223,7 +223,7 @@
       </ol>
 
       <h3>Points et grades</h3>
-      <p>Chaque bon geste rapporte des points (XP). En cumulant les points, tu montes de grade, de Débutant à Légende. Les points récompensent la régularité, jamais le fait de manger moins.</p>
+      <p>Chaque bon geste rapporte des points (XP). En cumulant les points, tu montes en grade dans la brigade : Plongeur, Commis, Apprenti, Cuistot, Cuisinier, Chef de partie, Sous-chef, Chef de cuisine, Chef étoilé, Grand chef, et enfin la Toque d'or, qui demande au moins 250 jours de rigueur. Les points récompensent la régularité, jamais le fait de manger moins.</p>
       <ul>
         <li>Repas noté : +10 XP · recette cuisinée : +15 XP</li>
         <li>Séance d'entraînement : +20 XP (une par jour)</li>
@@ -236,7 +236,7 @@
       <p>L'Autorité européenne de sécurité des aliments (EFSA) conseille environ 2 L d'eau par jour pour une femme et 2,5 L pour un homme, dont à peu près 20 % viennent des aliments. Il reste environ 1,6 L à boire pour une femme et 2 L pour un homme : 7 ou 8 verres de 25 cl. Bois davantage s'il fait chaud ou si tu fais du sport.</p>
 
       <h3>L'analyse photo</h3>
-      <p>La photo est envoyée à un service d'intelligence artificielle (Claude, d'Anthropic) qui reconnaît les aliments et estime les quantités. C'est une estimation : vérifie toujours les grammes. La photo n'est pas conservée par Gamelle. Six analyses par jour sont offertes.</p>
+      <p>La photo est envoyée à un service d'intelligence artificielle (Claude, d'Anthropic) qui reconnaît les aliments et estime les quantités. C'est une estimation : vérifie toujours les grammes. La photo n'est pas conservée par Bon'Assiette. Cette fonction fera partie de l'abonnement Bon'Assiette+.</p>
 
       <h3>D'où viennent les valeurs nutritionnelles ?</h3>
       <p>De la <strong>table Ciqual 2025</strong> de l'ANSES (Agence nationale de sécurité sanitaire), la référence officielle française. Chaque plat indique sa portion et l'aliment Ciqual utilisé : appuie sur « Source » pour le voir. Les recettes sont calculées ingrédient par ingrédient.</p>
@@ -249,10 +249,10 @@
         <li><strong>Lipides</strong> : 35 % des calories, dans la fourchette de 35 à 40 % recommandée par l'ANSES pour les adultes.</li>
         <li><strong>Glucides</strong> : le reste des calories.</li>
       </ul>
-      <p class="note">Ce sont des repères généraux. Gamelle n'est pas un outil médical. En cas de maladie, de grossesse, de troubles alimentaires ou de doute, demande conseil à un médecin ou à un diététicien.</p>
+      <p class="note">Ce sont des repères généraux. Bon'Assiette n'est pas un outil médical. En cas de maladie, de grossesse, de troubles alimentaires ou de doute, demande conseil à un médecin ou à un diététicien.</p>
 
       <h3>Pourquoi une seule pesée par semaine ?</h3>
-      <p>Le poids bouge de 1 à 2 kg d'un jour à l'autre sans que rien ne change vraiment (eau, sel, digestion). Se peser tous les jours ne montre que ce bruit et peut devenir une source de stress. Une mesure par semaine, ou mieux une par mois, montre la vraie tendance. C'est pour ça que Gamelle bloque la mesure suivante pendant 7 jours.</p>
+      <p>Le poids bouge de 1 à 2 kg d'un jour à l'autre sans que rien ne change vraiment (eau, sel, digestion). Se peser tous les jours ne montre que ce bruit et peut devenir une source de stress. Une mesure par semaine, ou mieux une par mois, montre la vraie tendance. C'est pour ça que Bon'Assiette bloque la mesure suivante pendant 7 jours.</p>
 
       <h3>Et les prix ?</h3>
       <p>Ce sont des estimations pour une portion, basées sur des produits de marque distributeur en supermarché discount. Ils changent selon le magasin et la période.</p>
@@ -299,6 +299,15 @@
   <div class="grid2"><button class="ghost" id="photoCancel" type="button">Annuler</button><button class="primary" id="photoAdd" type="button" disabled>Ajouter</button></div>
 </div>
 
+<div class="sheet-bg" id="premBg" hidden></div>
+<div class="sheet" id="premSheet" role="dialog" aria-modal="true" aria-labelledby="premTitle" hidden>
+  <div class="eyebrow">Bon'Assiette+</div>
+  <h3 id="premTitle">Ton assiette en photo, analysée aliment par aliment</h3>
+  <p>Prends ton repas en photo : chaque aliment est reconnu et pesé, par exemple 150 g de pâtes, 60 g de béchamel, 15 g d'emmental, avec ses calories et ses macros. Tu corriges les grammes si besoin, et c'est noté.</p>
+  <p class="note">L'abonnement Bon'Assiette+ arrive bientôt. En attendant, tout le reste de l'appli reste gratuit.</p>
+  <button class="primary big-cta" id="premOk" type="button">J'ai compris</button>
+</div>
+
 <!-- Accueil guidé -->
 <div class="onb" id="onb" role="dialog" aria-modal="true" aria-labelledby="onbTitle" hidden>
   <div class="onb-in">
@@ -316,7 +325,7 @@
     <div class="onb-step" data-step="2" hidden>
       <p class="eyebrow">Étape 1 sur 2</p>
       <h2 class="onb-title">Parle-nous de toi</h2>
-      <p class="small muted">Ça sert à calculer ton objectif du jour. Gamelle est réservée aux adultes.</p>
+      <p class="small muted">Ça sert à calculer ton objectif du jour. Bon'Assiette est réservée aux adultes.</p>
       <div id="onbForm"></div>
       <button class="primary big-cta" type="button" id="onbCalc">Calculer mon objectif</button>
     </div>
@@ -334,7 +343,7 @@
 <!-- Bandeau cookies (mesure d'audience) -->
 <div class="consent" id="consent" role="dialog" aria-labelledby="consentTitle" hidden>
   <h3 id="consentTitle">Tu acceptes la mesure d'audience ?</h3>
-  <p class="small">Gamelle aimerait utiliser Google Analytics pour compter les visites et améliorer l'appli. Ça dépose des cookies. Tes repas et ton profil ne sont jamais envoyés. <a href="/confidentialite">En savoir plus</a></p>
+  <p class="small">Bon'Assiette aimerait utiliser Google Analytics pour compter les visites et améliorer l'appli. Ça dépose des cookies. Tes repas et ton profil ne sont jamais envoyés. <a href="/confidentialite">En savoir plus</a></p>
   <div class="grid2"><button class="ghost" id="consentNo" type="button">Refuser</button><button class="ghost" id="consentYes" type="button">Accepter</button></div>
 </div>
 

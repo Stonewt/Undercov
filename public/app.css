@@ -239,3 +239,11 @@ nav.tabs svg{width:22px;height:22px}
   .sheet{top:50%;bottom:auto;transform:translate(-50%,-50%);border-radius:20px;width:min(480px,calc(100% - 32px))}
 }
 @media (prefers-reduced-motion:reduce){.bar i,.arc{transition:none}}
+
+/* Bandeau cookies : accepter et refuser ont le même poids */
+.consent{position:fixed;z-index:45;left:50%;transform:translateX(-50%);bottom:calc(var(--nav-h) + 12px + env(safe-area-inset-bottom,0px));
+  width:min(520px,calc(100% - 32px));background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;
+  display:flex;flex-direction:column;gap:10px;box-shadow:0 8px 30px rgba(0,0,0,.18)}
+.consent a{color:var(--accent)}
+@media (min-width:900px){.consent{bottom:24px}}
+.consent:not([hidden]) ~ .toast{bottom:auto;top:calc(76px + env(safe-area-inset-top,0px))}

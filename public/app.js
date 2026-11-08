@@ -2,9 +2,12 @@
   "use strict";
 
   // ---------- Réglages ----------
-  // Publicité : renseigner les identifiants d'emplacement AdSense pour l'activer.
-  // Tant qu'ils sont vides, aucun script publicitaire n'est chargé.
-  const ADS = { client: "ca-pub-9008802243897755", slots: { jour: "", recettes: "" } };
+  // Réglages envoyés par le serveur (voir config.js). Vides = publicité et mesure désactivées.
+  let CFG = {};
+  try { CFG = JSON.parse(document.getElementById("cfg")?.textContent || "{}"); } catch { CFG = {}; }
+  const ADS = { client: CFG.adsClient || "", slots: CFG.adSlots || {} };
+  const GA_ID = /^G-[A-Z0-9]{6,12}$/.test(CFG.gaId || "") ? CFG.gaId : "";
+  const NONCE = document.querySelector("script[nonce]")?.nonce || "";
   // L'abonnement sera vérifié par le serveur ; en attendant, personne n'est abonné.
   const isSubscriber = () => false;
 
@@ -130,6 +133,7 @@
   $("onbDone").addEventListener("click", () => {
     profile = readProfile("o-"); LS.set("g-profile", profile);
     $("onb").hidden = true;
+    track("onboarding_termine", { objectif: profile.goal });
     renderAll(); toast("Objectif enregistré");
   });
 
@@ -218,6 +222,7 @@
     };
     days[TODAY] = [...meals(), item];
     saveDays();
+    track(item.recipe ? "recette_mangee" : "repas_ajoute", { nb_jour: days[TODAY].length, serie: streak() });
     const before = Number($("streakN").textContent);
     renderDay();
     const after = streak();
@@ -383,6 +388,7 @@
     if (v === "progres") renderProgress();
     if (v === "profil") mountProfileForm($("profileForm"), "p-");
     if (v === "jour") loadAd("jour");
+    track("vue", { onglet: v });
     window.scrollTo({ top: 0 });
   }
   document.querySelectorAll("nav.tabs button").forEach(b => b.addEventListener("click", () => show(b.dataset.v)));
@@ -393,7 +399,7 @@
   let adsScript = null;
   function loadAd(where) {
     const slot = ADS.slots[where], box = $("ad-" + where);
-    if (!box || !slot || isSubscriber()) { if (box) box.hidden = true; return; }
+    if (!box || !ADS.client || !slot || isSubscriber()) { if (box) box.hidden = true; return; }
     if (box.dataset.loaded) return;
     box.hidden = false; box.dataset.loaded = "1";
     const ins = document.createElement("ins");
@@ -404,12 +410,60 @@
     if (!adsScript) {
       adsScript = document.createElement("script");
       adsScript.async = true; adsScript.crossOrigin = "anonymous";
-      adsScript.nonce = document.currentScript?.nonce || document.querySelector("script[nonce]")?.nonce || "";
+      adsScript.nonce = NONCE;
       adsScript.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(ADS.client)}`;
       document.head.appendChild(adsScript);
     }
     (window.adsbygoogle = window.adsbygoogle || []).push({});
   }
+
+  // ---------- Mesure d'audience (Google Analytics) ----------
+  // Avec la publicité, le message de consentement officiel de Google s'en charge (mode consentement).
+  // Sans publicité, Gamelle affiche son propre bandeau et ne charge Analytics qu'après « Accepter ».
+  window.dataLayer = window.dataLayer || [];
+  function gtag() { window.dataLayer.push(arguments); }
+  let gaLoaded = false;
+  function loadGA() {
+    if (!GA_ID || gaLoaded) return;
+    gaLoaded = true;
+    gtag("js", new Date());
+    gtag("config", GA_ID, { anonymize_ip: true });
+    const s = document.createElement("script");
+    s.async = true; s.nonce = NONCE;
+    s.src = "https://www.googletagmanager.com/gtag/js?id=" + encodeURIComponent(GA_ID);
+    document.head.appendChild(s);
+  }
+  const track = (name, params) => { if (gaLoaded) gtag("event", name, params || {}); };
+  const SIX_MONTHS = 182 * 24 * 3600 * 1000;
+  function consentState() {
+    const c = LS.get("g-consent", null);
+    return c && Date.now() - c.at < SIX_MONTHS ? c.v : null;
+  }
+  function setConsent(v) {
+    LS.set("g-consent", { v, at: Date.now() });
+    $("consent").hidden = true;
+    if (v === "yes") loadGA();
+  }
+  function initMeasure() {
+    if (!GA_ID) return;
+    if (ADS.client && Object.values(ADS.slots).some(Boolean)) {
+      gtag("consent", "default", { ad_storage: "denied", analytics_storage: "denied", ad_user_data: "denied", ad_personalization: "denied", wait_for_update: 500 });
+      loadGA();
+      return;
+    }
+    $("cookiesBtn").hidden = false;
+    const c = consentState();
+    if (c === "yes") loadGA();
+    else if (c === null) $("consent").hidden = false;
+  }
+  $("consentYes").addEventListener("click", () => setConsent("yes"));
+  $("consentNo").addEventListener("click", () => setConsent("no"));
+  $("cookiesBtn").addEventListener("click", () => {
+    if (consentState() === "yes" && gaLoaded) {
+      // Retirer son accord : on l'enregistre et on recharge pour arrêter la mesure.
+      LS.set("g-consent", { v: "no", at: Date.now() }); location.reload();
+    } else { $("consent").hidden = false; }
+  });
 
   // ---------- Toast ----------
   let tt;
@@ -426,6 +480,7 @@
   function renderAll() { renderDay(); }
   $("today").textContent = today.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
   renderAll();
+  initMeasure();
   loadAd("jour");
   if (!profile) openOnboarding(1);
 })();

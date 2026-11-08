@@ -11,6 +11,8 @@
 <link rel="apple-touch-icon" href="/icon.svg">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="stylesheet" href="/app.css">
+<!--HEAD_EXTRA-->
+<script type="application/json" id="cfg">__CONFIG__</script>
 </head>
 <body>
 <header class="top">
@@ -150,6 +152,7 @@
       <div class="panel">
         <h3>Tes données</h3>
         <p class="small muted">Tout reste dans ce navigateur. Rien n'est envoyé à un serveur.</p>
+        <button class="ghost" id="cookiesBtn" type="button" hidden>Gérer les cookies</button>
         <button class="ghost" id="resetBtn" type="button">Effacer toutes mes données</button>
         <div id="resetConfirm" class="confirm" hidden>
           <p class="small">Tous tes repas, ton profil et tes badges seront effacés de cet appareil. C'est définitif.</p>
@@ -247,6 +250,13 @@
       <button class="linkbtn" type="button" data-next="2">Modifier mes informations</button>
     </div>
   </div>
+</div>
+
+<!-- Bandeau cookies (mesure d'audience) -->
+<div class="consent" id="consent" role="dialog" aria-labelledby="consentTitle" hidden>
+  <h3 id="consentTitle">Tu acceptes la mesure d'audience ?</h3>
+  <p class="small">Gamelle aimerait utiliser Google Analytics pour compter les visites et améliorer l'appli. Ça dépose des cookies. Tes repas et ton profil ne sont jamais envoyés. <a href="/confidentialite">En savoir plus</a></p>
+  <div class="grid2"><button class="ghost" id="consentNo" type="button">Refuser</button><button class="ghost" id="consentYes" type="button">Accepter</button></div>
 </div>
 
 <div class="toast" id="toast" role="status" hidden></div>

@@ -7,21 +7,23 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import CONFIG from "./config.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT) || 8080;
 const IS_PROD = process.env.NODE_ENV === "production" || Boolean(process.env.RAILWAY_ENVIRONMENT);
 
-// Publicité Google AdSense. À passer à true en même temps que les emplacements
-// sont renseignés dans public/app.js. Tant que c'est false, aucun domaine Google n'est autorisé.
-const ADS_ENABLED = false;
-const GOOGLE_ADS = [
+// Réglages publics (identifiants AdSense et Analytics) : voir config.js.
+const ADS_ON = CONFIG.adsEnabled && /^ca-pub-\d{10,20}$/.test(CONFIG.adsClient);
+const GA_ON = /^G-[A-Z0-9]{6,12}$/.test(CONFIG.gaId);
+const ADS_SOURCES = [
   "https://pagead2.googlesyndication.com", "https://*.googlesyndication.com", "https://*.doubleclick.net",
   "https://*.google.com", "https://*.gstatic.com", "https://*.googleadservices.com",
   "https://*.adtrafficquality.google", "https://fundingchoicesmessages.google.com"
 ];
-const ads = (list) => (ADS_ENABLED ? list : []);
+const GA_SOURCES = ["https://www.googletagmanager.com", "https://*.google-analytics.com", "https://*.analytics.google.com"];
+const THIRD = [...(ADS_ON ? ADS_SOURCES : []), ...(GA_ON ? GA_SOURCES : [])];
 
 // La page d'accueil est lue une fois ; un code unique (nonce) y est inséré à chaque affichage.
 const INDEX_HTML = fs.readFileSync(path.join(PUBLIC_DIR, "index.html"), "utf8");
@@ -62,12 +64,12 @@ app.use(
       useDefaults: false,
       directives: {
         "default-src": ["'none'"],
-        "script-src": [(req, res) => `'nonce-${res.locals.nonce}'`, "'strict-dynamic'", "'self'", ...ads(GOOGLE_ADS)],
-        "style-src": ["'self'", ...ads(["'unsafe-inline'"])],
+        "script-src": [(req, res) => `'nonce-${res.locals.nonce}'`, "'strict-dynamic'", "'self'", ...THIRD],
+        "style-src": ["'self'", ...(ADS_ON ? ["'unsafe-inline'"] : [])],
         "font-src": ["'self'"],
-        "img-src": ["'self'", "data:", ...ads(["https:"])],
-        "connect-src": ["'self'", ...ads(GOOGLE_ADS)],
-        "frame-src": ads(GOOGLE_ADS).length ? ads(GOOGLE_ADS) : ["'none'"],
+        "img-src": ["'self'", "data:", ...(THIRD.length ? ["https:"] : [])],
+        "connect-src": ["'self'", ...THIRD],
+        "frame-src": ADS_ON ? ADS_SOURCES : ["'none'"],
         "manifest-src": ["'self'"],
         "worker-src": ["'self'"],
         "base-uri": ["'none'"],
@@ -78,9 +80,9 @@ app.use(
       }
     },
     strictTransportSecurity: IS_PROD ? { maxAge: 63072000, includeSubDomains: true } : false,
-    referrerPolicy: { policy: ADS_ENABLED ? "strict-origin-when-cross-origin" : "no-referrer" },
-    crossOriginEmbedderPolicy: ADS_ENABLED ? false : { policy: "require-corp" },
-    crossOriginOpenerPolicy: { policy: ADS_ENABLED ? "same-origin-allow-popups" : "same-origin" },
+    referrerPolicy: { policy: THIRD.length ? "strict-origin-when-cross-origin" : "no-referrer" },
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: { policy: ADS_ON ? "same-origin-allow-popups" : "same-origin" },
     crossOriginResourcePolicy: { policy: "same-origin" },
     xFrameOptions: { action: "deny" }
   })
@@ -102,11 +104,27 @@ app.use(
 );
 
 // 7. Page d'accueil avec son code unique.
+const PUBLIC_CONFIG = JSON.stringify({
+  adsClient: ADS_ON ? CONFIG.adsClient : "", adSlots: ADS_ON ? CONFIG.adSlots : {}, gaId: GA_ON ? CONFIG.gaId : ""
+}).replace(/</g, "\\u003c");
+const HEAD_EXTRA = /^ca-pub-\d{10,20}$/.test(CONFIG.adsClient)
+  ? `<meta name="google-adsense-account" content="${CONFIG.adsClient}">` : "";
 const sendIndex = (req, res) => {
   res.set("Cache-Control", "no-cache");
-  res.type("html").send(INDEX_HTML.replaceAll("__NONCE__", res.locals.nonce));
+  res.type("html").send(
+    INDEX_HTML.replaceAll("__NONCE__", res.locals.nonce)
+      .replace("<!--HEAD_EXTRA-->", HEAD_EXTRA)
+      .replace("__CONFIG__", PUBLIC_CONFIG)
+  );
 };
 app.get(["/", "/index.html"], sendIndex);
+
+// ads.txt : déclare qui a le droit de vendre la publicité du site.
+app.get("/ads.txt", (req, res) => {
+  const m = /^ca-pub-(\d{10,20})$/.exec(CONFIG.adsClient);
+  res.type("text/plain").set("Cache-Control", "public, max-age=3600");
+  res.send(m ? `google.com, pub-${m[1]}, DIRECT, f08c47fec0942fa0\n` : "");
+});
 
 // 8. Anciennes adresses : /gamelle/ renvoie vers l'accueil.
 app.get(["/gamelle", "/gamelle/{*rest}"], (req, res) => res.redirect(301, "/"));

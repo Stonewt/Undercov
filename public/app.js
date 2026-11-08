@@ -1,1949 +1,348 @@
-const socket = io();
-window.socket = socket;
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const r0 = (n) => Math.round(Number(n) || 0);
+  const pad = (n) => String(n).padStart(2, "0");
+  const keyOf = (d) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const euro = (n) => n.toFixed(2).replace(".", ",") + " €";
+  const today = new Date(); const TODAY = keyOf(today);
+  $("today").textContent = today.toLocaleDateString("fr-FR", { weekday:"long", day:"numeric", month:"long" });
 
-let currentRoom = null;
-window.currentRoom = null;
+  // ---------- Base de plats (valeurs moyennes indicatives par portion) ----------
+  // [nom, kcal, protéines, glucides, lipides, mots-clés]
+  const FOODS = [
+    ["Plateau resto U (entrée, plat, dessert)",850,35,100,30,"crous ru cantine"],
+    ["Plat chaud resto U seul",550,28,60,20,"crous ru cantine"],
+    ["Kebab galette + frites",1100,45,110,50,"grec tacos"],
+    ["Kebab sandwich sans frites",700,38,60,32,"grec"],
+    ["Tacos français taille M",1100,45,110,52,"tacos"],
+    ["Burger + frites (menu)",1050,35,120,48,"fast food mcdo"],
+    ["Pizza entière (marguerita)",1000,42,120,36,"pizza"],
+    ["Part de pizza",250,11,30,9,"pizza"],
+    ["Pâtes bolognaise (assiette)",600,28,80,18,"pates spaghetti"],
+    ["Pâtes au thon et tomate",550,35,75,12,"pates"],
+    ["Pâtes carbonara",700,30,80,28,"pates"],
+    ["Riz, poulet et légumes",550,40,65,12,"riz"],
+    ["Chili con carne et riz",650,32,85,18,"chili"],
+    ["Lentilles cuisinées (250 g)",290,20,45,2,"legumineuses"],
+    ["Couscous poulet merguez",750,38,80,30,"couscous"],
+    ["Sushis (12 pièces)",550,24,85,10,"japonais"],
+    ["Nouilles instantanées",400,8,55,16,"ramen"],
+    ["Sandwich jambon-beurre",450,20,50,18,"boulangerie"],
+    ["Croque-monsieur",400,20,35,20,"boulangerie"],
+    ["Quiche lorraine (part)",450,14,28,31,"boulangerie"],
+    ["Salade composée au poulet",450,30,25,25,"salade"],
+    ["Omelette 3 œufs",300,20,2,23,"oeufs"],
+    ["Poulet rôti (150 g)",300,40,0,15,"viande"],
+    ["Steak haché 5 % + purée",550,30,45,26,"viande"],
+    ["Bol de céréales + lait",350,10,60,6,"petit dejeuner"],
+    ["Tartines beurre-confiture (2)",300,5,45,11,"petit dejeuner"],
+    ["Croissant",230,5,25,12,"viennoiserie boulangerie"],
+    ["Pain au chocolat",280,5,31,15,"viennoiserie boulangerie chocolatine"],
+    ["Skyr nature (150 g)",90,15,6,0,"yaourt laitage"],
+    ["Yaourt nature",60,4,6,2,"laitage"],
+    ["Fromage blanc (200 g)",150,15,8,6,"laitage"],
+    ["Banane",105,1,27,0,"fruit"],
+    ["Pomme",80,0,21,0,"fruit"],
+    ["Poignée d'amandes (30 g)",175,6,6,15,"noix"],
+    ["Barre chocolatée",250,3,30,13,"snack"],
+    ["Paquet de chips (45 g)",240,3,24,15,"snack apero"],
+    ["Shaker de whey (30 g, eau)",120,24,3,2,"proteine"],
+    ["Soda (33 cl)",140,0,35,0,"boisson coca"],
+    ["Bière (25 cl)",105,1,9,0,"boisson alcool"],
+    ["Café au lait sucré",80,3,10,3,"boisson"]
+  ].map(([name,kcal,prot,gluc,lip,tags]) => ({ name, kcal, prot, gluc, lip, tags }));
 
-let myPlayerId = localStorage.getItem("playerId") || null;
-window.myPlayerId = myPlayerId;
-let myPlayerToken = localStorage.getItem("playerToken") || null;
-let myRoomCode = localStorage.getItem("roomCode") || null;
-let timerInterval = null;
-let selectedVoteTargetId = null;
-let selectedVoteTargetName = null;
-let voteAlreadySent = false;
-let currentTurnKey = null;
-let autoSubmittedTurnKey = null;
-let previousVisiblePlayerIds = [];
-let lastTensionSecondPlayed = null;
-let mobileActiveTab = null;
-
-// ─── DOM refs ───────────────────────────────────────────
-const nameInput        = document.getElementById("nameInput");
-const roomInput        = document.getElementById("roomInput");
-const createBtn        = document.getElementById("createBtn");
-const joinBtn          = document.getElementById("joinBtn");
-const resumeBlock      = document.getElementById("resumeBlock");
-const resumeBtn        = document.getElementById("resumeBtn");
-const resumeSeparator  = document.getElementById("resumeSeparator");
-const statusBanner     = document.getElementById("statusBanner");
-const topRoomInfo      = document.getElementById("topRoomInfo");
-const topHostInfo      = document.getElementById("topHostInfo");
-const startWrap        = document.getElementById("startWrap");
-const roomSetupCard    = document.getElementById("roomSetupCard");
-const leaveWrap        = document.getElementById("leaveWrap");
-const leaveBtn         = document.getElementById("leaveBtn");
-const lobby            = document.getElementById("lobby");
-const phaseInfo        = document.getElementById("phaseInfo");
-const speakerInfo      = document.getElementById("speakerInfo");
-const playersList      = document.getElementById("playersList");
-const startBtn         = document.getElementById("startBtn");
-const restartBtn       = document.getElementById("restartBtn");
-const secretCard       = document.getElementById("secretCard");
-const wordText         = document.getElementById("wordText");
-const compositionCard  = document.getElementById("compositionCard");
-const compositionHelp  = document.getElementById("compositionHelp");
-const compositionSummary = document.getElementById("compositionSummary");
-const undercoverCountInput = document.getElementById("undercoverCountInput");
-const mrWhiteCountInput    = document.getElementById("mrWhiteCountInput");
-const turnDurationInput    = document.getElementById("turnDurationInput");
-const voteDurationInput    = document.getElementById("voteDurationInput");
-const categorySelect       = document.getElementById("categorySelect");
-const subcategorySelect    = document.getElementById("subcategorySelect");
-const wordsPerTurnInput    = document.getElementById("wordsPerTurnInput");
-const gameMasterModeInput  = document.getElementById("gameMasterModeInput");
-const gameMasterFixedSelect = document.getElementById("gameMasterFixedSelect");
-const gameMasterFixedBlock  = document.getElementById("gameMasterFixedBlock");
-const chatCard         = document.getElementById("chatCard");
-const messagesList     = document.getElementById("messagesList");
-const chatInput        = document.getElementById("chatInput");
-const sendChatBtn      = document.getElementById("sendChatBtn");
-const chatHelp         = document.getElementById("chatHelp");
-const roleDolls        = document.getElementById("roleDolls");
-const waitingRoleDolls = document.getElementById("waitingRoleDolls");
-const waitingCard      = document.getElementById("waitingCard");
-const waitingText      = document.getElementById("waitingText");
-const waitingCategory  = document.getElementById("waitingCategory");
-const waitingSubcategory = document.getElementById("waitingSubcategory");
-const waitingTurnDuration = document.getElementById("waitingTurnDuration");
-const waitingVoteDuration = document.getElementById("waitingVoteDuration");
-const voteCard         = document.getElementById("voteCard");
-const voteButtons      = document.getElementById("voteButtons");
-const selectedVoteText = document.getElementById("selectedVoteText");
-const confirmVoteBtn   = document.getElementById("confirmVoteBtn");
-const endCard          = document.getElementById("endCard");
-const endTitle         = document.getElementById("endTitle");
-const winnerText       = document.getElementById("winnerText");
-const revealList       = document.getElementById("revealList");
-const timerFill        = document.getElementById("timerFill");
-const timerText        = document.getElementById("timerText");
-
-let audioCtx = null;
-
-// ─── AUDIO ──────────────────────────────────────────────
-function ensureAudio() {
-  if (!audioCtx) {
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (AC) audioCtx = new AC();
-  }
-  if (audioCtx?.state === "suspended") audioCtx.resume().catch(() => {});
-}
-
-function playTone({ type="triangle", from=440, to=660, duration=0.08, gain=0.05 }={}) {
-  ensureAudio();
-  if (!audioCtx) return;
-  const now = audioCtx.currentTime;
-  const osc = audioCtx.createOscillator();
-  const gn  = audioCtx.createGain();
-  osc.type = type;
-  osc.connect(gn); gn.connect(audioCtx.destination);
-  osc.frequency.setValueAtTime(from, now);
-  osc.frequency.exponentialRampToValueAtTime(Math.max(to, 0.001), now + duration);
-  gn.gain.setValueAtTime(0.0001, now);
-  gn.gain.exponentialRampToValueAtTime(gain, now + 0.01);
-  gn.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-  osc.start(now); osc.stop(now + duration + 0.01);
-}
-
-function playClickSound(type = "default") {
-  const map = {
-    soft:    { type:"sine",     from:520, to:760, duration:0.05, gain:0.035 },
-    success: { type:"triangle", from:660, to:980, duration:0.09, gain:0.05  },
-    join:    { type:"triangle", from:520, to:840, duration:0.1,  gain:0.05  },
-    leave:   { type:"sawtooth", from:420, to:220, duration:0.1,  gain:0.04  },
-    vote:    { type:"square",   from:500, to:680, duration:0.07, gain:0.035 },
-    tension: { type:"square",   from:780, to:840, duration:0.06, gain:0.028 },
-    reveal:  { type:"triangle", from:340, to:720, duration:0.16, gain:0.045 },
-    default: { type:"triangle", from:420, to:620, duration:0.04, gain:0.04  },
-  };
-  playTone(map[type] || map.default);
-}
-
-function attachUiSounds() {
-  document.addEventListener("pointerdown", (e) => {
-    if (e.target.closest("button")) { playClickSound("default"); return; }
-    if (e.target.closest("select,input")) playClickSound("soft");
-  }, { passive: true });
-}
-
-// ─── STATUS ─────────────────────────────────────────────
-function setStatus(msg, important = false) {
-  statusBanner.textContent = msg;
-  statusBanner.classList.remove("hidden");
-  statusBanner.classList.toggle("important", important);
-  clearTimeout(setStatus._t);
-  setStatus._t = setTimeout(() => {
-    statusBanner.classList.add("hidden");
-    statusBanner.classList.remove("important");
-  }, important ? 2200 : 1600);
-}
-
-// ─── COPY ────────────────────────────────────────────────
-function copyText(text, cb) {
-  const done = () => cb?.();
-  if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(text).then(done).catch(() => { fallback(); done(); });
-    return;
-  }
-  fallback(); done();
-  function fallback() {
-    const el = Object.assign(document.createElement("textarea"), { value: text });
-    document.body.appendChild(el); el.select(); document.execCommand("copy"); el.remove();
-  }
-}
-
-function initTopRoomCopy() {
-  if (!topRoomInfo) return;
-  topRoomInfo.addEventListener("click", () => {
-    if (!currentRoom?.code) return;
-    copyText(currentRoom.code, () => {
-      topRoomInfo.classList.add("copy-flash");
-      setStatus(`Code ${currentRoom.code} copié`);
-      setTimeout(() => topRoomInfo.classList.remove("copy-flash"), 950);
-    });
-  });
-}
-
-// ─── SESSION ─────────────────────────────────────────────
-function saveSession(playerId, playerToken, roomCode) {
-  myPlayerId = playerId; window.myPlayerId = playerId;
-  myPlayerToken = playerToken;
-  myRoomCode = roomCode || myRoomCode;
-  localStorage.setItem("playerId", playerId);
-  localStorage.setItem("playerToken", playerToken);
-  if (myRoomCode) localStorage.setItem("roomCode", myRoomCode);
-}
-
-function clearSession() {
-  myPlayerId = myPlayerToken = myRoomCode = null;
-  ["playerId","playerToken","roomCode"].forEach(k => localStorage.removeItem(k));
-}
-
-function updateResumeUI(canResume = false) {
-  resumeBlock?.classList.toggle("hidden", !canResume);
-  resumeSeparator?.classList.toggle("hidden", !canResume);
-  if (canResume && myRoomCode && resumeBtn)
-    resumeBtn.textContent = `↩ Reprendre ma partie (${myRoomCode})`;
-}
-
-function validateStoredSession() {
-  if (!myPlayerToken || !myRoomCode) { updateResumeUI(false); return; }
-  socket.emit("checkSession", { playerToken: myPlayerToken, roomCode: myRoomCode }, (res) => {
-    if (!res?.ok) { clearSession(); updateResumeUI(false); return; }
-    updateResumeUI(true);
-  });
-}
-
-// ─── HELPERS ─────────────────────────────────────────────
-function normalizeSingleWordInput(v) {
-  if (typeof v !== "string") return "";
-  const c = v.trim().replace(/\s+/g," ");
-  return c ? c.split(" ")[0].slice(0,24) : "";
-}
-
-function stopTimer() {
-  clearInterval(timerInterval); timerInterval = null;
-  if (timerFill) { timerFill.style.width = "0%"; timerFill.style.background = "#22c55e"; }
-  if (timerText) timerText.textContent = "--";
-  lastTensionSecondPlayed = null;
-}
-
-function resetVoteSelection() {
-  selectedVoteTargetId = selectedVoteTargetName = null;
-  voteAlreadySent = false;
-  if (selectedVoteText) selectedVoteText.textContent = "Aucun joueur sélectionné.";
-  if (confirmVoteBtn) confirmVoteBtn.disabled = true;
-}
-
-function isMobile() { return window.innerWidth <= 820; }
-
-// ─── MOBILE : construction dynamique des panels ──────────
-function getMobileTabs(room) {
-  if (!room) return [];
-  const isHost = room.hostPlayerId === myPlayerId;
-  if (room.gameOver) {
-    return [{ id:"mob-result", label:"🏁 Résultat" }];
-  }
-  if (!room.started) {
-    if (isHost) return [
-      { id:"mob-waiting-players", label:"👥 Joueurs" },
-      { id:"mob-config",          label:"⚙ Config"  },
-    ];
-    return [{ id:"mob-waiting-players", label:"👥 Attente" }];
-  }
-  const tabs = [
-    { id:"mob-word",    label:"🔤 Mot"     },
-    { id:"mob-chat",    label:"💬 Chat"    },
-    { id:"mob-players", label:"👥 Joueurs" },
-    { id:"mob-vote",    label:"🗳 Vote", isVote: true },
+  // ---------- Recettes étudiantes (prix discount estimés par portion) ----------
+  const RECIPES = [
+    { name:"Pâtes thon-tomate", cost:1.10, min:15, need:["plaques"], kcal:620, prot:38, gluc:85, lip:12,
+      ing:[["Pâtes",  "100 g",0.10],["Thon au naturel","1 boîte 140 g",0.75],["Coulis de tomate","150 g",0.20],["Ail, herbes","pincée",0.05]],
+      steps:["Cuire les pâtes 10 min.","Chauffer le coulis avec l'ail et les herbes, ajouter le thon émietté.","Mélanger avec les pâtes."], tip:"Fais-en 3 portions : ça se garde 3 jours au frigo." },
+    { name:"Riz sauté aux œufs et légumes", cost:0.95, min:15, need:["plaques"], kcal:580, prot:24, gluc:80, lip:17,
+      ing:[["Riz","80 g",0.10],["Œufs","2",0.45],["Légumes surgelés","150 g",0.30],["Sauce soja","1 c. à s.",0.10]],
+      steps:["Cuire le riz (ou utiliser un reste de la veille).","Faire revenir les légumes, ajouter le riz.","Pousser sur le côté, brouiller les œufs, mélanger avec la sauce soja."], tip:"Le riz de la veille donne un meilleur résultat." },
+    { name:"Dahl de lentilles corail au lait de coco", cost:1.20, min:25, need:["plaques"], kcal:600, prot:26, gluc:80, lip:16,
+      ing:[["Lentilles corail","90 g",0.30],["Lait de coco","100 ml",0.35],["Tomates concassées","150 g",0.25],["Curry, oignon","",0.20],["Riz","60 g",0.10]],
+      steps:["Faire revenir l'oignon et le curry.","Ajouter lentilles, tomates, lait de coco et un verre d'eau ; cuire 15 min.","Servir avec du riz."], tip:"Se congèle très bien." },
+    { name:"Wrap poulet-crudités", cost:2.40, min:10, need:[], kcal:550, prot:38, gluc:55, lip:18,
+      ing:[["Tortillas","2",0.40],["Blanc de poulet cuit","120 g",1.50],["Salade, tomate","",0.30],["Fromage blanc + moutarde","2 c. à s.",0.20]],
+      steps:["Étaler la sauce fromage blanc-moutarde sur les tortillas.","Garnir de poulet et crudités.","Rouler."], tip:"Parfait à emporter en cours." },
+    { name:"Chili sin carne", cost:1.30, min:25, need:["plaques"], kcal:650, prot:25, gluc:110, lip:8,
+      ing:[["Haricots rouges","1/2 boîte",0.40],["Maïs","1/4 boîte",0.20],["Tomates concassées","200 g",0.30],["Épices chili, oignon","",0.20],["Riz","70 g",0.10]],
+      steps:["Faire revenir l'oignon et les épices.","Ajouter tomates, haricots et maïs ; mijoter 15 min.","Servir avec du riz."], tip:"Ajoute un œuf au plat pour plus de protéines." },
+    { name:"Tortilla de pommes de terre", cost:1.00, min:25, need:["plaques"], kcal:600, prot:26, gluc:55, lip:28,
+      ing:[["Pommes de terre","250 g",0.30],["Œufs","3",0.65],["Oignon","1/2",0.05]],
+      steps:["Cuire les pommes de terre en fines rondelles à la poêle 12 min avec l'oignon.","Verser les œufs battus.","Cuire à feu doux à couvert 8 min."], tip:"Se mange chaude ou froide le lendemain." },
+    { name:"Patate douce farcie thon-fromage blanc", cost:1.60, min:12, need:["micro"], kcal:520, prot:35, gluc:70, lip:8,
+      ing:[["Patate douce","1 moyenne",0.60],["Thon","1/2 boîte",0.40],["Fromage blanc","100 g",0.25],["Ciboulette","",0.10]],
+      steps:["Piquer la patate douce, micro-ondes 8 à 10 min.","Mélanger thon, fromage blanc et ciboulette.","Ouvrir la patate et garnir."], tip:"Au four : 45 min à 200 °C, encore meilleur." },
+    { name:"Bowl skyr, avoine et banane", cost:1.10, min:5, need:[], kcal:480, prot:30, gluc:70, lip:8,
+      ing:[["Skyr","200 g",0.60],["Flocons d'avoine","50 g",0.10],["Banane","1",0.25],["Miel","1 c. à c.",0.10]],
+      steps:["Verser le skyr dans un bol.","Ajouter l'avoine, la banane en rondelles et le miel."], tip:"Prépare-le la veille, l'avoine devient plus moelleuse." },
+    { name:"Croque au micro-ondes et salade", cost:1.50, min:5, need:["micro"], kcal:500, prot:28, gluc:45, lip:22,
+      ing:[["Pain de mie","4 tranches",0.25],["Jambon","2 tranches",0.70],["Fromage râpé","40 g",0.35],["Salade","",0.20]],
+      steps:["Monter deux croques jambon-fromage.","Micro-ondes 1 min 30.","Servir avec la salade."], tip:"Au grille-pain à plat, ils deviennent croustillants." },
+    { name:"Couscous express pois chiches-légumes", cost:1.40, min:10, need:["bouilloire"], kcal:580, prot:22, gluc:95, lip:10,
+      ing:[["Semoule","80 g",0.10],["Pois chiches","1/2 boîte",0.40],["Légumes grillés en bocal","100 g",0.60],["Épices ras-el-hanout","",0.10]],
+      steps:["Couvrir la semoule d'eau bouillante, attendre 5 min.","Ajouter pois chiches, légumes et épices.","Mélanger avec un filet d'huile."], tip:"Se mange aussi froid, en salade." },
+    { name:"Carbonara économique", cost:1.30, min:15, need:["plaques"], kcal:700, prot:30, gluc:80, lip:28,
+      ing:[["Pâtes","100 g",0.10],["Lardons","50 g",0.50],["Œuf","1 + 1 jaune",0.45],["Fromage râpé","20 g",0.20]],
+      steps:["Cuire les pâtes, faire dorer les lardons.","Battre œufs et fromage.","Hors du feu, mélanger pâtes, lardons et œufs avec un peu d'eau de cuisson."], tip:"Jamais de crème : c'est l'eau de cuisson qui rend la sauce onctueuse." },
+    { name:"Nouilles instantanées améliorées", cost:0.90, min:10, need:["bouilloire"], kcal:520, prot:20, gluc:58, lip:22,
+      ing:[["Nouilles instantanées","1 sachet",0.30],["Œuf","1",0.22],["Légumes surgelés","80 g",0.20],["Sauce soja","",0.05]],
+      steps:["Préparer les nouilles à l'eau bouillante.","Ajouter les légumes et l'œuf (poché dans le bouillon ou mollet).","Assaisonner."], tip:"N'utilise que la moitié du sachet d'assaisonnement : très salé." }
   ];
-  return tabs;
-}
 
-function buildMobileTabs(room) {
-  const tabBar  = document.getElementById("mobileTabBar");
-  const mobArea = document.getElementById("mobileArea");
-  if (!tabBar || !mobArea) return;
+  // ---------- Défis du jour (doux, jamais punitifs) ----------
+  const DEFIS = [
+    { txt:"Atteindre ton objectif de protéines", test:(s,t)=> s.prot >= t.prot },
+    { txt:"Noter 3 repas ou collations aujourd'hui", test:(s,t,m)=> m.length >= 3 },
+    { txt:"Manger un fruit", test:(s,t,m)=> m.some(x => /banane|pomme|fruit/i.test(x.name)) },
+    { txt:"Cuisiner un repas pas cher", test:(s,t,m)=> m.some(x => x.recipe) },
+    { txt:"Un repas d'au moins 30 g de protéines", test:(s,t,m)=> m.some(x => x.prot >= 30) },
+    { txt:"Rester entre 90 et 110 % de ton objectif de calories", test:(s,t)=> s.kcal >= t.kcal*0.9 && s.kcal <= t.kcal*1.1 },
+    { txt:"Noter ton petit-déjeuner", test:(s,t,m)=> m.some(x => Number(String(x.time).slice(0,2)) < 11) }
+  ];
 
-  const tabs = getMobileTabs(room);
-  const validIds = tabs.map(t => t.id);
+  // ---------- Stockage local ----------
+  const LS = {
+    get(k, d){ try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+  };
+  const DEFAULT_PROFILE = { sex:"h", age:21, weight:70, height:175, activity:1.55, goal:"maintien" };
+  let profile = { ...DEFAULT_PROFILE, ...LS.get("g-profile", {}) };
+  let days = LS.get("g-days", {});              // { "AAAA-MM-JJ": [repas] }
+  let badges = LS.get("g-badges", {});          // { id: dateObtenue }
+  let kitchen = new Set(["plaques","micro","bouilloire"]);
+  const meals = () => days[TODAY] || [];
+  const saveDays = () => LS.set("g-days", days);
 
-  let defaultTab = validIds[0] || null;
-  if (room.gameOver)              defaultTab = "mob-result";
-  else if (room.phase==="voting") defaultTab = "mob-vote";
-  else if (room.started)          defaultTab = "mob-chat";
-  else                            defaultTab = "mob-waiting-players";
-
-  if (!mobileActiveTab || !validIds.includes(mobileActiveTab)) {
-    mobileActiveTab = defaultTab;
+  // ---------- Calculs ----------
+  function targets(p){
+    const bmr = 10*p.weight + 6.25*p.height - 5*p.age + (p.sex === "h" ? 5 : -161);
+    let kcal = bmr * Number(p.activity);
+    if (p.goal === "muscle") kcal *= 1.10;
+    if (p.goal === "perte") kcal *= 0.85;                 // déficit limité à 15 %
+    kcal = Math.max(kcal, p.sex === "h" ? 1800 : 1500);    // plancher prudent
+    const prot = p.weight * (p.goal === "muscle" ? 1.8 : p.goal === "perte" ? 1.6 : 1.2);
+    const lip = kcal * 0.30 / 9, gluc = Math.max(0, (kcal - prot*4 - lip*9) / 4);
+    return { kcal:r0(kcal), prot:r0(prot), gluc:r0(gluc), lip:r0(lip) };
+  }
+  const sum = (list) => list.reduce((a,m)=>({kcal:a.kcal+m.kcal,prot:a.prot+m.prot,gluc:a.gluc+m.gluc,lip:a.lip+m.lip}),{kcal:0,prot:0,gluc:0,lip:0});
+  function streak(){
+    let n = 0; const d = new Date(today);
+    if (!(days[keyOf(d)] || []).length) d.setDate(d.getDate()-1);   // la série tient jusqu'à ce soir
+    while ((days[keyOf(d)] || []).length) { n++; d.setDate(d.getDate()-1); }
+    return n;
+  }
+  function defiToday(){
+    const seed = Number(TODAY.replaceAll("-","")) % DEFIS.length;
+    return DEFIS[seed];
   }
 
-  tabBar.innerHTML = "";
-  tabs.forEach(tab => {
-    const btn = document.createElement("button");
-    btn.className = "mobile-game-tab";
-    if (tab.isVote) btn.classList.add("vote-tab");
-    if (tab.isVote && room.phase==="voting" && !room.gameOver) btn.classList.add("vote-tab-active-phase");
-    if (tab.id === mobileActiveTab) btn.classList.add("active");
-    btn.textContent = tab.label;
-    btn.addEventListener("click", () => {
-      mobileActiveTab = tab.id;
-      buildMobileTabs(room);
-    });
-    tabBar.appendChild(btn);
-  });
-
-  tabBar.style.display = "flex";
-  mobArea.style.display = "block";
-
-  mobArea.innerHTML = "";
-  switch (mobileActiveTab) {
-    case "mob-waiting-players": renderMobWaitingPlayers(room, mobArea); break;
-    case "mob-config":          renderMobConfig(mobArea);               break;
-    case "mob-word":            renderMobWord(mobArea);                 break;
-    case "mob-chat":            renderMobChat(room, mobArea);           break;
-    case "mob-players":         renderMobPlayers(room, mobArea);        break;
-    case "mob-vote":            renderMobVote(room, mobArea);           break;
-    case "mob-result":          renderMobResult(room, mobArea);         break;
-  }
-}
-
-// ── Salle d'attente / lobby ──────────────────────────────
-function renderMobWaitingPlayers(room, area) {
-  const isHost = room.hostPlayerId === myPlayerId;
-  const box = mkPanel();
-
-  const title = document.createElement("h2");
-  title.className = "waiting-title";
-  title.textContent = isHost ? "Salon d'attente" : "En attente…";
-  box.appendChild(title);
-
-  const sub = document.createElement("p");
-  sub.style.cssText = "text-align:center;font-size:14px;opacity:.70;margin-bottom:16px;";
-  sub.textContent = isHost
-    ? `${room.players.length} joueur(s) connecté(s). Configure dans l'onglet ⚙ Config.`
-    : "L'hôte va bientôt lancer la partie…";
-  box.appendChild(sub);
-
-  appendDolls(box, room, "Composition prévue");
-
-  const meta = document.createElement("div");
-  meta.className = "waiting-meta";
-  meta.style.margin = "14px 0";
-  meta.innerHTML = `
-    <div class="waiting-meta-item"><span class="waiting-meta-label">Catégorie</span><span>${room.selectedCategory||"--"}</span></div>
-    <div class="waiting-meta-item"><span class="waiting-meta-label">Sous-cat.</span><span>${room.selectedSubcategory||"--"}</span></div>
-    <div class="waiting-meta-item"><span class="waiting-meta-label">Tour</span><span>${room.turnDurationSeconds||30} s</span></div>
-    <div class="waiting-meta-item"><span class="waiting-meta-label">Vote</span><span>${room.voteDurationSeconds||30} s</span></div>
-  `;
-  box.appendChild(meta);
-
-  appendLabel(box, "Joueurs");
-  const ul = document.createElement("ul");
-  ul.className = "players-list-mobile";
-  room.players.forEach(p => {
-    const li = document.createElement("li");
-    li.className = "players-list-mobile-item";
-    let label = p.name;
-    if (p.id === myPlayerId) label += " (toi)";
-    if (p.id === room.hostPlayerId) label += " 👑";
-    if (!p.connected) label += " — déconnecté";
-    li.textContent = label;
-    ul.appendChild(li);
-  });
-  box.appendChild(ul);
-
-  if (isHost) {
-    const btn = mkBigBtn("Lancer la partie", "#22c55e", "#16a34a");
-    btn.style.marginTop = "18px";
-    btn.addEventListener("click", doStartGame);
-    box.appendChild(btn);
+  // ---------- Badges ----------
+  const BADGES = [
+    { id:"first", t:"Premier repas", d:"Noter ton premier repas", test:()=> Object.values(days).some(l=>l.length) },
+    { id:"s3", t:"3 jours d'affilée", d:"Une série de 3 jours", test:()=> streak() >= 3 },
+    { id:"s7", t:"Une semaine pleine", d:"Une série de 7 jours", test:()=> streak() >= 7 },
+    { id:"s30", t:"Un mois de régularité", d:"Une série de 30 jours", test:()=> streak() >= 30 },
+    { id:"chef", t:"Chef fauché", d:"Cuisiner 5 recettes pas chères", test:()=> Object.values(days).flat().filter(m=>m.recipe).length >= 5 },
+    { id:"prot3", t:"Protéines au rendez-vous", d:"Objectif de protéines atteint 3 jours", test:()=> Object.values(days).filter(l=> sum(l).prot >= targets(profile).prot).length >= 3 },
+    { id:"defi5", t:"Défis relevés", d:"Réussir 5 défis du jour", test:()=> LS.get("g-defis", []).length >= 5 }
+  ];
+  function checkBadges(){
+    let fresh = null;
+    for (const b of BADGES) if (!badges[b.id] && b.test()) { badges[b.id] = TODAY; fresh = b; }
+    LS.set("g-badges", badges);
+    if (fresh) toast(`Badge débloqué : ${fresh.t}`);
   }
 
-  area.appendChild(box);
-}
+  // ---------- Rendu : aujourd'hui ----------
+  function renderDay(){
+    const t = targets(profile), list = meals(), s = sum(list);
+    const left = t.kcal - s.kcal;
+    $("kcalLeft").textContent = Math.abs(r0(left));
+    $("kcalLbl").textContent = left >= 0 ? "KCAL RESTANTES" : "KCAL EN PLUS";
+    $("ringArc").style.strokeDashoffset = (326.7 * (1 - Math.min(1, s.kcal/t.kcal))).toFixed(1);
+    const bar = (k, b, n) => { $(b).style.width = Math.min(100, s[k]/Math.max(1,t[k])*100) + "%"; $(n).textContent = `${r0(s[k])} / ${t[k]} g`; };
+    bar("prot","barP","numP"); bar("gluc","barG","numG"); bar("lip","barL","numL");
 
-// ── Config (hôte en lobby) ───────────────────────────────
-function renderMobConfig(area) {
-  const box = mkPanel();
-  appendLabel(box, "Configuration");
+    $("streakN").textContent = streak();
 
-  if (!currentRoom) { area.appendChild(box); return; }
-  const room = currentRoom;
-  const n = room.players.length;
-  const isPublic = Boolean(room.isPublic);
+    const d = defiToday(), ok = d.test(s, t, list);
+    $("defiTxt").textContent = d.txt;
+    $("defi").classList.toggle("done", ok);
+    $("defiIco").textContent = ok ? "✓" : "!";
+    $("defiState").textContent = ok ? "Réussi" : "";
+    if (ok) { const done = LS.get("g-defis", []); if (!done.includes(TODAY)) { done.push(TODAY); LS.set("g-defis", done); toast("Défi du jour réussi"); } }
 
-  // Si room publique : afficher config en lecture seule
-  if (isPublic) {
-    const lockMsg = document.createElement("p");
-    lockMsg.style.cssText = "font-size:13px;color:#fdba74;opacity:.8;margin-bottom:12px;padding:10px;background:rgba(224,122,32,0.10);border-radius:10px;border:1px solid rgba(224,122,32,0.25);";
-    lockMsg.textContent = "🔒 Configuration verrouillée — room publique";
-    box.appendChild(lockMsg);
+    $("mealCount").textContent = list.length ? `${list.length} REPAS` : "";
+    $("meals").innerHTML = list.length ? list.map((m,i) => `
+      <div class="meal"><span class="t">${esc(m.name)}</span><span class="k">${r0(m.kcal)} kcal</span>
+      <div class="sub"><span>${esc(m.time)}</span><span>P ${r0(m.prot)} g</span><span>G ${r0(m.gluc)} g</span><span>L ${r0(m.lip)} g</span>
+      <button class="del" type="button" data-i="${i}">Retirer</button></div></div>`).join("")
+      : `<div class="empty"><h3>Rien de noté pour l'instant</h3><p class="small muted">Cherche ton plat ci-dessus : un geste suffit, et ta série démarre.</p></div>`;
+
+    renderRecent();
+    checkBadges();
   }
 
-  box.appendChild(mkField("Intrus", () => {
-    const inp = document.createElement("input");
-    inp.type="number"; inp.min="1"; inp.step="1";
-    inp.value = undercoverCountInput?.value || "1";
-    inp.style.cssText = "width:100%;background:rgba(255,255,255,.9);color:#111;border-radius:10px;padding:10px 12px;font-size:16px;border:none;";
-    inp.addEventListener("input", () => {
-      if (undercoverCountInput) { undercoverCountInput.value = inp.value; renderComposition(room); }
-    });
-    if (n<=3 || isPublic) inp.disabled=true;
-    return inp;
-  }));
-
-  box.appendChild(mkField("Le Mystère (0 ou 1)", () => {
-    const inp = document.createElement("input");
-    inp.type="number"; inp.min="0"; inp.max="1"; inp.step="1";
-    inp.value = mrWhiteCountInput?.value || "0";
-    inp.style.cssText = "width:100%;background:rgba(255,255,255,.9);color:#111;border-radius:10px;padding:10px 12px;font-size:16px;border:none;";
-    inp.addEventListener("input", () => {
-      if (mrWhiteCountInput) { mrWhiteCountInput.value = inp.value; renderComposition(room); }
-    });
-    if (n<=3 || isPublic) inp.disabled=true;
-    return inp;
-  }));
-
-  const turnVal = document.createElement("span");
-  turnVal.textContent = turnDurationInput?.value || "30";
-  box.appendChild(mkField(`Durée du tour : ${turnVal.textContent} s`, () => {
-    const inp = document.createElement("input");
-    inp.type="range"; inp.min="15"; inp.max="45"; inp.step="1";
-    inp.value = turnDurationInput?.value || "30";
-    inp.className = "duration-slider";
-    inp.addEventListener("input", () => {
-      if (turnDurationInput) { turnDurationInput.value=inp.value; renderComposition(room); }
-      inp.previousElementSibling && (inp.previousElementSibling.textContent = `Durée du tour : ${inp.value} s`);
-    });
-    if (isPublic) inp.disabled=true;
-    return inp;
-  }));
-
-  box.appendChild(mkField(`Durée du vote : ${voteDurationInput?.value||"30"} s`, () => {
-    const inp = document.createElement("input");
-    inp.type="range"; inp.min="15"; inp.max="45"; inp.step="1";
-    inp.value = voteDurationInput?.value || "30";
-    inp.className = "duration-slider";
-    inp.addEventListener("input", () => {
-      if (voteDurationInput) { voteDurationInput.value=inp.value; renderComposition(room); }
-    });
-    if (isPublic) inp.disabled=true;
-    return inp;
-  }));
-
-  if (room.categoryOptions?.length) {
-    box.appendChild(mkField("Catégorie", () => {
-      const sel = document.createElement("select");
-      sel.style.cssText = "width:100%;background:rgba(255,255,255,.9);color:#111;border-radius:10px;padding:10px 12px;font-size:16px;border:none;";
-      room.categoryOptions.forEach(cat => {
-        const o=document.createElement("option"); o.value=cat.name; o.textContent=cat.name;
-        if (cat.name===(categorySelect?.value||room.selectedCategory)) o.selected=true;
-        sel.appendChild(o);
-      });
-      if (!isPublic) {
-        sel.addEventListener("change", () => {
-          if (categorySelect) { categorySelect.value=sel.value; populateSubcategorySelect(room, sel.value); renderComposition(room); }
-          buildMobileTabs(room);
-        });
-      } else {
-        sel.disabled=true;
-      }
-      return sel;
+  function renderRecent(){
+    const seen = new Map();
+    Object.keys(days).sort().reverse().forEach(k => (days[k]||[]).slice().reverse().forEach(m => {
+      if (!seen.has(m.name)) seen.set(m.name, { ...m, n: 0 });
+      seen.get(m.name).n++;
     }));
-
-    const selCat = categorySelect?.value || room.selectedCategory;
-    const catObj = room.categoryOptions.find(c=>c.name===selCat)||room.categoryOptions[0];
-    if (catObj?.subcategories?.length && selCat !== "Tout") {
-      box.appendChild(mkField("Sous-catégorie", () => {
-        const sel = document.createElement("select");
-        sel.style.cssText = "width:100%;background:rgba(255,255,255,.9);color:#111;border-radius:10px;padding:10px 12px;font-size:16px;border:none;";
-        catObj.subcategories.forEach(name => {
-          const o=document.createElement("option"); o.value=name; o.textContent=name;
-          if (name===(subcategorySelect?.value||room.selectedSubcategory)) o.selected=true;
-          sel.appendChild(o);
-        });
-        if (!isPublic) {
-          sel.addEventListener("change", () => {
-            if (subcategorySelect) { subcategorySelect.value=sel.value; renderComposition(room); }
-          });
-        } else {
-          sel.disabled=true;
-        }
-        return sel;
-      }));
-    }
+    const top = [...seen.values()].sort((a,b)=> b.n - a.n).slice(0, 8);
+    $("recentWrap").hidden = !top.length;
+    $("recent").innerHTML = top.map((m,i) => `<button class="chip" type="button" data-r="${i}">${esc(m.name)}<b>${r0(m.kcal)}</b></button>`).join("");
+    $("recent").onclick = (e) => { const b = e.target.closest("[data-r]"); if (b) addMeal(top[Number(b.dataset.r)]); };
   }
 
-  if (compositionSummary?.textContent) {
-    const sum = document.createElement("p");
-    sum.style.cssText = "font-size:12px;color:#fdba74;font-weight:600;margin:12px 0;";
-    sum.textContent = compositionSummary.textContent;
-    box.appendChild(sum);
+  function addMeal(m){
+    const d = new Date();
+    const item = { name:m.name, kcal:r0(m.kcal), prot:r0(m.prot), gluc:r0(m.gluc), lip:r0(m.lip), time:`${pad(d.getHours())}h${pad(d.getMinutes())}`, ...(m.recipe ? { recipe:true } : {}) };
+    days[TODAY] = [...meals(), item];
+    saveDays();
+    const before = Number($("streakN").textContent);
+    renderDay();
+    const after = streak();
+    if (after > before && after > 1) toast(`${after} jours d'affilée`);
+    else toast(`${item.name} ajouté`);
   }
 
-  // Mots par tour
-  box.appendChild(mkField("Mots par joueur par tour", () => {
-    const sel = document.createElement("select");
-    sel.style.cssText = "width:100%;background:rgba(255,255,255,.9);color:#111;border-radius:10px;padding:10px 12px;font-size:16px;border:none;";
-    [1,2,3,4].forEach(n => {
-      const o=document.createElement("option"); o.value=n; o.textContent=`${n} mot${n>1?"s":""}`;
-      if(n===(room.wordsPerTurn||1)) o.selected=true;
-      sel.appendChild(o);
-    });
-    if (!isPublic) {
-      sel.addEventListener("change", () => {
-        if (wordsPerTurnInput) { wordsPerTurnInput.value=sel.value; renderComposition(room); }
-      });
-    } else {
-      sel.disabled=true;
-    }
-    return sel;
+  // Recherche
+  const norm = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  function renderResults(){
+    const q = norm($("search").value.trim());
+    if (!q) { $("results").innerHTML = ""; return; }
+    const hits = FOODS.filter(f => norm(f.name + " " + f.tags).includes(q)).slice(0, 8);
+    $("results").innerHTML = hits.length ? hits.map((f,i) => `
+      <button class="res" type="button" data-f="${FOODS.indexOf(f)}"><span>${esc(f.name)}</span><span class="k">${f.kcal} kcal</span>
+      <span class="sub">P ${f.prot} g · G ${f.gluc} g · L ${f.lip} g</span></button>`).join("")
+      : `<p class="small muted pad6">Pas trouvé. Utilise « Saisir un repas à la main ».</p>`;
+  }
+  $("search").addEventListener("input", renderResults);
+  $("results").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-f]"); if (!b) return;
+    addMeal(FOODS[Number(b.dataset.f)]);
+    $("search").value = ""; renderResults();
+  });
+
+  // Saisie manuelle
+  $("customBtn").addEventListener("click", () => { $("customBox").hidden = !$("customBox").hidden; if (!$("customBox").hidden) $("cName").focus(); });
+  $("cAdd").addEventListener("click", () => {
+    const name = $("cName").value.trim(), kcal = Number($("cK").value);
+    if (!name || !(kcal > 0)) { toast("Indique au moins un nom et des calories"); return; }
+    addMeal({ name, kcal, prot:Number($("cP").value)||0, gluc:Number($("cG").value)||0, lip:Number($("cL").value)||0 });
+    ["cName","cK","cP","cG","cL"].forEach(id => $(id).value = "");
+    $("customBox").hidden = true;
+  });
+
+  $("meals").addEventListener("click", (e) => {
+    const b = e.target.closest(".del"); if (!b) return;
+    days[TODAY] = meals().filter((_, i) => i !== Number(b.dataset.i));
+    if (!days[TODAY].length) delete days[TODAY];
+    saveDays(); renderDay();
+  });
+
+  // ---------- Rendu : recettes ----------
+  function renderRecipes(){
+    const t = targets(profile), s = sum(meals());
+    const kc = r0(t.kcal - s.kcal), pr = r0(t.prot - s.prot);
+    $("needLine").textContent = kc > 0 ? `Il te reste environ ${kc} kcal et ${Math.max(0,pr)} g de protéines pour aujourd'hui. Les recettes les plus riches en protéines passent en premier.` : "Ton objectif du jour est atteint. Voici des idées pour demain.";
+    const budget = Number($("budget").value), time = Number($("time").value);
+    const list = RECIPES.filter(r => r.cost <= budget && r.min <= time && r.need.every(n => kitchen.has(n)))
+      .sort((a,b) => (b.prot/b.cost) - (a.prot/a.cost));
+    $("recipes").innerHTML = list.length ? list.map(r => `
+      <article class="ticket">
+        <div class="row top"><div class="head">${esc(r.name)}</div><span class="price">${euro(r.cost)}</span></div>
+        <div class="line"><span>${r.min} min · ${r.kcal} kcal</span><span>P ${r.prot} · G ${r.gluc} · L ${r.lip}</span></div>
+        <div class="rule"></div>
+        ${r.ing.map(([n,q,c]) => `<div class="line"><span>${esc(n)}${q ? ` <span class="muted">· ${esc(q)}</span>` : ""}</span><span>${euro(c)}</span></div>`).join("")}
+        <div class="rule"></div>
+        <ol class="steps">${r.steps.map(x => `<li>${esc(x)}</li>`).join("")}</ol>
+        <p class="tip">${esc(r.tip)}</p>
+        <button class="primary" type="button" data-cook="${RECIPES.indexOf(r)}">Je l'ai mangé</button>
+      </article>`).join("")
+      : `<div class="note">Aucune recette ne correspond. Augmente le budget ou le temps, ou ajoute un équipement.</div>`;
+  }
+  $("recipes").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-cook]"); if (!b) return;
+    const r = RECIPES[Number(b.dataset.cook)];
+    addMeal({ ...r, recipe:true });
+  });
+  ["budget","time"].forEach(id => $(id).addEventListener("change", renderRecipes));
+  document.querySelectorAll("#kitchen button").forEach(b => b.addEventListener("click", () => {
+    const on = b.getAttribute("aria-pressed") !== "true";
+    b.setAttribute("aria-pressed", String(on));
+    on ? kitchen.add(b.dataset.k) : kitchen.delete(b.dataset.k);
+    renderRecipes();
   }));
 
-  appendDolls(box, room, "Composition");
-
-  const btn = mkBigBtn("Lancer la partie", "#22c55e", "#16a34a");
-  btn.style.marginTop = "18px";
-  btn.addEventListener("click", doStartGame);
-  box.appendChild(btn);
-
-  area.appendChild(box);
-}
-
-// ── Mot secret ───────────────────────────────────────────
-function renderMobWord(area) {
-  const box = mkPanel();
-  box.style.cssText += "display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;";
-
-  const lbl = document.createElement("p");
-  lbl.style.cssText = "font-family:'Syne',sans-serif;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;opacity:.50;margin-bottom:20px;";
-  lbl.textContent = "Ton mot secret";
-  box.appendChild(lbl);
-
-  const hasWord = wordText?.textContent && wordText.textContent !== "Tu n'as pas de mot.";
-  let wordHidden = false;
-
-  const w = document.createElement("p");
-  w.style.cssText = `font-family:'Syne',sans-serif;font-size:42px;font-weight:800;letter-spacing:1px;
-    color:#fff;text-align:center;padding:32px 24px;border-radius:20px;
-    background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);
-    margin:0;width:100%;
-    animation:wordReveal 1.2s cubic-bezier(.22,1,.36,1) forwards;
-    cursor:pointer;user-select:none;transition:filter 0.4s ease;`;
-  w.textContent = wordText?.textContent || "—";
-  box.appendChild(w);
-
-  // Bouton cacher/montrer
-  const toggleBtn = document.createElement("button");
-  toggleBtn.style.cssText = `display:flex;align-items:center;gap:6px;margin:12px auto 0;
-    background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);
-    color:rgba(255,255,255,0.65);font-size:12px;font-weight:600;
-    padding:6px 14px;border-radius:999px;cursor:pointer;
-    transition:all 0.15s ease;box-shadow:none;width:auto;min-height:auto;`;
-  toggleBtn.textContent = "👁 Cacher mon mot";
-  toggleBtn.addEventListener("click", () => {
-    wordHidden = !wordHidden;
-    w.style.filter = wordHidden ? "blur(12px)" : "blur(0px)";
-    toggleBtn.textContent = wordHidden ? "👁 Afficher mon mot" : "👁 Cacher mon mot";
-  });
-  box.appendChild(toggleBtn);
-
-  const hint = document.createElement("p");
-  hint.style.cssText = "text-align:center;font-size:13px;opacity:.50;margin-top:16px;line-height:1.5;max-width:280px;";
-  hint.textContent = hasWord
-    ? "Donne des indices sans dire ce mot !"
-    : "Tu es Le Mystère. Observe et bluff !";
-  box.appendChild(hint);
-
-  area.appendChild(box);
-}
-
-// ── Chat ─────────────────────────────────────────────────
-function renderMobChat(room, area) {
-  const box = mkPanel();
-  box.className = "mob-panel-chat";
-
-  const ph = document.createElement("p");
-  ph.style.cssText = "font-size:13px;font-weight:700;opacity:.80;margin:0 0 3px;font-family:'Syne',sans-serif;flex-shrink:0;";
-  ph.textContent = phaseInfo?.textContent || "";
-  box.appendChild(ph);
-
-  const sp = document.createElement("p");
-  sp.style.cssText = "font-size:13px;color:#fdba74;font-weight:600;margin:0 0 10px;flex-shrink:0;min-height:18px;";
-  sp.textContent = speakerInfo?.textContent || "";
-  box.appendChild(sp);
-
-  const msgs = document.createElement("div");
-  msgs.className = "messages";
-  (room.messages||[]).forEach(msg => {
-    const div = document.createElement("div");
-    div.className = "message" + (!msg.playerId ? " system" : "");
-    const ns = document.createElement("span"); ns.className="message-name"; ns.textContent=msg.playerName;
-    const ts = document.createElement("span"); ts.className="message-text"; ts.textContent=" "+msg.text;
-    div.appendChild(ns); div.appendChild(ts); msgs.appendChild(div);
-  });
-  box.appendChild(msgs);
-  setTimeout(() => { msgs.scrollTop = msgs.scrollHeight; }, 0);
-
-  const me = room.players.find(p => p.id === myPlayerId);
-  const isMyTurn = room.phase==="speaking" && room.currentSpeakerId===myPlayerId && me && !me.eliminated;
-
-  const row = document.createElement("div");
-  row.className = "row";
-
-  const inp = document.createElement("input");
-  inp.maxLength=24;
-  inp.placeholder=isMyTurn?"Ton mot…":"Ce n'est pas ton tour";
-  inp.disabled=!isMyTurn;
-  inp.style.fontSize="16px";
-  inp.autocomplete="off";
-
-  const sendB = document.createElement("button");
-  sendB.textContent="Envoyer"; sendB.disabled=!isMyTurn; sendB.style.whiteSpace="nowrap";
-
-  inp.addEventListener("input", () => {
-    const v = normalizeSingleWordInput(inp.value);
-    if (inp.value!==v) inp.value=v;
-    sendB.disabled = !isMyTurn || !v;
-  });
-  inp.addEventListener("keydown", e => { if(e.key==="Enter"&&!sendB.disabled) sendB.click(); });
-  sendB.addEventListener("click", () => {
-    const text = normalizeSingleWordInput(inp.value);
-    if (!text) return;
-    socket.emit("sendTurnMessage", { text }, (res) => {
-      if (!res?.ok) return setStatus(res?.error||"Impossible d'envoyer", true);
-      chatInput.value=""; sendChatBtn.disabled=true;
-      playClickSound("success"); setStatus("Mot envoyé");
-    });
-  });
-
-  row.appendChild(inp); row.appendChild(sendB);
-  box.appendChild(row);
-
-  const help = document.createElement("p");
-  help.style.cssText="font-size:11px;opacity:.50;margin-top:6px;flex-shrink:0;";
-  help.textContent = isMyTurn
-    ? "Entre un seul mot. Tu ne peux pas écrire ton mot secret."
-    : (room.phase==="voting" ? "Vote en cours." : "Ce n'est pas ton tour.");
-  box.appendChild(help);
-
-  area.appendChild(box);
-}
-
-// ── Joueurs + compo ──────────────────────────────────────
-function renderMobPlayers(room, area) {
-  const box = mkPanel();
-
-  appendLabel(box, `Joueurs — Manche ${room.round}`);
-
-  const ul = document.createElement("ul");
-  ul.className = "players-list-mobile";
-  sortPlayersForDisplay(room).forEach(p => {
-    const li = document.createElement("li");
-    li.className = "players-list-mobile-item";
-    if (p.eliminated) li.classList.add("player-dead");
-    if (p.id===room.currentSpeakerId && room.phase==="speaking" && !room.gameOver) li.classList.add("player-current");
-    let label = p.name;
-    if (p.id===myPlayerId) label+=" (toi)";
-    if (p.id===room.hostPlayerId) label+=" 👑";
-    if (p.eliminated) label+=" — éliminé";
-    else if (p.id===room.currentSpeakerId && room.phase==="speaking") label+=" — parle";
-    li.textContent=label;
-    ul.appendChild(li);
-  });
-  box.appendChild(ul);
-
-  appendDolls(box, room, "Composition");
-
-  area.appendChild(box);
-}
-
-// ── Vote ─────────────────────────────────────────────────
-function renderMobVote(room, area) {
-  const box = mkPanel();
-
-  const me = room.players.find(p => p.id === myPlayerId);
-
-  if (room.phase !== "voting" || room.gameOver) {
-    box.innerHTML=`
-      <div class="vote-not-ready-inner" style="padding:50px 16px;text-align:center;">
-        <div class="vote-not-ready-icon">🗳</div>
-        <p class="vote-not-ready-title">Pas encore le moment</p>
-        <p class="vote-not-ready-sub">Le vote s'ouvrira une fois que tous les joueurs auront donné leur indice.</p>
-      </div>`;
-    area.appendChild(box); return;
-  }
-
-  if (me?.eliminated) {
-    const p=document.createElement("p");
-    p.style.cssText="text-align:center;opacity:.55;padding:40px 16px;";
-    p.textContent="Tu es éliminé et ne peux pas voter.";
-    box.appendChild(p); area.appendChild(box); return;
-  }
-
-  const header=document.createElement("div"); header.className="vote-card-header";
-  header.innerHTML=`<div class="vote-pulse-dot"></div><h2>⚡ Vote en cours</h2>`;
-  box.appendChild(header);
-
-  const btnsWrap=document.createElement("div");
-  const votables=room.players.filter(p=>!p.eliminated&&p.id!==myPlayerId);
-
-  const infoText=document.createElement("p");
-  infoText.style.cssText="font-size:13px;opacity:.80;margin:10px 0 6px;";
-  infoText.textContent=voteAlreadySent
-    ? `Vote confirmé contre ${selectedVoteTargetName}.`
-    : (selectedVoteTargetId ? `Cible : ${selectedVoteTargetName}` : "Aucun joueur sélectionné.");
-
-  const confirmB=document.createElement("button");
-  confirmB.style.cssText="width:100%;background:linear-gradient(180deg,#f97316,#ea580c);box-shadow:0 5px 0 rgba(0,0,0,.28),0 8px 22px rgba(249,115,22,.32);margin-top:4px;";
-  confirmB.textContent="Confirmer mon vote";
-  confirmB.disabled=!selectedVoteTargetId||voteAlreadySent;
-
-  votables.forEach(player => {
-    const btn=document.createElement("button");
-    btn.className="vote-btn"+(selectedVoteTargetId===player.id?" vote-btn-selected":"");
-    btn.textContent=`Choisir ${player.name}`;
-    if (voteAlreadySent) btn.disabled=true;
-    btn.addEventListener("click", () => {
-      if (voteAlreadySent) return;
-      selectedVoteTargetId=player.id; selectedVoteTargetName=player.name;
-      btnsWrap.querySelectorAll(".vote-btn").forEach(b=>b.classList.remove("vote-btn-selected"));
-      btn.classList.add("vote-btn-selected");
-      confirmB.disabled=false;
-      infoText.textContent=`Cible : ${player.name}`;
-    });
-    btnsWrap.appendChild(btn);
-  });
-  box.appendChild(btnsWrap);
-  box.appendChild(infoText);
-
-  confirmB.addEventListener("click", () => {
-    if (!selectedVoteTargetId||voteAlreadySent) return;
-    socket.emit("votePlayer", { targetId:selectedVoteTargetId }, (res) => {
-      if (!res?.ok) return setStatus(res?.error||"Impossible de voter", true);
-      voteAlreadySent=true; confirmB.disabled=true;
-      infoText.textContent=`Vote confirmé contre ${selectedVoteTargetName}.`;
-      voteAlreadySent=true; if(confirmVoteBtn) confirmVoteBtn.disabled=true;
-      playClickSound("vote"); setStatus("Vote envoyé", true);
-    });
-  });
-  box.appendChild(confirmB);
-
-  area.appendChild(box);
-}
-
-// ── Résultat ─────────────────────────────────────────────
-function renderMobResult(room, area) {
-  const box = mkPanel();
-
-  const title=document.createElement("h2");
-  title.style.cssText="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;text-align:center;margin-bottom:10px;";
-  title.textContent=getMyOutcome(room)||"Fin de partie";
-  box.appendChild(title);
-
-  const sub=document.createElement("p");
-  sub.style.cssText="text-align:center;font-size:15px;opacity:.80;margin-bottom:16px;";
-  sub.textContent=room.winner==="aucun"?"La partie a été interrompue.":`Équipe gagnante : ${room.winner === "undercover" ? "les intrus" : room.winner}`;
-  box.appendChild(sub);
-
-  if (room.reveal) {
-    const ul=document.createElement("ul");
-    ul.style.cssText="list-style:none;margin:0;padding:0;display:grid;gap:8px;";
-    room.reveal.forEach((player,i) => {
-      const li=document.createElement("li"); li.className="reveal-item"; li.style.animationDelay=`${i*120}ms`;
-      const badge=document.createElement("span"); badge.className=`reveal-role-badge ${player.role}`; badge.textContent=translateRole(player.role);
-      const text=document.createElement("span"); text.className="reveal-main-text";
-      text.textContent=`${player.name} • ${player.word||"aucun mot"}`;
-      li.appendChild(badge); li.appendChild(text); ul.appendChild(li);
-    });
-    box.appendChild(ul);
-  }
-
-  if (room.hostPlayerId===myPlayerId) {
-    const btn=mkBigBtn("⚙ Configurer & Rejouer", "#22c55e", "#16a34a");
-    btn.style.marginTop="18px";
-    btn.addEventListener("click", () => {
-      socket.emit("returnToLobby", {}, (res) => {
-        if (!res?.ok) return setStatus(res?.error||"Impossible", true);
-        playClickSound("success"); setStatus("Retour au lobby !");
-      });
-    });
-    box.appendChild(btn);
-  }
-
-  area.appendChild(box);
-}
-
-// ─── UTILS DOM ───────────────────────────────────────────
-function mkPanel() {
-  const d=document.createElement("div");
-  d.style.cssText="width:100%;box-sizing:border-box;padding:4px 0;";
-  return d;
-}
-
-function mkBigBtn(label, c1, c2) {
-  const btn=document.createElement("button");
-  btn.className="big-btn";
-  btn.textContent=label;
-  btn.style.background=`linear-gradient(180deg,${c1},${c2})`;
-  return btn;
-}
-
-function mkField(labelText, inputFactory) {
-  const wrap=document.createElement("div");
-  wrap.className="form-block";
-  const lbl=document.createElement("label");
-  lbl.style.cssText="display:block;margin-bottom:6px;font-size:14px;opacity:.85;font-weight:500;";
-  lbl.textContent=labelText;
-  wrap.appendChild(lbl);
-  wrap.appendChild(inputFactory());
-  return wrap;
-}
-
-function appendLabel(parent, text) {
-  const p=document.createElement("p");
-  p.style.cssText="font-family:'Syne',sans-serif;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;opacity:.50;margin-bottom:10px;";
-  p.textContent=text;
-  parent.appendChild(p);
-}
-
-function appendDolls(parent, room, label) {
-  const wrap=document.createElement("div"); wrap.className="role-dolls-wrap";
-  const t=document.createElement("div"); t.className="role-dolls-title"; t.textContent=label;
-  const row=document.createElement("div"); row.className="role-dolls";
-  fillRoleDolls(row, room);
-  wrap.appendChild(t); wrap.appendChild(row); parent.appendChild(wrap);
-}
-
-
-function translateRole(role) {
-  if (role === "undercover") return "Intrus";
-  if (role === "civil") return "Civil";
-  if (role === "mrwhite") return "Le Mystère";
-  return role;
-}
-
-// ─── RESET UI ────────────────────────────────────────────
-function resetUI() {
-  currentRoom=null; window.currentRoom=null;
-  currentTurnKey=autoSubmittedTurnKey=null;
-  previousVisiblePlayerIds=[]; lastTensionSecondPlayed=null;
-  mobileActiveTab=null;
-
-  lobby.classList.add("hidden");
-  if(secretCard) secretCard.classList.add("hidden");
-  if(compositionCard) { compositionCard.classList.add("hidden"); compositionCard.style=""; }
-  if(chatCard) chatCard.classList.add("hidden");
-  if(waitingCard) waitingCard.classList.add("hidden");
-  if(voteCard) voteCard.classList.add("hidden");
-  if(endCard) endCard.classList.add("hidden");
-  leaveWrap.classList.add("hidden");
-  startWrap.classList.remove("hidden");
-  roomSetupCard.classList.remove("hidden");
-
-  topRoomInfo.classList.add("hidden");
-  topHostInfo.classList.add("hidden");
-  const cs=document.getElementById("topRoomCode"); if(cs) cs.textContent="";
-  topHostInfo.textContent="";
-
-  playersList.innerHTML="";
-  if(messagesList) messagesList.innerHTML="";
-  if(voteButtons) voteButtons.innerHTML="";
-  if(revealList) revealList.innerHTML="";
-  if(roleDolls) roleDolls.innerHTML="";
-  if(waitingRoleDolls) waitingRoleDolls.innerHTML="";
-
-  if(phaseInfo) phaseInfo.textContent="";
-  if(speakerInfo) speakerInfo.textContent="";
-  if(wordText) wordText.textContent="";
-  if(winnerText) winnerText.textContent="";
-  if(compositionHelp) compositionHelp.textContent="";
-  if(compositionSummary) compositionSummary.textContent="";
-  if(waitingCategory) waitingCategory.textContent="--";
-  if(waitingSubcategory) waitingSubcategory.textContent="--";
-  if(waitingTurnDuration) waitingTurnDuration.textContent="--";
-  if(waitingVoteDuration) waitingVoteDuration.textContent="--";
-  if(chatInput) chatInput.value="";
-  if(categorySelect) categorySelect.innerHTML="";
-  if(subcategorySelect) subcategorySelect.innerHTML="";
-  // FIX : réinitialiser le gameId pour éviter le bug d'écran de fin
-  if(endCard) { endCard.dataset.renderedGameId=""; }
-
-  // Supprimer le bouton returnToLobby s'il existe
-  document.getElementById("returnToLobbyBtn")?.remove();
-
-  // Reset zone mobile
-  const tabBar=document.getElementById("mobileTabBar");
-  const mobArea=document.getElementById("mobileArea");
-  if(tabBar) { tabBar.innerHTML=""; tabBar.style.display="none"; }
-  if(mobArea) { mobArea.innerHTML=""; mobArea.style.display="none"; }
-
-  resetVoteSelection();
-  stopTimer();
-  validateStoredSession();
-}
-
-function hideGameplayButtons() {
-  startBtn.classList.add("hidden");
-  restartBtn.classList.add("hidden");
-}
-
-// ─── DESKTOP HELPERS ─────────────────────────────────────
-function sortPlayersForDisplay(room) {
-  if (!room.started || !Array.isArray(room.speakingOrder) || !room.speakingOrder.length)
-    return [...room.players];
-  const idx=new Map(room.speakingOrder.map((id,i)=>[id,i]));
-  return [...room.players].sort((a,b)=>(idx.get(a.id)??Infinity)-(idx.get(b.id)??Infinity));
-}
-
-function renderPlayers(room) {
-  playersList.innerHTML="";
-  sortPlayersForDisplay(room).forEach(player => {
-    const li=document.createElement("li");
-    if(player.eliminated) li.classList.add("player-dead");
-    if(player.id===room.currentSpeakerId&&room.phase==="speaking"&&!room.gameOver) li.classList.add("player-current");
-    const ns=document.createElement("span"); ns.className="player-name";
-    let label=player.name;
-    if(player.id===myPlayerId) label+=" (toi)";
-    if(player.id===room.hostPlayerId) label+=" 👑";
-    if(player.id===room.gameMasterId && room.phase==="waiting_words") label+=" 🎲 MJ";
-    ns.textContent=label; li.appendChild(ns);
-    const sub=[];
-    if(player.id===room.currentSpeakerId&&room.phase==="speaking"&&!room.gameOver) sub.push("réfléchit");
-    if(player.eliminated) sub.push("éliminé");
-    if(sub.length) { const s=document.createElement("span"); s.className="player-sub"; s.textContent=sub.join(" • "); li.appendChild(s); }
-    playersList.appendChild(li);
-  });
-}
-
-function getDisplayCounts(room) {
-  if (room.started) return room.roleComposition || {};
-  const n = room.players.length;
-  let u = 1, m = 0;
-  if (undercoverCountInput) u = Math.max(1, parseInt(undercoverCountInput.value, 10) || 1);
-  if (mrWhiteCountInput)    m = Math.max(0, Math.min(1, parseInt(mrWhiteCountInput.value, 10) || 0));
-  if (n <= 3) return { civil: 2, undercover: 1, mrwhite: 0 };
-  u = Math.min(u, Math.max(1, n - m - 1));
-  let c = n - u - m;
-  if (c < 1) { u = Math.max(1, n - m - 1); c = n - u - m; }
-  return { civil: c, undercover: u, mrwhite: m };
-}
-
-function fillRoleDolls(container, room) {
-  if (!container) return;
-  container.innerHTML = "";
-  const c = getDisplayCounts(room);
-  [...Array(c.civil||0).fill("civil"), ...Array(c.undercover||0).fill("undercover"), ...Array(c.mrwhite||0).fill("mrwhite")]
-    .forEach(role => {
-      const d = document.createElement("div"); d.className = `role-doll ${role}`;
-      const h = document.createElement("div"); h.className = "role-doll-head";
-      const b = document.createElement("div"); b.className = "role-doll-body";
-      d.appendChild(h); d.appendChild(b); container.appendChild(d);
-    });
-}
-
-function renderRoleDolls(room) {
-  fillRoleDolls(roleDolls, room);
-  fillRoleDolls(waitingRoleDolls, room);
-  const hw = document.getElementById("roleDollsHostWrap");
-  const hc = document.getElementById("roleDollsHost");
-  if (hw && hc) {
-    const isHost = room.hostPlayerId === myPlayerId;
-    const show = isHost && !room.started && !room.gameOver;
-    const c = getDisplayCounts(room);
-    const total = (c.civil||0) + (c.undercover||0) + (c.mrwhite||0);
-    hw.style.display = (show && total > 0) ? "" : "none";
-    if (show) fillRoleDolls(hc, room);
-  }
-}
-
-function renderMessages(room) {
-  messagesList.innerHTML="";
-  (room.messages||[]).forEach(msg=>{
-    const div=document.createElement("div"); div.className="message"+(!msg.playerId?" system":"");
-    const ns=document.createElement("span"); ns.className="message-name"; ns.textContent=msg.playerName;
-    const ts=document.createElement("span"); ts.className="message-text"; ts.textContent=" "+msg.text;
-    div.appendChild(ns); div.appendChild(ts); messagesList.appendChild(div);
-  });
-  messagesList.scrollTop=messagesList.scrollHeight;
-}
-
-function renderChat(room) {
-  if(!room.started||room.gameOver) { chatCard.classList.add("hidden"); return; }
-  chatCard.classList.remove("hidden");
-  renderRoleDolls(room); renderMessages(room);
-  const me=room.players.find(p=>p.id===myPlayerId);
-  const isMyTurn=room.phase==="speaking"&&room.currentSpeakerId===myPlayerId&&me&&!me.eliminated;
-  const wordsPerTurn=room.wordsPerTurn||1;
-
-  // Compter mots déjà envoyés ce tour
-  const wordsSent=(room.messages||[]).filter(
-    m=>m.round===room.round&&m.playerId===myPlayerId&&m.turnIndex===room.currentSpeakerIndex
-  ).length;
-  const wordsLeft=wordsPerTurn-wordsSent;
-
-  chatInput.disabled=!isMyTurn||wordsLeft<=0;
-  sendChatBtn.disabled=!isMyTurn||!normalizeSingleWordInput(chatInput.value)||wordsLeft<=0;
-
-  if(room.phase==="voting") chatHelp.textContent="Vote en cours.";
-  else if(isMyTurn && wordsPerTurn>1) chatHelp.textContent=`Mot ${wordsSent+1}/${wordsPerTurn} — Entre un mot. Tu ne peux pas écrire ton mot secret.`;
-  else if(isMyTurn) chatHelp.textContent="Entre un seul mot. Tu ne peux pas écrire ton mot secret.";
-  else chatHelp.textContent="Ce n'est pas ton tour.";
-}
-
-function renderWaitingRoom(room) {
-  const isHost=room.hostPlayerId===myPlayerId;
-  const show=!room.started&&!room.gameOver&&!isHost;
-  waitingCard.classList.toggle("hidden",!show);
-  if(!show) return;
-  renderRoleDolls(room);
-  waitingText.textContent="En attente du lancement de la partie par l'hôte…";
-  waitingCategory.textContent=room.selectedCategory||"--";
-  waitingSubcategory.textContent=room.selectedSubcategory||"--";
-  waitingTurnDuration.textContent=`${room.turnDurationSeconds||30} s`;
-  waitingVoteDuration.textContent=`${room.voteDurationSeconds||30} s`;
-}
-
-function renderVoteButtons(room) {
-  voteButtons.innerHTML="";
-  const me=room.players.find(p=>p.id===myPlayerId);
-  if(!me||me.eliminated||room.phase!=="voting"||room.gameOver) { voteCard.classList.add("hidden"); resetVoteSelection(); return; }
-  voteCard.classList.remove("hidden");
-  room.players.filter(p=>!p.eliminated&&p.id!==myPlayerId).forEach(player=>{
-    const btn=document.createElement("button"); btn.className="vote-btn"; btn.textContent=`Choisir ${player.name}`;
-    if(selectedVoteTargetId===player.id) btn.classList.add("vote-btn-selected");
-    btn.onclick=()=>{
-      if(voteAlreadySent) return;
-      selectedVoteTargetId=player.id; selectedVoteTargetName=player.name;
-      selectedVoteText.textContent=`Cible sélectionnée : ${player.name}`;
-      confirmVoteBtn.disabled=false; renderVoteButtons(room);
-    };
-    voteButtons.appendChild(btn);
-  });
-  if(voteAlreadySent) { confirmVoteBtn.disabled=true; selectedVoteText.textContent=`Vote confirmé contre ${selectedVoteTargetName}.`; }
-}
-
-function getMyOutcome(room) {
-  if(!room.gameOver||!room.reveal) return null;
-  if(room.winner==="aucun") return "Partie arrêtée";
-  const me=room.reveal.find(p=>p.id===myPlayerId); if(!me) return null;
-  if(room.winner==="civils"&&me.role==="civil") return "Victoire";
-  if(room.winner==="undercover"&&me.role==="undercover") return "Victoire";
-  if(room.winner==="mrwhite"&&me.role==="mrwhite") return "Victoire";
-  return "Défaite";
-}
-
-function renderEndGame(room) {
-  if(!room.gameOver) { endCard.classList.add("hidden"); return; }
-  // FIX : utiliser gameId unique pour éviter d'afficher le mauvais écran de fin
-  const already=endCard.dataset.renderedGameId===String(room.gameId);
-  endCard.classList.remove("hidden");
-  endTitle.textContent=getMyOutcome(room)||"Fin de partie";
-  winnerText.textContent=room.winner==="aucun"
-    ?"La partie a été interrompue."
-    :`Équipe gagnante : ${room.winner === "undercover" ? "les intrus" : room.winner}`;
-  if(!already) {
-    revealList.innerHTML="";
-    (room.reveal||[]).forEach((player,i)=>{
-      const li=document.createElement("li"); li.className="reveal-item"; li.style.animationDelay=`${i*120}ms`;
-      const badge=document.createElement("span"); badge.className=`reveal-role-badge ${player.role}`; badge.textContent=translateRole(player.role);
-      const text=document.createElement("span"); text.className="reveal-main-text"; text.textContent=`${player.name} • ${player.word||"aucun mot"}`;
-      li.appendChild(badge); li.appendChild(text); revealList.appendChild(li);
-    });
-    endCard.dataset.renderedGameId=String(room.gameId);
-    playClickSound("reveal");
-  }
-}
-
-function renderTimer(room) {
-  stopTimer();
-  let endAt=null, total=null;
-  if(room.phase==="speaking"&&room.turnEndsAt) { endAt=room.turnEndsAt; total=room.turnDurationMs||30000; }
-  else if(room.phase==="voting"&&room.voteEndsAt) { endAt=room.voteEndsAt; total=room.voteDurationMs||30000; }
-  else return;
-  const tick=()=>{
-    const rem=Math.max(0,endAt-Date.now());
-    const pct=Math.max(0,Math.min(100,(rem/total)*100));
-    const sec=Math.ceil(rem/1000);
-    timerFill.style.width=`${pct}%`;
-    timerText.textContent=`${sec} s`;
-    timerFill.style.background=rem<=3000?"#ef4444":rem<=7000?"#f59e0b":"#22c55e";
-    if(sec<=5&&sec>0&&lastTensionSecondPlayed!==sec) { lastTensionSecondPlayed=sec; playClickSound("tension"); }
-    const isMyTurn=room.phase==="speaking"&&room.currentSpeakerId===myPlayerId&&!room.gameOver;
-    if(isMyTurn&&rem<=250&&currentTurnKey&&autoSubmittedTurnKey!==currentTurnKey) {
-      const w=normalizeSingleWordInput(chatInput.value);
-      if(w&&!sendChatBtn.disabled) { autoSubmittedTurnKey=currentTurnKey; sendChatBtn.click(); }
+  // ---------- Rendu : progrès ----------
+  function renderProgress(){
+    const t = targets(profile), cols = [];
+    let total = 0, n = 0;
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today); d.setDate(d.getDate() - i);
+      const k = keyOf(d), s = sum(days[k] || []);
+      if (s.kcal) { total += s.kcal; n++; }
+      const h = Math.max(4, Math.min(100, s.kcal / t.kcal * 100));
+      const ok = s.prot >= t.prot;
+      cols.push(`<div class="wd" title="${d.toLocaleDateString("fr-FR")} : ${r0(s.kcal)} kcal, ${r0(s.prot)} g de protéines">
+        <div class="col ${ok ? "ok" : ""} ${i === 0 ? "today" : ""}" data-h="${s.kcal ? h : 4}"></div>
+        <span>${d.toLocaleDateString("fr-FR",{weekday:"short"}).slice(0,2)}</span></div>`);
     }
-    if(rem<=0) stopTimer();
-  };
-  tick(); timerInterval=setInterval(tick,250);
-}
-
-function clampCompositionValues(room) {
-  if(!undercoverCountInput||!mrWhiteCountInput) return {undercoverCount:1,mrwhiteCount:0,civilCount:room.players.length-1};
-  const n=room.players.length;
-  if(n<=3) { undercoverCountInput.value="1"; mrWhiteCountInput.value="0"; return {undercoverCount:1,mrwhiteCount:0,civilCount:2}; }
-  let u=Math.max(1,parseInt(undercoverCountInput.value,10)||1);
-  let m=Math.max(0,Math.min(1,parseInt(mrWhiteCountInput.value,10)||0));
-  u=Math.min(u,Math.max(1,n-m-1));
-  let c=n-u-m; if(c<1) { u=Math.max(1,n-m-1); c=n-u-m; }
-  undercoverCountInput.value=String(u); mrWhiteCountInput.value=String(m);
-  return {undercoverCount:u,mrwhiteCount:m,civilCount:c};
-}
-
-function clampSeconds(v,fallback=30) { const n=parseInt(v,10); return isNaN(n)?fallback:Math.max(15,Math.min(45,n)); }
-
-function populateCategorySelect(room) {
-  if(!categorySelect||!subcategorySelect) return;
-  const opts=Array.isArray(room.categoryOptions)?room.categoryOptions:[];
-  const cur=categorySelect.value;
-  const sel=opts.find(o=>o.name===cur)?.name||room.selectedCategory||opts[0]?.name||"Tout";
-  categorySelect.innerHTML="";
-  opts.forEach(cat=>{ const o=document.createElement("option"); o.value=cat.name; o.textContent=cat.name; o.selected=cat.name===sel; categorySelect.appendChild(o); });
-  const isTout=categorySelect.value==="Tout";
-  const subWrap=subcategorySelect?.closest(".form-block");
-  if(subWrap) subWrap.style.display=isTout?"none":"";
-  if(!isTout) populateSubcategorySelect(room, sel, subcategorySelect.value||room.selectedSubcategory);
-}
-
-function populateSubcategorySelect(room,catName,pref=null) {
-  if(!subcategorySelect) return;
-  if(catName==="Tout") {
-    subcategorySelect.innerHTML="";
-    const subWrap=subcategorySelect.closest(".form-block");
-    if(subWrap) subWrap.style.display="none";
-    return;
-  }
-  const opts=Array.isArray(room.categoryOptions)?room.categoryOptions:[];
-  const cat=opts.find(i=>i.name===catName)||opts[0];
-  const subs=cat?.subcategories||[];
-  const sel=(pref&&subs.includes(pref))?pref:(room.selectedSubcategory&&subs.includes(room.selectedSubcategory))?room.selectedSubcategory:subs[0]||"";
-  subcategorySelect.innerHTML="";
-  subs.forEach(name=>{ const o=document.createElement("option"); o.value=name; o.textContent=name; o.selected=name===sel; subcategorySelect.appendChild(o); });
-  const subWrap=subcategorySelect.closest(".form-block");
-  if(subWrap) subWrap.style.display="";
-}
-
-function getSelectedComposition(room) { const v=clampCompositionValues(room); return {undercoverCount:v.undercoverCount,mrwhiteCount:v.mrwhiteCount}; }
-
-function getSelectedSettings(room) {
-  const t=clampSeconds(turnDurationInput?.value,room?.turnDurationSeconds||30);
-  const v=clampSeconds(voteDurationInput?.value,room?.voteDurationSeconds||30);
-  if(turnDurationInput) turnDurationInput.value=String(t);
-  if(voteDurationInput) voteDurationInput.value=String(v);
-  const cat=categorySelect?.value||room?.selectedCategory||"Tout";
-  const sub=cat==="Tout"?null:(subcategorySelect?.value||room?.selectedSubcategory||null);
-  const wordsPerTurn=Math.max(1,Math.min(4,parseInt(wordsPerTurnInput?.value||room?.wordsPerTurn||1)||1));
-  return {turnDurationSeconds:t,voteDurationSeconds:v,category:cat,subcategory:sub,wordsPerTurn};
-}
-
-function renderComposition(room) {
-  if(!compositionCard) return;
-  const isHost=room.hostPlayerId===myPlayerId;
-  if(!(!room.started&&!room.gameOver&&isHost)) { compositionCard.classList.add("hidden"); return; }
-  compositionCard.classList.remove("hidden");
-  const n=room.players.length;
-  const isPublic=Boolean(room.isPublic);
-
-  if(turnDurationInput!==document.activeElement) turnDurationInput.value=String(clampSeconds(turnDurationInput.value,room.turnDurationSeconds||30));
-  if(voteDurationInput!==document.activeElement) voteDurationInput.value=String(clampSeconds(voteDurationInput.value,room.voteDurationSeconds||30));
-  populateCategorySelect(room);
-
-  if(isPublic) {
-    // Room publique : tout est verrouillé, config non modifiable
-    undercoverCountInput.disabled=true;
-    mrWhiteCountInput.disabled=true;
-    turnDurationInput.disabled=true;
-    voteDurationInput.disabled=true;
-    categorySelect.disabled=true;
-    subcategorySelect.disabled=true;
-    compositionHelp.textContent="Configuration verrouillée — room publique.";
-    compositionCard.style.opacity="0.6";
-    compositionCard.style.pointerEvents="none";
-  } else if(n<=3) {
-    undercoverCountInput.disabled=true; mrWhiteCountInput.disabled=true;
-    undercoverCountInput.value="1"; mrWhiteCountInput.value="0";
-    turnDurationInput.disabled=false; voteDurationInput.disabled=false;
-    categorySelect.disabled=false; subcategorySelect.disabled=false;
-    compositionHelp.textContent="À 3 joueurs : composition fixe.";
-    compositionCard.style.opacity=""; compositionCard.style.pointerEvents="";
-  } else {
-    undercoverCountInput.disabled=false; mrWhiteCountInput.disabled=false;
-    undercoverCountInput.min="1"; undercoverCountInput.max=String(n-1);
-    mrWhiteCountInput.min="0"; mrWhiteCountInput.max="1";
-    turnDurationInput.disabled=false; voteDurationInput.disabled=false;
-    categorySelect.disabled=false; subcategorySelect.disabled=false;
-    compositionHelp.textContent="Choisissez la composition, les durées et la catégorie.";
-    compositionCard.style.opacity=""; compositionCard.style.pointerEvents="";
+    $("week").innerHTML = cols.join("");
+    $("week").querySelectorAll("[data-h]").forEach(el => { el.style.height = Number(el.dataset.h) + "%"; });
+    $("weekAvg").textContent = n ? `MOYENNE ${r0(total/n)} KCAL` : "";
+    const got = BADGES.filter(b => badges[b.id]).length;
+    $("badgeCount").textContent = `${got} / ${BADGES.length}`;
+    $("badges").innerHTML = BADGES.map(b => `<div class="badge ${badges[b.id] ? "on" : ""}"><span class="bt">${esc(b.t)}</span><span class="bd">${esc(b.d)}</span></div>`).join("");
   }
 
-  // Sync gameMasterMode
-  if (gameMasterModeInput && !isPublic) {
-    gameMasterModeInput.value = room.gameMasterMode || "none";
-    const showFixed = gameMasterModeInput.value === "fixed";
-    if (gameMasterFixedBlock) gameMasterFixedBlock.classList.toggle("hidden", !showFixed);
-    if (showFixed && gameMasterFixedSelect) {
-      gameMasterFixedSelect.innerHTML = "";
-      room.players.forEach(p => {
-        const o = document.createElement("option");
-        o.value = p.id; o.textContent = p.name;
-        if (p.id === room.gameMasterId) o.selected = true;
-        gameMasterFixedSelect.appendChild(o);
-      });
-    }
+  // ---------- Profil ----------
+  function renderProfile(){
+    $("sex").value = profile.sex; $("age").value = profile.age; $("weight").value = profile.weight;
+    $("height").value = profile.height; $("activity").value = String(profile.activity);
+    document.querySelectorAll("#goal button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.g === profile.goal)));
+    targetLine();
   }
-  if (isPublic && gameMasterModeInput) gameMasterModeInput.disabled = true;
-
-  // Sync wordsPerTurn
-  if(wordsPerTurnInput && !isPublic) wordsPerTurnInput.value=String(room.wordsPerTurn||1);
-  if(isPublic && wordsPerTurnInput) { wordsPerTurnInput.value=String(room.wordsPerTurn||1); wordsPerTurnInput.disabled=true; }
-  else if(wordsPerTurnInput) wordsPerTurnInput.disabled=false;
-
-  const vals=clampCompositionValues(room); const sets=getSelectedSettings(room);
-  compositionSummary.textContent=`${vals.civilCount} Civil(s) • ${vals.undercoverCount} Intrus${vals.mrwhiteCount?" • 1 Le Mystère":""} • Tours ${sets.turnDurationSeconds}s • Vote ${sets.voteDurationSeconds}s • ${sets.wordsPerTurn} mot(s)/tour`;
-  renderRoleDolls(room);
-}
-window.renderComposition=renderComposition;
-
-function handlePresenceSounds(room) {
-  const ids=(room.players||[]).map(p=>p.id);
-  if(!previousVisiblePlayerIds.length) { previousVisiblePlayerIds=ids; return; }
-  if(ids.filter(id=>!previousVisiblePlayerIds.includes(id)).length) playClickSound("join");
-  else if(previousVisiblePlayerIds.filter(id=>!ids.includes(id)).length) playClickSound("leave");
-  previousVisiblePlayerIds=ids;
-}
-
-// ─── MAIN RENDER ─────────────────────────────────────────
-function renderRoom(room) {
-  handlePresenceSounds(room);
-  currentRoom=room; window.currentRoom=room;
-  myRoomCode=room.code; localStorage.setItem("roomCode",room.code);
-
-  // Stocker les options de catégorie globalement pour l'UI publique
-  if (room.categoryOptions) window._categoryOptions = room.categoryOptions;
-
-  lobby.classList.remove("hidden");
-  leaveWrap.classList.remove("hidden");
-  startWrap.classList.add("hidden");
-
-  const host=room.players.find(p=>p.id===room.hostPlayerId);
-  const cs=document.getElementById("topRoomCode"); if(cs) cs.textContent="Room "+room.code;
-  topRoomInfo.classList.remove("hidden");
-  topHostInfo.textContent=host?`Hôte : ${host.name}`:"Pas d'hôte";
-  topHostInfo.classList.remove("hidden");
-
-  const nextKey=`${room.code}-${room.phase}-${room.round}-${room.currentSpeakerId||"none"}`;
-  if(currentTurnKey!==nextKey) {
-    currentTurnKey=nextKey; autoSubmittedTurnKey=null; lastTensionSecondPlayed=null;
-    if(!(room.phase==="speaking"&&room.currentSpeakerId===myPlayerId)) chatInput.value="";
+  function readProfile(){
+    const c = (v,a,b,d) => { v = Number(v); return Number.isFinite(v) && v ? Math.min(b, Math.max(a, v)) : d; };
+    return { sex:$("sex").value, age:c($("age").value,18,99,21), weight:c($("weight").value,35,250,70), height:c($("height").value,130,230,175),
+      activity:Number($("activity").value), goal:document.querySelector('#goal button[aria-pressed="true"]')?.dataset.g || "maintien" };
   }
-
-  phaseInfo.textContent=!room.started?"Salon":`Manche ${room.round}`;
-  if(!room.started) { speakerInfo.textContent="La partie n'a pas encore commencé"; }
-  else {
-    const spk=room.players.find(p=>p.id===room.currentSpeakerId);
-    const wordsPerTurn=room.wordsPerTurn||1;
-    const wordsSent=(room.messages||[]).filter(
-      m=>m.round===room.round&&m.playerId===room.currentSpeakerId&&m.turnIndex===room.currentSpeakerIndex
-    ).length;
-    if(room.phase==="speaking"&&spk) {
-      speakerInfo.textContent=wordsPerTurn>1
-        ?`${spk.name} réfléchit (${wordsSent}/${wordsPerTurn} mots)`
-        :`${spk.name} réfléchit`;
-    } else if(room.phase==="voting") {
-      speakerInfo.textContent=`Vote en cours (${room.voteCount}/${room.players.filter(p=>!p.eliminated).length})`;
-    } else if(room.phase==="mrwhite_guess") {
-      speakerInfo.textContent="Le Mystère tente de deviner le mot...";
-    } else if(room.phase==="waiting_words") {
-      const master = room.players.find(p=>p.id===room.gameMasterId);
-      speakerInfo.textContent=master ? `${master.name} choisit les mots de la manche...` : "En attente des mots...";
-    } else {
-      speakerInfo.textContent="";
-    }
-  }
-
-  renderPlayers(room);
-  renderComposition(room);
-  renderChat(room);
-  renderWaitingRoom(room);
-  renderTimer(room);
-  hideGameplayButtons();
-
-  const isHost=room.hostPlayerId===myPlayerId;
-  if(!room.started&&isHost) startBtn.classList.remove("hidden");
-
-  // Bouton "Configurer & Rejouer" pour l'hôte en fin de partie
-  if(room.gameOver&&isHost) {
-    restartBtn.classList.add("hidden");
-    let lobbyBtn = document.getElementById("returnToLobbyBtn");
-    if(!lobbyBtn) {
-      lobbyBtn = document.createElement("button");
-      lobbyBtn.id = "returnToLobbyBtn";
-      lobbyBtn.textContent = "⚙ Configurer & Rejouer";
-      lobbyBtn.style.background = "linear-gradient(180deg,#22c55e,#16a34a)";
-      lobbyBtn.addEventListener("click", () => {
-        socket.emit("returnToLobby", {}, (res) => {
-          if(!res?.ok) return setStatus(res?.error||"Impossible", true);
-          playClickSound("success"); setStatus("Retour au lobby !");
-        });
-      });
-      document.querySelector(".room-actions-bottom")?.appendChild(lobbyBtn);
-    }
-    lobbyBtn.classList.remove("hidden");
-  } else {
-    document.getElementById("returnToLobbyBtn")?.classList.add("hidden");
-  }
-
-  if(room.started&&!room.gameOver) secretCard.classList.remove("hidden");
-  renderVoteButtons(room);
-  renderEndGame(room);
-
-  if(isMobile()) {
-    if(room.gameOver) mobileActiveTab="mob-result";
-    else if(room.phase==="voting" && mobileActiveTab!=="mob-vote") mobileActiveTab="mob-vote";
-    else if(room.started && !["mob-word","mob-chat","mob-players","mob-vote"].includes(mobileActiveTab)) mobileActiveTab="mob-chat";
-    else if(!room.started && isHost && !["mob-waiting-players","mob-config"].includes(mobileActiveTab)) mobileActiveTab="mob-waiting-players";
-    else if(!room.started && !isHost) mobileActiveTab="mob-waiting-players";
-    buildMobileTabs(room);
-  }
-}
-window.renderRoom=renderRoom;
-
-// ─── ROOMS PUBLIQUES ────────────────────────────────────
-let currentPublicRooms = [];
-let publicCategoryFilter = "";
-let publicSubcategoryFilter = "";
-let publicMaxPlayersFilter = "";
-
-function initLandingModeTabs() {
-  const tabs = document.querySelectorAll(".landing-mode-tab");
-  const privatePanel = document.getElementById("privateModePanel");
-  const publicPanel = document.getElementById("publicModePanel");
-  if (!tabs.length || !privatePanel || !publicPanel) return;
-
-  tabs.forEach(tab => {
-    tab.addEventListener("click", () => {
-      tabs.forEach(t => t.classList.remove("active"));
-      tab.classList.add("active");
-      const mode = tab.dataset.mode;
-      privatePanel.style.display = mode === "private" ? "" : "none";
-      publicPanel.style.display = mode === "public" ? "" : "none";
-      if (mode === "public") {
-        fetchPublicRooms();
-        initPublicCategoryFilter();
-      }
-    });
-  });
-}
-
-function initPublicCategoryFilter() {
-  const sel = document.getElementById("publicCategoryFilter");
-  const subSel = document.getElementById("publicSubcategoryFilter");
-  const subBlock = document.getElementById("publicSubcategoryFilterBlock");
-  if (!sel) return;
-
-  // Peupler catégories
-  const opts = Array.isArray(window._categoryOptions) ? window._categoryOptions : [];
-  sel.innerHTML = '<option value="">Toutes</option>';
-  opts.filter(o => o.name !== "Tout").forEach(cat => {
-    const o = document.createElement("option");
-    o.value = cat.name; o.textContent = cat.name;
-    sel.appendChild(o);
-  });
-
-  sel.addEventListener("change", () => {
-    publicCategoryFilter = sel.value;
-    // Peupler sous-catégories
-    if (subSel && subBlock) {
-      const cat = opts.find(c => c.name === sel.value);
-      if (!sel.value || !cat?.subcategories?.length) {
-        subBlock.style.display = "none";
-        subSel.innerHTML = '<option value="">Toutes</option>';
-        publicSubcategoryFilter = "";
-      } else {
-        subBlock.style.display = "";
-        subSel.innerHTML = '<option value="">Toutes</option>';
-        cat.subcategories.forEach(s => {
-          const o = document.createElement("option"); o.value = s; o.textContent = s;
-          subSel.appendChild(o);
-        });
-      }
-    }
-    renderPublicRooms();
-  });
-
-  if (subSel) {
-    subSel.addEventListener("change", () => {
-      publicSubcategoryFilter = subSel.value;
-      renderPublicRooms();
-    });
-  }
-
-  const maxSel = document.getElementById("publicMaxPlayersFilter");
-  if (maxSel) {
-    maxSel.addEventListener("change", () => {
-      publicMaxPlayersFilter = maxSel.value;
-      renderPublicRooms();
-    });
-  }
-
-  // Masquer sous-catégorie filtre par défaut
-  if (subBlock) subBlock.style.display = "none";
-}
-
-function fetchPublicRooms() {
-  socket.emit("getPublicRooms", {}, (res) => {
-    if (res?.ok) {
-      currentPublicRooms = res.rooms || [];
-      renderPublicRooms();
-    }
-  });
-}
-
-function renderPublicRooms() {
-  const list = document.getElementById("publicRoomsList");
-  if (!list) return;
-
-  let rooms = currentPublicRooms;
-  if (publicCategoryFilter) rooms = rooms.filter(r => r.selectedCategory === publicCategoryFilter);
-  if (publicSubcategoryFilter) rooms = rooms.filter(r => r.selectedSubcategory === publicSubcategoryFilter);
-  if (publicMaxPlayersFilter) rooms = rooms.filter(r => r.maxPlayers === parseInt(publicMaxPlayersFilter));
-
-  list.innerHTML = "";
-  if (!rooms.length) {
-    list.innerHTML = `<div class="public-rooms-empty"><p>Aucune salle disponible</p><p style="font-size:12px;opacity:.5;">Crée la première !</p></div>`;
-    return;
-  }
-
-  rooms.forEach(room => {
-    const isFull = room.playerCount >= room.maxPlayers;
-    const card = document.createElement("div");
-    card.className = "public-room-card";
-    const civilCount = room.maxPlayers - (room.undercoverCount || 1) - (room.mrwhiteCount || 0);
-    card.innerHTML = `
-      <div class="public-room-info">
-        <div class="public-room-title">${room.selectedCategory || "Toutes catégories"}${room.selectedSubcategory && room.selectedSubcategory !== "Général" ? " · " + room.selectedSubcategory : ""}</div>
-        <div class="public-room-meta">
-          <span class="public-room-players ${isFull ? "full" : "available"}">
-            ${room.playerCount}/${room.maxPlayers} joueurs
-          </span>
-          <span>${civilCount}C · ${room.undercoverCount || 1}I${room.mrwhiteCount ? " · 1M" : ""}</span>
-          <span>Tour ${room.turnDurationSeconds}s · Vote ${room.voteDurationSeconds}s</span>
-        </div>
-      </div>
-      <button class="public-room-join-btn" ${isFull ? "disabled" : ""}>${isFull ? "Pleine" : "Rejoindre"}</button>
-    `;
-    if (!isFull) {
-      card.querySelector(".public-room-join-btn").addEventListener("click", () => {
-        const name = nameInput?.value.trim();
-        if (!name) return setStatus("Entre un pseudo d'abord", true);
-        socket.emit("joinPublicRoom", { code: room.code, name }, (res) => {
-          if (!res?.ok) return setStatus(res?.error || "Impossible de rejoindre", true);
-          saveSession(res.playerId, res.playerToken, res.room.code);
-          renderRoom(res.room);
-          updateResumeUI(true); playClickSound("join"); setStatus("Room rejointe !");
-        });
-      });
-    }
-    list.appendChild(card);
-  });
-}
-
-function initPublicCreateConfig() {
-  const createPublicBtn = document.getElementById("createPublicBtn");
-  const configPanel = document.getElementById("publicCreateConfig");
-  const confirmBtn = document.getElementById("confirmPublicCreateBtn");
-  const catSel = document.getElementById("publicCategorySelect");
-  const subSel = document.getElementById("publicSubcategorySelect");
-  const subBlock = document.getElementById("publicSubcategoryBlock");
-  const turnSlider = document.getElementById("publicTurnDuration");
-  const voteSlider = document.getElementById("publicVoteDuration");
-  const turnVal = document.getElementById("publicTurnVal");
-  const voteVal = document.getElementById("publicVoteVal");
-  const maxPlayersSel = document.getElementById("publicMaxPlayers");
-  const undercoverInp = document.getElementById("publicUndercoverCount");
-  const mrwhiteInp = document.getElementById("publicMrWhiteCount");
-  const summary = document.getElementById("publicConfigSummary");
-
-  if (!createPublicBtn || !configPanel) return;
-
-  function updateSummary() {
-    if (!summary) return;
-    const max = parseInt(maxPlayersSel?.value || "6");
-    if (max <= 3) {
-      summary.textContent = "2 Civil(s) · 1 Intrus · 0 Mystère (composition fixe à 3 joueurs)";
-      summary.style.color = "#fdba74";
-      if (undercoverInp) { undercoverInp.value = "1"; undercoverInp.disabled = true; }
-      if (mrwhiteInp) { mrwhiteInp.value = "0"; mrwhiteInp.disabled = true; }
-      return;
-    }
-    if (undercoverInp) undercoverInp.disabled = false;
-    if (mrwhiteInp) mrwhiteInp.disabled = false;
-    let u = parseInt(undercoverInp?.value || "1");
-    let m = parseInt(mrwhiteInp?.value || "0");
-    u = Math.max(1, Math.min(u, max - m - 1));
-    const c = max - u - m;
-    if (c < 1) {
-      summary.textContent = "⚠ Composition invalide — trop d'intrus ou de Mystère";
-      summary.style.color = "#ef4444";
-    } else {
-      summary.textContent = `${c} Civil(s) · ${u} Intrus · ${m ? "1 Le Mystère" : "0 Mystère"}`;
-      summary.style.color = "#fdba74";
-    }
-  }
-
-  // Peupler la catégorie
-  function populatePublicCategories() {
-    if (!catSel) return;
-    catSel.innerHTML = "";
-    const opts = Array.isArray(window._categoryOptions) ? window._categoryOptions : [];
-    opts.forEach(cat => {
-      const o = document.createElement("option");
-      o.value = cat.name; o.textContent = cat.name;
-      catSel.appendChild(o);
-    });
-    catSel.dispatchEvent(new Event("change"));
-  }
-
-  if (catSel) {
-    catSel.addEventListener("change", () => {
-      const cat = window._categoryOptions?.find(c => c.name === catSel.value);
-      if (subSel && subBlock) {
-        if (!cat || !cat.subcategories?.length || catSel.value === "Tout") {
-          subBlock.style.display = "none";
-        } else {
-          subBlock.style.display = "";
-          subSel.innerHTML = "";
-          cat.subcategories.forEach(s => {
-            const o = document.createElement("option"); o.value = s; o.textContent = s;
-            subSel.appendChild(o);
-          });
-        }
-      }
-    });
-  }
-
-  if (turnSlider && turnVal) turnSlider.addEventListener("input", () => { turnVal.textContent = turnSlider.value; });
-  if (voteSlider && voteVal) voteSlider.addEventListener("input", () => { voteVal.textContent = voteSlider.value; });
-  if (maxPlayersSel) maxPlayersSel.addEventListener("change", updateSummary);
-  if (undercoverInp) undercoverInp.addEventListener("input", updateSummary);
-  if (mrwhiteInp) mrwhiteInp.addEventListener("change", updateSummary);
-
-  // Toggle config
-  createPublicBtn.addEventListener("click", () => {
-    const visible = configPanel.style.display !== "none";
-    configPanel.style.display = visible ? "none" : "";
-    if (!visible) {
-      populatePublicCategories();
-      updateSummary();
-    }
-  });
-
-  if (confirmBtn) {
-    confirmBtn.addEventListener("click", () => {
-      const name = nameInput?.value.trim();
-      if (!name) return setStatus("Entre un pseudo d'abord", true);
-
-      const maxPlayers = parseInt(maxPlayersSel?.value || "6");
-      let undercoverCount = parseInt(undercoverInp?.value || "1");
-      let mrwhiteCount = parseInt(mrwhiteInp?.value || "0");
-
-      // Valider composition
-      undercoverCount = Math.max(1, Math.min(undercoverCount, maxPlayers - mrwhiteCount - 1));
-      const civilCount = maxPlayers - undercoverCount - mrwhiteCount;
-      if (civilCount < 1) return setStatus("Composition invalide — trop d'intrus", true);
-
-      const category = catSel?.value || "Tout";
-      const subcategory = category === "Tout" ? null : (subSel?.value || null);
-      const turnDurationSeconds = parseInt(turnSlider?.value || "30");
-      const voteDurationSeconds = parseInt(voteSlider?.value || "30");
-
-      const wordsPerTurn = parseInt(document.getElementById("publicWordsPerTurn")?.value || "1");
-
-      socket.emit("createRoom", {
-        name,
-        isPublic: true,
-        maxPlayers,
-        undercoverCount,
-        mrwhiteCount,
-        category,
-        subcategory,
-        turnDurationSeconds,
-        voteDurationSeconds,
-        wordsPerTurn
-      }, (res) => {
-        if (!res?.ok) return setStatus(res?.error || "Impossible de créer", true);
-        saveSession(res.playerId, res.playerToken, res.room.code);
-        renderRoom(res.room);
-        updateResumeUI(true);
-        playClickSound("success");
-        setStatus("Room publique créée !");
-        configPanel.style.display = "none";
-      });
-    });
-  }
-}
-
-// Charger les categoryOptions au démarrage
-socket.emit("getCategoryOptions", {}, (res) => {
-  if (res?.ok) window._categoryOptions = res.options;
-});
-
-// Socket : mise à jour temps réel des rooms publiques
-socket.on("publicRoomsUpdated", (rooms) => {
-  currentPublicRooms = rooms || [];
-  renderPublicRooms();
-});
-function initMobileTabs() {
-  const mobileTabs=document.getElementById("mobileTabs");
-  const loginCard=document.getElementById("roomSetupCard");
-  const rulesCard=document.getElementById("rulesCard");
-  if(!mobileTabs||!loginCard||!rulesCard) return;
-  const apply=()=>{
-    if(window.innerWidth>820) { mobileTabs.classList.add("hidden"); loginCard.classList.remove("hidden-tab"); rulesCard.classList.remove("active"); return; }
-    mobileTabs.classList.remove("hidden");
-    const active=mobileTabs.querySelector(".mobile-tab-btn.active");
-    if(active?.dataset.tab==="rules") { loginCard.classList.add("hidden-tab"); rulesCard.classList.add("active"); }
-    else { loginCard.classList.remove("hidden-tab"); rulesCard.classList.remove("active"); }
-  };
-  mobileTabs.querySelectorAll(".mobile-tab-btn").forEach(btn=>{
-    btn.addEventListener("click",()=>{
-      mobileTabs.querySelectorAll(".mobile-tab-btn").forEach(b=>b.classList.remove("active"));
-      btn.classList.add("active");
-      if(btn.dataset.tab==="rules") { loginCard.classList.add("hidden-tab"); rulesCard.classList.add("active"); }
-      else { loginCard.classList.remove("hidden-tab"); rulesCard.classList.remove("active"); }
-    });
-  });
-  apply(); window.addEventListener("resize",apply);
-}
-
-// ─── ACTIONS ─────────────────────────────────────────────
-function doStartGame() {
-  const composition=currentRoom?getSelectedComposition(currentRoom):null;
-  const settings=currentRoom?getSelectedSettings(currentRoom):null;
-  socket.emit("startGame",{composition,settings},(res)=>{
-    if(!res?.ok) return setStatus(res?.error||"Impossible de lancer",true);
-    playClickSound("success"); setStatus("Partie lancée");
-  });
-}
-window.doStartGame=doStartGame;
-
-function doResumeSession() {
-  if(!myPlayerToken) { updateResumeUI(false); return setStatus("Aucune session à reprendre",true); }
-  socket.emit("resumeSession",{playerToken:myPlayerToken},(res)=>{
-    if(!res?.ok) { clearSession(); resetUI(); return setStatus(res?.error||"Impossible de reprendre la session",true); }
-    saveSession(res.playerId,res.playerToken,res.room.code);
-    renderRoom(res.room);
-    updateResumeUI(true); playClickSound("join"); setStatus("Reconnexion réussie");
-  });
-}
-
-createBtn.addEventListener("click",()=>{
-  const name=nameInput.value.trim();
-  if(!name) return setStatus("Entre un pseudo",true);
-  clearSession(); resetUI();
-  socket.emit("createRoom",{name},(res)=>{
-    if(!res?.ok) return setStatus(res?.error||"Impossible de créer la room",true);
-    saveSession(res.playerId,res.playerToken,res.room.code);
-    renderRoom(res.room);
-    updateResumeUI(true); playClickSound("success"); setStatus("Room créée");
-  });
-});
-
-joinBtn.addEventListener("click",()=>{
-  const name=nameInput.value.trim();
-  const code=roomInput.value.trim().toUpperCase();
-  if(!name||!code) return setStatus("Entre un pseudo et un code",true);
-  const token=myRoomCode===code?myPlayerToken:null;
-  socket.emit("joinRoom",{name,code,playerToken:token},(res)=>{
-    if(!res?.ok) return setStatus(res?.error||"Impossible de rejoindre la room",true);
-    saveSession(res.playerId,res.playerToken,res.room.code);
-    renderRoom(res.room);
-    updateResumeUI(true); playClickSound("join"); setStatus("Room rejointe");
-  });
-});
-
-resumeBtn?.addEventListener("click", doResumeSession);
-startBtn.addEventListener("click", doStartGame);
-
-restartBtn.addEventListener("click",()=>{
-  const composition=currentRoom?getSelectedComposition(currentRoom):null;
-  const settings=currentRoom?getSelectedSettings(currentRoom):null;
-  socket.emit("restartGame",{composition,settings},(res)=>{
-    if(!res?.ok) return setStatus(res?.error||"Impossible de relancer",true);
-    playClickSound("success"); setStatus("Nouvelle partie lancée");
-  });
-});
-
-leaveBtn.addEventListener("click",()=>{
-  socket.emit("leaveRoom",{},(()=>{
-    resetUI(); validateStoredSession(); playClickSound("leave"); setStatus("Tu as quitté la partie.");
+  function targetLine(){ const t = targets(readProfile()); $("targetLine").textContent = `Objectif : ${t.kcal} kcal · ${t.prot} g de protéines · ${t.gluc} g de glucides · ${t.lip} g de lipides par jour.`; }
+  document.querySelectorAll("#goal button").forEach(b => b.addEventListener("click", () => {
+    document.querySelectorAll("#goal button").forEach(x => x.setAttribute("aria-pressed", String(x === b))); targetLine();
   }));
-});
+  ["sex","age","weight","height","activity"].forEach(id => $(id).addEventListener("input", targetLine));
+  $("saveProfile").addEventListener("click", () => { profile = readProfile(); LS.set("g-profile", profile); renderDay(); toast("Profil enregistré"); });
 
-sendChatBtn.addEventListener("click",()=>{
-  const text=normalizeSingleWordInput(chatInput.value);
-  if(!text) return;
-  socket.emit("sendTurnMessage",{text},(res)=>{
-    if(!res?.ok) return setStatus(res?.error||"Impossible d'envoyer",true);
-    chatInput.value=""; sendChatBtn.disabled=true; playClickSound("success"); setStatus("Mot envoyé");
-  });
-});
-
-confirmVoteBtn.addEventListener("click",()=>{
-  if(!selectedVoteTargetId||voteAlreadySent) return;
-  socket.emit("votePlayer",{targetId:selectedVoteTargetId},(res)=>{
-    if(!res?.ok) return setStatus(res?.error||"Impossible de voter",true);
-    voteAlreadySent=true; confirmVoteBtn.disabled=true;
-    selectedVoteText.textContent=`Vote confirmé contre ${selectedVoteTargetName}.`;
-    playClickSound("vote"); setStatus("Vote envoyé",true);
-  });
-});
-
-chatInput.addEventListener("input",()=>{
-  const v=normalizeSingleWordInput(chatInput.value);
-  if(chatInput.value!==v) chatInput.value=v;
-  const isMyTurn=currentRoom&&currentRoom.phase==="speaking"&&currentRoom.currentSpeakerId===myPlayerId&&!currentRoom.gameOver;
-  sendChatBtn.disabled=!isMyTurn||!v;
-});
-chatInput.addEventListener("keydown",e=>{ if(e.key==="Enter"&&!sendChatBtn.disabled) sendChatBtn.click(); });
-
-if(undercoverCountInput) undercoverCountInput.addEventListener("input",()=>{ if(currentRoom) renderComposition(currentRoom); });
-if(mrWhiteCountInput)    mrWhiteCountInput.addEventListener("input",()=>{ if(currentRoom) renderComposition(currentRoom); });
-if(turnDurationInput)    turnDurationInput.addEventListener("input",()=>{ turnDurationInput.value=String(clampSeconds(turnDurationInput.value,30)); if(currentRoom) renderComposition(currentRoom); });
-if(voteDurationInput)    voteDurationInput.addEventListener("input",()=>{ voteDurationInput.value=String(clampSeconds(voteDurationInput.value,30)); if(currentRoom) renderComposition(currentRoom); });
-if(categorySelect)       categorySelect.addEventListener("change",()=>{ if(!currentRoom) return; populateSubcategorySelect(currentRoom,categorySelect.value); renderComposition(currentRoom); });
-if(subcategorySelect)    subcategorySelect.addEventListener("change",()=>{ if(currentRoom) renderComposition(currentRoom); });
-if(wordsPerTurnInput)    wordsPerTurnInput.addEventListener("change",()=>{ if(currentRoom) renderComposition(currentRoom); });
-if(gameMasterModeInput)  gameMasterModeInput.addEventListener("change",()=>{
-  if(!currentRoom) return;
-  const mode = gameMasterModeInput.value;
-  const showFixed = mode === "fixed";
-  if(gameMasterFixedBlock) gameMasterFixedBlock.classList.toggle("hidden", !showFixed);
-  socket.emit("updateGameMasterMode", { mode, fixedPlayerId: gameMasterFixedSelect?.value || null }, () => {});
-});
-if(gameMasterFixedSelect) gameMasterFixedSelect.addEventListener("change",()=>{
-  if(!currentRoom) return;
-  socket.emit("updateGameMasterMode", { mode: "fixed", fixedPlayerId: gameMasterFixedSelect.value }, () => {});
-});
-
-// ─── SOCKET EVENTS ───────────────────────────────────────
-socket.on("roomUpdated",(room)=>{
-  if(room.phase!=="voting") resetVoteSelection();
-  renderRoom(room);
-});
-
-socket.on("gameStarted",({word})=>{
-  secretCard.classList.remove("hidden");
-  endCard.classList.add("hidden");
-  // FIX : réinitialiser le gameId quand une nouvelle partie commence
-  if(endCard) endCard.dataset.renderedGameId="";
-  waitingCard.classList.add("hidden");
-  resetVoteSelection();
-  wordText.textContent=word||"Tu n'as pas de mot.";
-
-  // Animation révélation
-  wordText.classList.remove("word-reveal", "word-hidden");
-  void wordText.offsetWidth; // force reflow
-  wordText.classList.add("word-reveal");
-
-  // Ajouter bouton cacher/montrer sur PC
-  let toggleBtn = document.getElementById("wordToggleBtn");
-  if (!toggleBtn) {
-    toggleBtn = document.createElement("button");
-    toggleBtn.id = "wordToggleBtn";
-    toggleBtn.className = "word-toggle-btn";
-    toggleBtn.textContent = "👁 Cacher mon mot";
-    toggleBtn.addEventListener("click", () => {
-      const hidden = wordText.classList.toggle("word-hidden");
-      toggleBtn.textContent = hidden ? "👁 Afficher mon mot" : "👁 Cacher mon mot";
-    });
-    secretCard.appendChild(toggleBtn);
+  // ---------- Onglets ----------
+  function show(v){
+    ["jour","recettes","progres","profil"].forEach(x => $("view-"+x).hidden = x !== v);
+    document.querySelectorAll("nav.tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.v === v)));
+    if (v === "recettes") renderRecipes();
+    if (v === "progres") renderProgress();
+    window.scrollTo({ top:0 });
   }
-  wordText.classList.remove("word-hidden");
-  toggleBtn.textContent = "👁 Cacher mon mot";
+  document.querySelectorAll("nav.tabs button").forEach(b => b.addEventListener("click", () => show(b.dataset.v)));
 
-  playClickSound("success"); setStatus("La partie commence");
-  mobileActiveTab="mob-word";
-  if(isMobile()&&currentRoom) buildMobileTabs(currentRoom);
-});
+  // ---------- Toast ----------
+  let tt;
+  function toast(msg){ const el = $("toast"); el.textContent = msg; el.hidden = false; clearTimeout(tt); tt = setTimeout(() => el.hidden = true, 2200); }
 
-socket.on("sessionResumed",({word})=>{
-  secretCard.classList.remove("hidden");
-  wordText.textContent=word||"Tu n'as pas de mot.";
-});
+  // ---------- Installation (écran d'accueil) ----------
+  let deferred = null;
+  window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); deferred = e; $("installBtn").hidden = false; });
+  $("installBtn").addEventListener("click", async () => { if (!deferred) return; deferred.prompt(); await deferred.userChoice.catch(()=>{}); deferred = null; $("installBtn").hidden = true; });
+  if (window.matchMedia("(display-mode: standalone)").matches) $("installPanel").hidden = true;
+  if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
 
-// ─── MAÎTRE DU JEU ──────────────────────────────────────
-socket.on("gameMasterPrompt", ({ round }) => {
-  const existing = document.getElementById("gameMasterOverlay");
-  if (existing) existing.remove();
-
-  const overlay = document.createElement("div");
-  overlay.id = "gameMasterOverlay";
-  overlay.style.cssText = `
-    position:fixed;inset:0;z-index:9999;
-    background:rgba(5,9,20,0.93);
-    display:flex;align-items:center;justify-content:center;
-    padding:20px;box-sizing:border-box;
-  `;
-
-  const box = document.createElement("div");
-  box.style.cssText = `
-    background:#0d1530;border:1px solid rgba(224,122,32,0.4);
-    border-radius:20px;padding:32px 28px;max-width:440px;width:100%;
-    text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.5);
-  `;
-
-  box.innerHTML = `
-    <div style="font-size:36px;margin-bottom:12px;">👑</div>
-    <h2 style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:#fdba74;margin:0 0 8px;">Vous êtes le Maître du Jeu</h2>
-    <p style="font-size:14px;color:rgba(255,255,255,0.60);margin:0 0 22px;line-height:1.5;">Manche ${round} — Choisissez la paire de mots. Les Civils recevront le premier mot, les Intrus le second.</p>
-    <div class="form-block" style="margin-bottom:12px;text-align:left;">
-      <label style="display:block;font-size:13px;opacity:.75;margin-bottom:6px;">Mot des Civils</label>
-      <input id="gmCivilWord" maxlength="24" placeholder="Ex: Chat" autocomplete="off"
-        style="width:100%;background:rgba(255,255,255,0.92);color:#111;border:none;border-radius:12px;padding:12px 14px;font-size:16px;box-sizing:border-box;"/>
-    </div>
-    <div class="form-block" style="margin-bottom:20px;text-align:left;">
-      <label style="display:block;font-size:13px;opacity:.75;margin-bottom:6px;">Mot des Intrus</label>
-      <input id="gmIntrusWord" maxlength="24" placeholder="Ex: Chien" autocomplete="off"
-        style="width:100%;background:rgba(255,255,255,0.92);color:#111;border:none;border-radius:12px;padding:12px 14px;font-size:16px;box-sizing:border-box;"/>
-    </div>
-    <p id="gmError" style="font-size:13px;color:#ef4444;min-height:18px;margin:0 0 12px;"></p>
-    <button id="gmSubmitBtn" style="width:100%;background:linear-gradient(180deg,#e07a20,#b85a10);color:white;border:none;border-radius:14px;padding:14px;font-size:16px;font-weight:700;cursor:pointer;">
-      Lancer la manche
-    </button>
-  `;
-
-  overlay.appendChild(box);
-  document.body.appendChild(overlay);
-
-  const submit = () => {
-    const civil = box.querySelector("#gmCivilWord")?.value.trim();
-    const intrus = box.querySelector("#gmIntrusWord")?.value.trim();
-    const err = box.querySelector("#gmError");
-    if (!civil || !intrus) { if(err) err.textContent = "Les deux mots sont requis."; return; }
-    if (civil.toLowerCase() === intrus.toLowerCase()) { if(err) err.textContent = "Les deux mots doivent être différents."; return; }
-    socket.emit("submitGameMasterWords", { civilWord: civil, intrusWord: intrus }, (res) => {
-      if (!res?.ok) { if(err) err.textContent = res?.error || "Erreur"; return; }
-      overlay.remove();
-      playClickSound("success");
-      setStatus("Manche lancée !");
-    });
-  };
-
-  box.querySelector("#gmSubmitBtn")?.addEventListener("click", submit);
-  box.querySelector("#gmIntrusWord")?.addEventListener("keydown", e => { if(e.key==="Enter") submit(); });
-  setTimeout(() => box.querySelector("#gmCivilWord")?.focus(), 100);
-});
-
-socket.on("mysteryGuessPrompt", ({ message }) => {
-  // Afficher une popup de devinette pour Le Mystère
-  const existing = document.getElementById("mysteryGuessOverlay");
-  if (existing) existing.remove();
-
-  const overlay = document.createElement("div");
-  overlay.id = "mysteryGuessOverlay";
-  overlay.style.cssText = `
-    position:fixed;inset:0;z-index:9999;
-    background:rgba(5,9,20,0.92);
-    display:flex;align-items:center;justify-content:center;
-    padding:20px;box-sizing:border-box;
-  `;
-
-  const box = document.createElement("div");
-  box.style.cssText = `
-    background:#0d1530;border:1px solid rgba(248,250,252,0.25);
-    border-radius:20px;padding:32px 28px;max-width:420px;width:100%;
-    text-align:center;box-shadow:0 20px 50px rgba(0,0,0,0.5);
-  `;
-
-  box.innerHTML = `
-    <div style="font-size:36px;margin-bottom:12px;">🔮</div>
-    <h2 style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:#f1f5f9;margin:0 0 10px;">Vous êtes Le Mystère !</h2>
-    <p style="font-size:15px;color:rgba(255,255,255,0.65);margin:0 0 20px;line-height:1.5;">Devinez le mot secret des Civils pour remporter la victoire. Vous avez 30 secondes.</p>
-    <div style="display:flex;gap:10px;">
-      <input id="mysteryGuessInput" maxlength="30" placeholder="Votre mot..." autocomplete="off"
-        style="flex:1;background:rgba(255,255,255,0.9);color:#111;border:none;border-radius:12px;padding:12px 14px;font-size:16px;"/>
-      <button id="mysteryGuessBtn"
-        style="background:linear-gradient(180deg,#f1f5f9,#cbd5e1);color:#111;border:none;border-radius:12px;padding:12px 18px;font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap;">
-        Deviner
-      </button>
-    </div>
-    <p id="mysteryGuessTimer" style="font-size:12px;color:rgba(255,255,255,0.38);margin-top:12px;">30s restantes</p>
-  `;
-
-  overlay.appendChild(box);
-  document.body.appendChild(overlay);
-
-  // Timer 30s
-  let seconds = 30;
-  const timerEl = box.querySelector("#mysteryGuessTimer");
-  const countdown = setInterval(() => {
-    seconds--;
-    if (timerEl) timerEl.textContent = `${seconds}s restantes`;
-    if (seconds <= 0) {
-      clearInterval(countdown);
-      overlay.remove();
-    }
-  }, 1000);
-
-  const doGuess = () => {
-    const inp = box.querySelector("#mysteryGuessInput");
-    const guess = inp?.value.trim();
-    if (!guess) return;
-    clearInterval(countdown);
-    socket.emit("guessMysteryWord", { guess }, (res) => {
-      overlay.remove();
-      if (res?.correct) {
-        setStatus(`Bravo ! Tu as deviné "${res.word}" — Le Mystère gagne !`, true);
-        playClickSound("reveal");
-      } else {
-        setStatus(`Raté ! Le mot était "${res.word}"`, true);
-      }
-    });
-  };
-
-  const btn = box.querySelector("#mysteryGuessBtn");
-  const inp2 = box.querySelector("#mysteryGuessInput");
-  btn?.addEventListener("click", doGuess);
-  inp2?.addEventListener("keydown", e => { if (e.key === "Enter") doGuess(); });
-  setTimeout(() => inp2?.focus(), 100);
-});
-
-socket.on("voteResult",(result)=>{
-  resetVoteSelection();
-  if(result.tie) setStatus("Égalité : personne n'est éliminé.",true);
-  else setStatus(`${result.eliminated.name} est éliminé · ${translateRole(result.eliminated.role)}`,true);
-  playClickSound("vote");
-});
-
-// ─── INIT ────────────────────────────────────────────────
-window.addEventListener("load",()=>{
-  const intro=document.getElementById("introOverlay");
-  const scene=document.getElementById("introScene");
-  if(!intro||!scene) {
-    initMobileTabs();
-    initLandingModeTabs();
-    initPublicCreateConfig();
-    return;
-  }
-  setTimeout(()=>{
-    scene.classList.add("intro-hidden");
-    setTimeout(()=>{
-      intro.remove();
-      initMobileTabs();
-      initLandingModeTabs();
-      initPublicCreateConfig();
-    },900);
-  },2300);
-});
-
-function initAds() {
-  document.querySelectorAll("[data-close-ad]").forEach(btn=>{
-    btn.addEventListener("click",()=>{
-      const ad=document.querySelector(`[data-ad="${btn.dataset.closeAd}"]`);
-      if(!ad) return; ad.classList.add("hidden");
-      localStorage.setItem(`adClosed:${btn.dataset.closeAd}`,"1");
-    });
-  });
-  document.querySelectorAll("[data-ad]").forEach(ad=>{
-    if(localStorage.getItem(`adClosed:${ad.dataset.ad}`)==="1") ad.classList.add("hidden");
-  });
-}
-
-window.addEventListener("resize",()=>{
-  if(!currentRoom) return;
-  if(isMobile()) buildMobileTabs(currentRoom);
-  else {
-    const tabBar=document.getElementById("mobileTabBar");
-    const mobArea=document.getElementById("mobileArea");
-    if(tabBar) tabBar.style.display="none";
-    if(mobArea) mobArea.style.display="none";
-  }
-});
-
-attachUiSounds();
-initAds();
-initTopRoomCopy();
-validateStoredSession();
+  // ---------- Démarrage ----------
+  renderProfile(); renderDay();
+})();

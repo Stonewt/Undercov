@@ -1,9 +1,9 @@
 // Gamelle : garde l'appli en cache pour qu'elle s'ouvre même sans réseau.
 // Ce fichier remplace aussi l'ancien service worker publicitaire de l'ancien site
 // chez les visiteurs qui l'avaient encore.
-const CACHE = "gamelle-v2";
+const CACHE = "gamelle-v3";
 const FILES = [
-  "/", "/index.html", "/app.css", "/app.js", "/manifest.webmanifest", "/icon.svg",
+  "/", "/app.css", "/app.js", "/data.js", "/manifest.webmanifest", "/icon.svg",
   "/fonts/bricolage-grotesque-latin-700-normal.woff2", "/fonts/bricolage-grotesque-latin-800-normal.woff2",
   "/fonts/figtree-latin-400-normal.woff2", "/fonts/figtree-latin-500-normal.woff2", "/fonts/figtree-latin-600-normal.woff2",
   "/fonts/dm-mono-latin-400-normal.woff2", "/fonts/dm-mono-latin-500-normal.woff2"
@@ -34,6 +34,6 @@ self.addEventListener("fetch", (e) => {
         }
         return res;
       })
-      .catch(() => caches.match(e.request).then((r) => r || caches.match("/index.html")))
+      .catch(() => caches.match(e.request).then((r) => r || caches.match("/")))
   );
 });

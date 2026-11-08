@@ -187,6 +187,9 @@ setInterval(() => {
 }, 5 * 60 * 1000);
 
 // ─── MIDDLEWARE HTTP ─────────────────────────────────────
+// Railway place un proxy devant le serveur : on lit la vraie IP du visiteur
+// (sinon la limite de requêtes est partagée par tous les visiteurs).
+app.set("trust proxy", 1);
 app.use(
   helmet({
     contentSecurityPolicy: false

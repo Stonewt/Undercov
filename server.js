@@ -42,6 +42,16 @@ app.use((req, res, next) => {
   res.set("Allow", "GET, HEAD").status(405).end();
 });
 
+// 1 bis. Adresse officielle : si CANONICAL_HOST est réglé (ex. www.bonassiette.fr),
+//        les anciennes adresses (intrusonline.fr, *.up.railway.app) y renvoient définitivement.
+const CANONICAL_HOST = (process.env.CANONICAL_HOST || "").toLowerCase();
+app.use((req, res, next) => {
+  if (!CANONICAL_HOST || !IS_PROD) return next();
+  const host = (req.hostname || "").toLowerCase();
+  if (host === CANONICAL_HOST || req.method !== "GET" && req.method !== "HEAD") return next();
+  res.redirect(301, `https://${CANONICAL_HOST}${req.originalUrl}`);
+});
+
 // 2. Refus des adresses anormalement longues (sondes et attaques par saturation).
 app.use((req, res, next) => {
   if (req.originalUrl.length > 512) return res.status(414).end();

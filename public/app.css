@@ -264,3 +264,15 @@ nav.tabs svg{width:22px;height:22px}
 .cel-flame{font-size:64px;line-height:1;animation:pop .6s cubic-bezier(.2,1.6,.4,1) both}
 @keyframes pop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
 @media (prefers-reduced-motion:reduce){.cel-flame{animation:none}}
+
+/* Suivi du corps */
+.body-charts{display:flex;flex-direction:column;gap:14px}
+.body-chart{display:flex;flex-direction:column;gap:6px}
+.spark{width:100%;height:auto;display:block}
+.spark .grid{stroke:var(--line);stroke-width:1}
+.spark .axis{fill:var(--muted);font:500 10px var(--mono)}
+.w-line,.t-line{fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.w-line{stroke:var(--accent)} .w-dot{fill:var(--accent)}
+.t-line{stroke:var(--lip)} .t-dot{fill:var(--lip)}
+.body-charts details li{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.body-charts .del{padding:2px 0;font:500 12px var(--body);color:var(--muted);text-decoration:underline}

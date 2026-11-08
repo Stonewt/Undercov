@@ -42,6 +42,7 @@
   let xp = LS.get("g-xp", 0);
   let xpDay = LS.get("g-xpday", {});          // points gagnés par jour (plafond quotidien)
   let miles = LS.get("g-miles", []);          // paliers de série déjà célébrés
+  let measures = LS.get("g-measures", []);    // [{d: "AAAA-MM-JJ", w: kg, waist: cm|null}]
   const kitchen = new Set(["plaques", "micro", "bouilloire"]);
   const meals = () => days[TODAY] || [];
   const saveDays = () => LS.set("g-days", days);
@@ -462,12 +463,84 @@
     $("badges").innerHTML = BADGES.map(b => `<div class="badge ${badges[b.id] ? "on" : ""}"><span class="bt">${esc(b.t)}</span><span class="bd">${esc(b.d)}</span></div>`).join("");
   }
 
+  // ---------- Suivi du corps : une mesure par semaine au maximum ----------
+  const MEASURE_GAP_DAYS = 7;
+  const fmtDate = (k) => new Date(k + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
+  const daysBetween = (a, b) => Math.round((new Date(b + "T12:00:00") - new Date(a + "T12:00:00")) / 86400000);
+  // La date de la dernière pesée est gardée à part : supprimer une mesure ne débloque pas la suivante.
+  function nextMeasureKey() {
+    const lastAt = [LS.get("g-measure-at", ""), ...measures.map(m => m.d)].filter(Boolean).sort().pop();
+    if (!lastAt) return TODAY;
+    const d = new Date(lastAt + "T12:00:00"); d.setDate(d.getDate() + MEASURE_GAP_DAYS);
+    return keyOf(d);
+  }
+  function sparkline(points, unit, cls) {
+    if (points.length < 2) return "";
+    const W = 320, H = 120, padL = 44, padR = 12, padT = 12, padB = 24;
+    const vals = points.map(p => p.v);
+    const vMin = Math.min(...vals), vMax = Math.max(...vals);
+    let lo = vMin, hi = vMax;
+    if (hi - lo < 2) { const m = (hi + lo) / 2; lo = m - 1.5; hi = m + 1.5; }
+    const t1 = Math.max(1, daysBetween(points[0].d, points[points.length - 1].d));
+    const x = (p) => padL + (W - padL - padR) * daysBetween(points[0].d, p.d) / t1;
+    const y = (v) => padT + (H - padT - padB) * (1 - (v - lo) / (hi - lo));
+    const path = points.map((p, i) => `${i ? "L" : "M"}${x(p).toFixed(1)} ${y(p.v).toFixed(1)}`).join(" ");
+    const dots = points.map(p => `<circle cx="${x(p).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="3.5" class="${cls}-dot"/>`).join("");
+    const f = (v) => String(Math.round(v * 10) / 10).replace(".", ",");
+    return `<svg viewBox="0 0 ${W} ${H}" class="spark" role="img" aria-label="Évolution ${unit}">
+      <line x1="${padL}" x2="${W - padR}" y1="${y(vMax)}" y2="${y(vMax)}" class="grid"/><line x1="${padL}" x2="${W - padR}" y1="${y(vMin)}" y2="${y(vMin)}" class="grid"/>
+      <text x="${padL - 6}" y="${y(vMax) + 4}" class="axis" text-anchor="end">${f(vMax)}</text>${vMax !== vMin ? `<text x="${padL - 6}" y="${y(vMin) + 4}" class="axis" text-anchor="end">${f(vMin)}</text>` : ""}
+      <text x="${padL}" y="${H - 6}" class="axis">${esc(fmtDate(points[0].d))}</text><text x="${W - padR}" y="${H - 6}" class="axis" text-anchor="end">${esc(fmtDate(points[points.length - 1].d))}</text>
+      <path d="${path}" class="${cls}-line"/>${dots}</svg>`;
+  }
+  function renderBody() {
+    const next = nextMeasureKey(), can = next <= TODAY;
+    $("bodyForm").hidden = !can;
+    $("bodyWait").hidden = can;
+    if (!can) $("bodyWait").textContent = `Prochaine mesure possible le ${fmtDate(next)}. Une fois par semaine suffit largement : idéalement, une fois par mois.`;
+    const last = measures[measures.length - 1];
+    if (can && last) { $("mW").value = String(last.w); $("mWaist").value = last.waist ? String(last.waist) : ""; }
+    if (can && !last) { $("mW").value = String(P().weight); }
+    const wPts = measures.map(m => ({ d: m.d, v: m.w }));
+    const tPts = measures.filter(m => m.waist).map(m => ({ d: m.d, v: m.waist }));
+    const f = (v) => String(Math.round(v * 10) / 10).replace(".", ",");
+    const trend = (pts, u) => {
+      if (pts.length < 2) return "";
+      const dlt = pts[pts.length - 1].v - pts[0].v, n = daysBetween(pts[0].d, pts[pts.length - 1].d);
+      return `${dlt === 0 ? "Stable" : (dlt > 0 ? "+" : "−") + f(Math.abs(dlt)) + " " + u} en ${n} jours`;
+    };
+    $("bodyCharts").innerHTML = measures.length ? `
+      <div class="body-chart"><div class="row"><h3>Poids</h3><span class="num">${f(wPts[wPts.length - 1].v)} kg · ${esc(trend(wPts, "kg"))}</span></div>${sparkline(wPts, "du poids", "w")}</div>
+      ${tPts.length ? `<div class="body-chart"><div class="row"><h3>Tour de taille</h3><span class="num">${f(tPts[tPts.length - 1].v)} cm · ${esc(trend(tPts, "cm"))}</span></div>${sparkline(tPts, "du tour de taille", "t")}</div>` : ""}
+      ${measures.length < 2 ? `<p class="small muted">La courbe apparaîtra à partir de la deuxième mesure.</p>` : ""}
+      <details class="src"><summary>Toutes mes mesures</summary><ul>${measures.slice().reverse().map((m, i) => `<li>${esc(fmtDate(m.d))} : ${f(m.w)} kg${m.waist ? ` · ${f(m.waist)} cm` : ""} <button class="del" type="button" data-m="${measures.length - 1 - i}">Supprimer</button></li>`).join("")}</ul></details>`
+      : `<p class="small muted">Aucune mesure pour l'instant. Ce suivi est facultatif.</p>`;
+  }
+  $("bodySave").addEventListener("click", () => {
+    if (nextMeasureKey() > TODAY) return;
+    const w = Number(String($("mW").value).replace(",", "."));
+    const waistRaw = String($("mWaist").value).trim().replace(",", ".");
+    const waist = waistRaw ? Number(waistRaw) : null;
+    if (!(w >= 30 && w <= 300)) { toast("Indique un poids entre 30 et 300 kg"); return; }
+    if (waist !== null && !(waist >= 40 && waist <= 200)) { toast("Indique un tour de taille entre 40 et 200 cm"); return; }
+    measures = [...measures, { d: TODAY, w: Math.round(w * 10) / 10, waist: waist ? Math.round(waist * 10) / 10 : null }];
+    LS.set("g-measures", measures); LS.set("g-measure-at", TODAY);
+    profile = { ...P(), weight: Math.round(w) }; LS.set("g-profile", profile);
+    renderBody(); renderDay();
+    toast("Mesure enregistrée. Ton objectif du jour est mis à jour.");
+  });
+  $("bodyCharts").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-m]"); if (!b) return;
+    measures = measures.filter((_, i) => i !== Number(b.dataset.m));
+    LS.set("g-measures", measures); renderBody();
+  });
+
   // ---------- Vue Profil ----------
   $("saveProfile").addEventListener("click", () => { profile = readProfile("p-"); LS.set("g-profile", profile); renderDay(); toast("Profil enregistré"); });
   $("resetBtn").addEventListener("click", () => { $("resetConfirm").hidden = false; $("resetBtn").hidden = true; });
   $("resetNo").addEventListener("click", () => { $("resetConfirm").hidden = true; $("resetBtn").hidden = false; });
   $("resetYes").addEventListener("click", () => {
-    LS.clear(); profile = null; days = {}; badges = {}; frozen = []; freezes = 0; xp = 0; xpDay = {}; miles = [];
+    LS.clear(); profile = null; days = {}; badges = {}; frozen = []; freezes = 0; xp = 0; xpDay = {}; miles = []; measures = [];
     $("resetConfirm").hidden = true; $("resetBtn").hidden = false;
     show("jour"); openOnboarding(1);
   });
@@ -479,7 +552,7 @@
     VIEWS.forEach(x => $("view-" + x).hidden = x !== v);
     document.querySelectorAll("nav.tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.v === v)));
     if (v === "recettes") renderRecipes();
-    if (v === "progres") renderProgress();
+    if (v === "progres") { renderProgress(); renderBody(); }
     if (v === "profil") mountProfileForm($("profileForm"), "p-");
     if (v === "jour") loadAd("jour");
     track("vue", { onglet: v });

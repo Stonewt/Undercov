@@ -137,6 +137,18 @@
       <div class="legend"><span><i class="sq sq-ok"></i>Objectif de protéines atteint</span><span><i class="sq sq-soft"></i>Repas notés</span></div>
     </div>
     <div class="panel">
+      <h2>Suivi du corps</h2>
+      <p class="small muted">Une mesure par semaine au maximum, idéalement une par mois. Le poids varie de 1 à 2 kg d'un jour à l'autre (eau, repas, sel) : seule la tendance sur plusieurs semaines a du sens.</p>
+      <div id="bodyForm" class="grid2">
+        <label class="f" for="mW">Poids (kg)<input type="number" id="mW" inputmode="decimal" min="30" max="300" step="0.1"></label>
+        <label class="f" for="mWaist">Tour de taille (cm, facultatif)<input type="number" id="mWaist" inputmode="decimal" min="40" max="200" step="0.5"></label>
+        <p class="small muted full">Mesure le tour de taille au niveau du nombril, debout, sans serrer.</p>
+        <button class="primary full" id="bodySave" type="button">Enregistrer la mesure</button>
+      </div>
+      <p class="note" id="bodyWait" hidden></p>
+      <div id="bodyCharts" class="body-charts"></div>
+    </div>
+    <div class="panel">
       <h2>Ta semaine en bref</h2>
       <div class="recap" id="recap"></div>
     </div>
@@ -197,6 +209,9 @@
         <li><strong>Glucides</strong> : le reste des calories.</li>
       </ul>
       <p class="note">Ce sont des repères généraux. Gamelle n'est pas un outil médical. En cas de maladie, de grossesse, de troubles alimentaires ou de doute, demande conseil à un médecin ou à un diététicien.</p>
+
+      <h3>Pourquoi une seule pesée par semaine ?</h3>
+      <p>Le poids bouge de 1 à 2 kg d'un jour à l'autre sans que rien ne change vraiment (eau, sel, digestion). Se peser tous les jours ne montre que ce bruit et peut devenir une source de stress. Une mesure par semaine, ou mieux une par mois, montre la vraie tendance. C'est pour ça que Gamelle bloque la mesure suivante pendant 7 jours.</p>
 
       <h3>Et les prix ?</h3>
       <p>Ce sont des estimations pour une portion, basées sur des produits de marque distributeur en supermarché discount. Ils changent selon le magasin et la période.</p>

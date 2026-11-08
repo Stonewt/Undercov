@@ -196,7 +196,7 @@
     xp += add; xpDay = { [TODAY]: already + add }; // on ne garde que le jour en cours
     LS.set("g-xp", xp); LS.set("g-xpday", xpDay);
     const after = levelOf(xp);
-    if (after.n > before) setTimeout(() => celebrate(`Niveau ${after.n}`, `Tu passes ${after.name}. Continue comme ça.`), 400);
+    if (after.n > before) setTimeout(() => celebrate(`Nouveau grade : ${after.name}`, `Tu passes au grade ${after.n}. Ta rigueur paie, continue comme ça.`), 400);
     return add;
   }
 
@@ -229,7 +229,11 @@
     { id: "s30", t: "Un mois de régularité", d: "Une série de 30 jours", test: () => streak() >= 30 },
     { id: "chef", t: "Chef fauché", d: "Cuisiner 5 recettes pas chères", test: () => Object.values(days).flat().filter(m => m.recipe).length >= 5 },
     { id: "prot3", t: "Protéines au rendez-vous", d: "Objectif de protéines atteint 3 jours", test: () => Object.values(days).filter(l => sum(l).prot >= targets(P()).prot).length >= 3 },
-    { id: "defi5", t: "Défis relevés", d: "Réussir 5 défis du jour", test: () => LS.get("g-defis", []).length >= 5 }
+    { id: "defi5", t: "Défis relevés", d: "Réussir 5 défis du jour", test: () => LS.get("g-defis", []).length >= 5 },
+    { id: "eau5", t: "Bien hydraté", d: "Objectif d'eau atteint 5 jours", test: () => Object.values(water).filter(n => n >= waterGoal()).length >= 5 },
+    { id: "sport1", t: "Première séance", d: "Noter une séance d'entraînement", test: () => Object.keys(trains).length >= 1 },
+    { id: "sport3", t: "Rigueur", d: "3 séances en 7 jours", test: () => trainsWeek() >= 3 },
+    { id: "sport20", t: "Increvable", d: "Noter 20 séances", test: () => Object.keys(trains).length >= 20 }
   ];
   function checkBadges() {
     let fresh = null;
@@ -252,7 +256,7 @@
     const st = streak();
     $("streakN").textContent = st;
     const lv = levelOf(xp);
-    $("lvName").textContent = `Niveau ${lv.n} · ${lv.name}`;
+    $("lvName").textContent = `Grade ${lv.n} · ${lv.name}`;
     $("lvXp").textContent = lv.to ? `${nb(xp - lv.from)} / ${nb(lv.to - lv.from)} XP` : `${nb(xp)} XP`;
     $("lvBar").style.width = (lv.to ? Math.min(100, (xp - lv.from) / (lv.to - lv.from) * 100) : 100) + "%";
     $("lvFreeze").textContent = freezes ? `🧊 ${freezes} protection${freezes > 1 ? "s" : ""} de série` : "🧊 Une protection tous les 7 jours de série";
@@ -278,6 +282,8 @@
       : `<div class="empty"><h3>Rien de noté pour l'instant</h3><p class="small muted">Cherche ce que tu as mangé dans « Ajouter un repas » : un geste suffit, et ta série démarre.</p></div>`;
 
     renderRecent();
+    renderWater();
+    renderTrain();
     checkBadges();
   }
 
@@ -390,6 +396,208 @@
     saveDays(); renderDay();
   });
 
+  // ---------- Eau ----------
+  // Repère EFSA : environ 1,6 L de boissons par jour pour une femme, 2 L pour un homme.
+  const GLASS_ML = 250;
+  let water = LS.get("g-water", {});            // {"AAAA-MM-JJ": nombre de verres}
+  const waterGoal = () => (P().sex === "f" ? 7 : 8);
+  const liters = (ml) => (ml / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " L";
+  const lastDays = (n) => Array.from({ length: n }, (_, i) => { const d = new Date(today); d.setDate(d.getDate() - i); return keyOf(d); });
+  const waterWeek = () => lastDays(7).filter(k => (water[k] || 0) >= waterGoal()).length;
+  function renderWater() {
+    const n = water[TODAY] || 0, goal = waterGoal();
+    $("glasses").innerHTML = Array.from({ length: Math.max(goal, n) }, (_, i) =>
+      `<button type="button" class="glass ${i < n ? "on" : ""}" data-w="${i}" aria-pressed="${i < n}" aria-label="${i + 1} verre${i ? "s" : ""}"></button>`).join("");
+    $("waterNum").textContent = `${liters(n * GLASS_ML)} / ${liters(goal * GLASS_ML)}`;
+    $("waterLine").textContent = n >= goal ? "Objectif atteint 💧" : `Encore ${goal - n} verre${goal - n > 1 ? "s" : ""} de 25 cl`;
+    $("waterMinus").disabled = !n;
+  }
+  function setWater(n) {
+    n = Math.max(0, Math.min(20, n));
+    water = { ...water, [TODAY]: n };
+    if (!n) delete water[TODAY];
+    LS.set("g-water", water);
+    if (n >= waterGoal() && LS.get("g-water-xp", "") !== TODAY) {
+      LS.set("g-water-xp", TODAY);
+      const g = gainXP(10);
+      track("objectif_eau");
+      renderDay(); toast(`Objectif d'eau atteint 💧${g ? ` · +${g} XP` : ""}`);
+      return;
+    }
+    renderWater();
+  }
+  $("glasses").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-w]"); if (!b) return;
+    const i = Number(b.dataset.w), n = water[TODAY] || 0;
+    setWater(i === n - 1 ? n - 1 : i + 1);
+  });
+  $("waterPlus").addEventListener("click", () => setWater((water[TODAY] || 0) + 1));
+  $("waterMinus").addEventListener("click", () => setWater((water[TODAY] || 0) - 1));
+
+  // ---------- Entraînement ----------
+  const SPORTS = ["Muscu", "Course", "Foot", "Vélo", "Natation", "Autre"];
+  const DURS = [30, 45, 60, 90];
+  let trains = LS.get("g-train", {});           // {"AAAA-MM-JJ": {t: sport, min: durée}}
+  const pick = { t: "Muscu", min: 60 };
+  const trainsWeek = () => lastDays(7).filter(k => trains[k]).length;
+  const segHTML = (vals, cur, fmt) => vals.map(v => `<button type="button" data-v="${esc(v)}" aria-pressed="${v === cur}">${esc(fmt(v))}</button>`).join("");
+  function renderTrain() {
+    const s = trains[TODAY], open = !$("trainForm").hidden;
+    $("trainNum").textContent = `${trainsWeek()} SUR 7 JOURS`;
+    $("trainBtn").hidden = Boolean(s) || open;
+    $("trainDone").hidden = !s;
+    if (s) { $("trainForm").hidden = true; $("trainTxt").textContent = `✓ Séance notée : ${s.t}, ${s.min} min`; }
+  }
+  function mountTrainForm() {
+    $("trainType").innerHTML = segHTML(SPORTS, pick.t, v => v);
+    $("trainDur").innerHTML = segHTML(DURS, pick.min, v => (v === 90 ? "1 h 30+" : v === 60 ? "1 h" : `${v} min`));
+  }
+  $("trainBtn").addEventListener("click", () => { mountTrainForm(); $("trainForm").hidden = false; renderTrain(); });
+  $("trainCancel").addEventListener("click", () => { $("trainForm").hidden = true; renderTrain(); });
+  $("trainType").addEventListener("click", (e) => { const b = e.target.closest("[data-v]"); if (b) { pick.t = b.dataset.v; mountTrainForm(); } });
+  $("trainDur").addEventListener("click", (e) => { const b = e.target.closest("[data-v]"); if (b) { pick.min = Number(b.dataset.v); mountTrainForm(); } });
+  $("trainOk").addEventListener("click", () => {
+    trains = { ...trains, [TODAY]: { t: pick.t, min: pick.min } };
+    LS.set("g-train", trains);
+    $("trainForm").hidden = true;
+    let g = 0;
+    if (LS.get("g-train-xp", "") !== TODAY) { LS.set("g-train-xp", TODAY); g = gainXP(20); } // une seule fois par jour
+    track("seance_notee", { sport: pick.t, minutes: pick.min });
+    renderDay(); toast(`Séance notée 💪${g ? ` · +${g} XP` : ""}`);
+  });
+  $("trainUndo").addEventListener("click", () => {
+    const { [TODAY]: _, ...rest } = trains; trains = rest;
+    LS.set("g-train", trains); renderTrain();
+  });
+
+  // ---------- Photo de l'assiette ----------
+  // La photo est réduite sur le téléphone, envoyée au serveur Gamelle qui la fait analyser, puis oubliée.
+  let photo = null, photoRun = 0, photoFocus = null;
+  fetch("/api/status", { cache: "no-store" })
+    .then(r => (r.ok ? r.json() : null))
+    .then(s => { if (s?.photo) $("photoWrap").hidden = false; })
+    .catch(() => {});
+  function resizeImage(file) {
+    return new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onerror = () => reject(new Error("lecture"));
+      fr.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error("format"));
+        img.onload = () => {
+          const k = Math.min(1, 1024 / Math.max(img.naturalWidth, img.naturalHeight));
+          const c = document.createElement("canvas");
+          c.width = Math.max(1, Math.round(img.naturalWidth * k)); c.height = Math.max(1, Math.round(img.naturalHeight * k));
+          c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+          resolve(c.toDataURL("image/jpeg", 0.82));
+        };
+        img.src = fr.result;
+      };
+      fr.readAsDataURL(file);
+    });
+  }
+  function photoState(msg, mode) {
+    const el = $("photoState");
+    el.textContent = msg;
+    el.className = "small " + (mode === "wait" ? "muted wait" : mode === "err" ? "err" : "muted");
+  }
+  function openPhoto() {
+    photoFocus = document.activeElement;
+    $("photoTitle").textContent = "Analyse de ta photo";
+    $("photoImg").hidden = true; $("photoImg").removeAttribute("src");
+    $("photoBody").hidden = true; $("photoAdd").disabled = true; $("photoCancel").textContent = "Annuler";
+    $("photoBg").hidden = false; $("photoSheet").hidden = false;
+  }
+  function closePhoto() {
+    photoRun++; photo = null;
+    $("photoBg").hidden = true; $("photoSheet").hidden = true;
+    photoFocus?.focus?.();
+  }
+  const scaled = (a) => { const k = a.g0 > 0 ? a.g / a.g0 : 0; return { kcal: a.kcal * k, prot: a.proteines * k, gluc: a.glucides * k, lip: a.lipides * k }; };
+  const macroLine = (v) => `${nb(v.kcal)} kcal · P ${r0(v.prot)} g · G ${r0(v.gluc)} g · L ${r0(v.lip)} g`;
+  const CONF = {
+    faible: "Estimation peu sûre : vérifie bien chaque quantité.",
+    moyenne: "Estimation faite à partir de la photo : corrige les grammes si besoin.",
+    bonne: "Estimation plutôt fiable, mais jette un œil aux grammes."
+  };
+  function renderPhoto() {
+    $("photoTitle").textContent = photo.nom;
+    photoState("Voici ce qu'on voit dans ton assiette. Modifie les grammes : tout se recalcule.");
+    $("photoItems").innerHTML = photo.items.length ? photo.items.map((a, i) => `
+      <div class="pitem" data-i="${i}">
+        <span class="pn">${esc(a.nom)}</span>
+        <label class="pg"><input type="number" inputmode="numeric" min="0" max="2000" step="5" value="${r0(a.g)}" aria-label="Quantité de ${esc(a.nom)} en grammes"><span>g</span></label>
+        <button class="del" type="button" data-x="${i}" aria-label="Retirer ${esc(a.nom)}">Retirer</button>
+        <span class="sub" data-sub="${i}">${macroLine(scaled(a))}</span>
+      </div>`).join("") : `<p class="small muted">Plus aucun aliment dans la liste.</p>`;
+    $("photoNote").textContent = [CONF[photo.conf] || CONF.moyenne, photo.rem].filter(Boolean).join(" ");
+    $("photoBody").hidden = false;
+    updatePhotoTotal();
+  }
+  function updatePhotoTotal() {
+    const t = sum(photo.items.map(scaled));
+    $("photoTot").innerHTML = `
+      <div class="line tot"><span>Total</span><span>${nb(t.kcal)} kcal</span></div>
+      <div class="line"><span><i class="dot d-p"></i>Protéines</span><span>${r0(t.prot)} g</span></div>
+      <div class="line"><span><i class="dot d-g"></i>Glucides</span><span>${r0(t.gluc)} g</span></div>
+      <div class="line"><span><i class="dot d-l"></i>Lipides</span><span>${r0(t.lip)} g</span></div>`;
+    $("photoAdd").disabled = !(t.kcal > 0);
+  }
+  $("photoIn").addEventListener("change", async () => {
+    const file = $("photoIn").files?.[0];
+    $("photoIn").value = "";
+    if (!file) return;
+    const run = ++photoRun;
+    openPhoto();
+    photoState("Préparation de la photo…", "wait");
+    let dataUrl;
+    try { dataUrl = await resizeImage(file); } catch {
+      if (run === photoRun) photoState("Cette photo n'a pas pu être lue. Réessaie avec une photo au format JPEG.", "err");
+      return;
+    }
+    if (run !== photoRun) return;
+    $("photoImg").src = dataUrl; $("photoImg").hidden = false;
+    photoState("Analyse en cours… quelques secondes", "wait");
+    try {
+      const r = await fetch("/api/analyse", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ image: dataUrl.slice(dataUrl.indexOf(",") + 1), mime: "image/jpeg" })
+      });
+      const res = await r.json().catch(() => ({}));
+      if (run !== photoRun) return;
+      if (!r.ok) throw new Error(res.error || "L'analyse n'a pas abouti. Réessaie dans un moment.");
+      if (!res.est_un_repas || !Array.isArray(res.aliments)) throw new Error("On ne voit pas de repas sur cette photo. Cadre bien ton assiette et réessaie.");
+      photo = { nom: res.nom, conf: res.confiance, rem: res.remarque, items: res.aliments.map(a => ({ ...a, g0: a.grammes, g: a.grammes })) };
+      track("photo_analysee", { aliments: photo.items.length, confiance: photo.conf });
+      renderPhoto();
+    } catch (e) {
+      if (run !== photoRun) return;
+      photoState(navigator.onLine === false ? "Pas de connexion internet. Réessaie quand tu es connecté." : e.message, "err");
+      $("photoCancel").textContent = "Fermer";
+    }
+  });
+  $("photoItems").addEventListener("input", (e) => {
+    const row = e.target.closest(".pitem"); if (!row || !photo) return;
+    const a = photo.items[Number(row.dataset.i)];
+    a.g = Math.min(2000, Math.max(0, Number(e.target.value) || 0));
+    row.querySelector("[data-sub]").textContent = macroLine(scaled(a));
+    updatePhotoTotal();
+  });
+  $("photoItems").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-x]"); if (!b || !photo) return;
+    photo.items.splice(Number(b.dataset.x), 1); renderPhoto();
+  });
+  $("photoCancel").addEventListener("click", closePhoto);
+  $("photoBg").addEventListener("click", closePhoto);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("photoSheet").hidden) closePhoto(); });
+  $("photoAdd").addEventListener("click", () => {
+    if (!photo) return;
+    const t = sum(photo.items.map(scaled));
+    if (!(t.kcal > 0)) return;
+    addMeal({ name: photo.nom, ...t });
+    closePhoto();
+  });
+
   // ---------- Vue Pas cher ----------
   function renderRecipes() {
     const t = targets(P()), s = sum(meals());
@@ -445,7 +653,7 @@
     $("week").innerHTML = cols.join("");
     $("week").querySelectorAll("[data-h]").forEach(el => { el.style.height = Number(el.dataset.h) + "%"; });
     $("weekAvg").textContent = n ? `MOYENNE ${nb(total / n)} KCAL` : "";
-    let daysOk = 0, mealsN = 0, protOk = 0;
+    let daysOk = 0, mealsN = 0, protOk = 0; // sur les 7 derniers jours
     for (let i = 0; i < 7; i++) {
       const d = new Date(today); d.setDate(d.getDate() - i);
       const l = days[keyOf(d)] || [];
@@ -457,7 +665,9 @@
       <div class="stat"><b>${mealsN}</b><span>repas</span></div>
       <div class="stat"><b>${protOk}</b><span>jours protéines OK</span></div>
       <div class="stat"><b>${streak()}</b><span>jours de série</span></div>
-      <p class="small muted full">Niveau ${lv.n} · ${esc(lv.name)} · ${nb(xp)} XP au total.${lv.to ? ` Encore ${nb(lv.to - xp)} XP pour le niveau suivant.` : ""}</p>`;
+      <div class="stat"><b>${trainsWeek()}</b><span>séance${trainsWeek() > 1 ? "s" : ""}</span></div>
+      <div class="stat"><b>${waterWeek()}/7</b><span>jours eau OK</span></div>
+      <p class="small muted full">Grade ${lv.n} · ${esc(lv.name)} · ${nb(xp)} XP au total.${lv.to ? ` Encore ${nb(lv.to - xp)} XP pour le grade suivant.` : ""}</p>`;
     const got = BADGES.filter(b => badges[b.id]).length;
     $("badgeCount").textContent = `${got} / ${BADGES.length}`;
     $("badges").innerHTML = BADGES.map(b => `<div class="badge ${badges[b.id] ? "on" : ""}"><span class="bt">${esc(b.t)}</span><span class="bd">${esc(b.d)}</span></div>`).join("");

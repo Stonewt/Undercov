@@ -1,7 +1,7 @@
 // Gamelle : garde l'appli en cache pour qu'elle s'ouvre même sans réseau.
 // Ce fichier remplace aussi l'ancien service worker publicitaire de l'ancien site
 // chez les visiteurs qui l'avaient encore.
-const CACHE = "gamelle-v3";
+const CACHE = "gamelle-v4";
 const FILES = [
   "/", "/app.css", "/app.js", "/data.js", "/manifest.webmanifest", "/icon.svg",
   "/fonts/bricolage-grotesque-latin-700-normal.woff2", "/fonts/bricolage-grotesque-latin-800-normal.woff2",
@@ -24,7 +24,7 @@ self.addEventListener("activate", (e) => {
 // Réseau d'abord (dernière version), cache en secours. Uniquement nos propres fichiers.
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
-  if (e.request.method !== "GET" || url.origin !== self.location.origin) return;
+  if (e.request.method !== "GET" || url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
   e.respondWith(
     fetch(e.request)
       .then((res) => {

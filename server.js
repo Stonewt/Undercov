@@ -8,6 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import CONFIG from "./config.js";
+import { analyseHandler, photoEnabled } from "./analyse.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, "public");
@@ -33,9 +34,11 @@ app.disable("x-powered-by");
 app.disable("etag");
 app.set("trust proxy", 1); // Railway place un proxy devant : on lit la vraie IP du visiteur
 
-// 1. Le site ne fait que lire : toute autre méthode HTTP est refusée.
+// 1. Le site ne fait que lire : toute autre méthode HTTP est refusée,
+//    sauf l'envoi d'une photo à analyser, sur une seule adresse.
 app.use((req, res, next) => {
   if (req.method === "GET" || req.method === "HEAD") return next();
+  if (req.method === "POST" && req.path === "/api/analyse") return next();
   res.set("Allow", "GET, HEAD").status(405).end();
 });
 
@@ -101,6 +104,30 @@ app.use(
     legacyHeaders: false,
     message: "Trop de requêtes. Réessaie dans une minute."
   })
+);
+
+// Analyse photo : réservée aux requêtes venant du site, 6 par jour et par visiteur, photo de 1,5 Mo max.
+app.get("/api/status", (req, res) => res.set("Cache-Control", "no-store").json({ photo: photoEnabled() }));
+app.post(
+  "/api/analyse",
+  (req, res, next) => {
+    const origin = req.get("origin");
+    const site = req.get("sec-fetch-site");
+    if ((origin && origin !== `${req.protocol}://${req.get("host")}`) || (site && site !== "same-origin")) {
+      return res.status(403).json({ error: "Requête refusée." });
+    }
+    if (!req.is("application/json")) return res.status(415).json({ error: "Format refusé." });
+    next();
+  },
+  rateLimit({
+    windowMs: 24 * 60 * 60 * 1000,
+    limit: 6,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    handler: (req, res) => res.status(429).json({ error: "Tu as utilisé tes 6 analyses photo du jour. Reviens demain, ou ajoute ton repas à la main." })
+  }),
+  express.json({ limit: "2.1mb", strict: true }),
+  analyseHandler
 );
 
 // 7. Page d'accueil avec son code unique.

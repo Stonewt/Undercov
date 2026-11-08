@@ -70,6 +70,26 @@
         <span class="check" id="defiState"></span>
       </div>
 
+      <div class="panel" id="waterPanel">
+        <div class="row"><h2>Eau</h2><span class="num" id="waterNum"></span></div>
+        <div class="glasses" id="glasses" role="group" aria-label="Verres d'eau bus aujourd'hui"></div>
+        <div class="row center">
+          <p class="small muted" id="waterLine"></p>
+          <div class="pm"><button class="ghost sm" id="waterMinus" type="button" aria-label="Retirer un verre">−</button><button class="primary sm" id="waterPlus" type="button">+ 1 verre</button></div>
+        </div>
+      </div>
+
+      <div class="panel" id="trainPanel">
+        <div class="row"><h2>Entraînement</h2><span class="num" id="trainNum"></span></div>
+        <button class="primary" id="trainBtn" type="button">J'ai fait ma séance · +20 XP</button>
+        <div id="trainForm" class="train-form" hidden>
+          <div class="fieldset">Quel sport ?<div class="seg" id="trainType" role="group" aria-label="Sport"></div></div>
+          <div class="fieldset">Combien de temps ?<div class="seg" id="trainDur" role="group" aria-label="Durée"></div></div>
+          <div class="grid2"><button class="ghost" id="trainCancel" type="button">Annuler</button><button class="primary" id="trainOk" type="button">Valider</button></div>
+        </div>
+        <div id="trainDone" class="row center" hidden><p id="trainTxt"></p><button class="linkbtn" id="trainUndo" type="button">Annuler</button></div>
+      </div>
+
       <div class="panel">
         <div class="row"><h2>Repas du jour</h2><span class="num" id="mealCount"></span></div>
         <div id="meals"></div>
@@ -81,6 +101,10 @@
     <div class="col-b">
       <div class="panel">
         <h2>Ajouter un repas</h2>
+        <div id="photoWrap" hidden>
+          <label class="photo-btn" for="photoIn"><span>📷 Prendre mon assiette en photo</span><small>Calories et macros calculées aliment par aliment</small></label>
+          <input type="file" id="photoIn" accept="image/jpeg,image/png,image/webp,image/heic,image/*" class="sr">
+        </div>
         <div id="recentWrap" hidden>
           <div class="eyebrow mb8">Tes plats habituels</div>
           <div class="chips" id="recent"></div>
@@ -191,11 +215,28 @@
       <h2>Comment ça marche</h2>
       <ol class="how">
         <li><strong>Remplis ton profil.</strong> Gamelle calcule combien de calories et de protéines il te faut par jour.</li>
-        <li><strong>Note ce que tu manges.</strong> Cherche le plat, choisis la portion, appuie sur « Ajouter ». Tes plats habituels apparaissent ensuite en un geste.</li>
+        <li><strong>Note ce que tu manges.</strong> Cherche le plat, choisis la portion, appuie sur « Ajouter ». Tes plats habituels apparaissent ensuite en un geste. Tu peux aussi prendre ton assiette en photo : Gamelle détaille chaque aliment avec son poids (par exemple 150 g de pâtes, 60 g de béchamel) et tu corriges les grammes si besoin.</li>
         <li><strong>Regarde ce qu'il te reste.</strong> Le cercle montre les calories restantes, les barres tes protéines, glucides et lipides.</li>
         <li><strong>Manque d'idées ou de budget ?</strong> L'onglet « Pas cher » propose des recettes à moins de 2 € la portion, avec la liste de courses.</li>
+        <li><strong>Bois et bouge.</strong> Coche tes verres d'eau et note tes séances d'entraînement.</li>
         <li><strong>Reviens chaque jour.</strong> Ta série 🔥 augmente tant que tu notes au moins un repas par jour.</li>
       </ol>
+
+      <h3>Points et grades</h3>
+      <p>Chaque bon geste rapporte des points (XP). En cumulant les points, tu montes de grade, de Débutant à Légende. Les points récompensent la régularité, jamais le fait de manger moins.</p>
+      <ul>
+        <li>Repas noté : +10 XP · recette cuisinée : +15 XP</li>
+        <li>Séance d'entraînement : +20 XP (une par jour)</li>
+        <li>Défi du jour réussi : +20 XP · objectif d'eau atteint : +10 XP</li>
+        <li>Paliers de série (3, 7, 14, 30 jours…) : +25 à +50 XP</li>
+        <li>120 XP au maximum par jour.</li>
+      </ul>
+
+      <h3>Combien d'eau ?</h3>
+      <p>L'Autorité européenne de sécurité des aliments (EFSA) conseille environ 2 L d'eau par jour pour une femme et 2,5 L pour un homme, dont à peu près 20 % viennent des aliments. Il reste environ 1,6 L à boire pour une femme et 2 L pour un homme : 7 ou 8 verres de 25 cl. Bois davantage s'il fait chaud ou si tu fais du sport.</p>
+
+      <h3>L'analyse photo</h3>
+      <p>La photo est envoyée à un service d'intelligence artificielle (Claude, d'Anthropic) qui reconnaît les aliments et estime les quantités. C'est une estimation : vérifie toujours les grammes. La photo n'est pas conservée par Gamelle. Six analyses par jour sont offertes.</p>
 
       <h3>D'où viennent les valeurs nutritionnelles ?</h3>
       <p>De la <strong>table Ciqual 2025</strong> de l'ANSES (Agence nationale de sécurité sanitaire), la référence officielle française. Chaque plat indique sa portion et l'aliment Ciqual utilisé : appuie sur « Source » pour le voir. Les recettes sont calculées ingrédient par ingrédient.</p>
@@ -219,6 +260,7 @@
       <h3>Sources</h3>
       <ul>
         <li>ANSES, Table de composition nutritionnelle des aliments Ciqual, version 2025 — <span class="mono">ciqual.anses.fr</span></li>
+        <li>EFSA, Scientific Opinion on Dietary Reference Values for water, EFSA Journal, 2010.</li>
         <li>Mifflin M. D. et al., « A new predictive equation for resting energy expenditure in healthy individuals », American Journal of Clinical Nutrition, 1990.</li>
         <li>ANSES, Actualisation des repères du PNNS : élaboration des références nutritionnelles, 2016.</li>
       </ul>
@@ -244,6 +286,17 @@
   <div class="ticket" id="sheetVals"></div>
   <details class="src"><summary>Source</summary><div id="sheetSrc"></div></details>
   <div class="grid2"><button class="ghost" id="sheetCancel" type="button">Annuler</button><button class="primary" id="sheetAdd" type="button">Ajouter</button></div>
+</div>
+
+<div class="sheet-bg" id="photoBg" hidden></div>
+<div class="sheet" id="photoSheet" role="dialog" aria-modal="true" aria-labelledby="photoTitle" hidden>
+  <div class="photo-head"><img id="photoImg" alt="Ta photo" hidden><div><h3 id="photoTitle">Analyse de ta photo</h3><p class="small muted" id="photoState" aria-live="polite"></p></div></div>
+  <div id="photoBody" hidden>
+    <div id="photoItems"></div>
+    <div class="ticket" id="photoTot"></div>
+    <p class="note" id="photoNote"></p>
+  </div>
+  <div class="grid2"><button class="ghost" id="photoCancel" type="button">Annuler</button><button class="primary" id="photoAdd" type="button" disabled>Ajouter</button></div>
 </div>
 
 <!-- Accueil guidé -->

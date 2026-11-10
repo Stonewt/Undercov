@@ -3,7 +3,7 @@
 export default {
   // Google AdSense : identifiant éditeur, par exemple "ca-pub-1234567890123456".
   // Le renseigner suffit pour la validation du site (balise + ads.txt).
-  adsClient: "",
+  adsClient: "ca-pub-4765209928947760",
   // Mettre à true quand AdSense a approuvé le site et que les emplacements sont créés.
   adsEnabled: false,
   adSlots: { jour: "", recettes: "" },

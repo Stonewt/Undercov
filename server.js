@@ -40,6 +40,8 @@ const ACCOUNTS_ON = Boolean(SB_URL && SB_ANON);
 const STRIPE_KEY = /^sk_(live|test)_[A-Za-z0-9]{10,}$/.test(process.env.STRIPE_SECRET_KEY || "") ? process.env.STRIPE_SECRET_KEY : "";
 const STRIPE_WH = /^whsec_[A-Za-z0-9]{10,}$/.test(process.env.STRIPE_WEBHOOK_SECRET || "") ? process.env.STRIPE_WEBHOOK_SECRET : "";
 const STRIPE_PRICE = /^price_[A-Za-z0-9]{10,}$/.test(process.env.STRIPE_PRICE_ID || "") ? process.env.STRIPE_PRICE_ID : "";
+// Facultatif : configuration du portail client créée par scripts/setup.mjs (sinon, celle par défaut du tableau de bord Stripe).
+const STRIPE_PORTAL = /^bpc_[A-Za-z0-9]{10,}$/.test(process.env.STRIPE_PORTAL_CONFIG_ID || "") ? process.env.STRIPE_PORTAL_CONFIG_ID : "";
 const PREMIUM_ON = Boolean(ACCOUNTS_ON && SB_SERVICE && STRIPE_KEY && STRIPE_WH && STRIPE_PRICE);
 const stripe = PREMIUM_ON ? new Stripe(STRIPE_KEY, { timeout: 15_000, maxNetworkRetries: 1 }) : null;
 if (ACCOUNTS_ON && !PREMIUM_ON) console.log("Abonnement Bon'Assiette+ inactif : variables Stripe ou SUPABASE_SERVICE_ROLE_KEY manquantes.");
@@ -251,7 +253,9 @@ app.post("/api/portal", sameOrigin, payLimit, requireUser, async (req, res) => {
   try {
     const current = await subscriptionOf(req.user.id);
     if (!current?.provider_ref) return res.status(404).json({ error: "Aucun abonnement trouvé pour ce compte." });
-    const portal = await stripe.billingPortal.sessions.create({ customer: current.provider_ref, return_url: `${siteUrl(req)}/` });
+    const portal = await stripe.billingPortal.sessions.create({
+      customer: current.provider_ref, return_url: `${siteUrl(req)}/`, ...(STRIPE_PORTAL ? { configuration: STRIPE_PORTAL } : {})
+    });
     res.set("Cache-Control", "no-store").json({ url: portal.url });
   } catch (e) {
     console.error("portail:", e?.message);

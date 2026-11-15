@@ -6,6 +6,28 @@ comptes facultatifs (Supabase) et abonnement Bon'Assiette+ (Stripe) qui ouvre l'
 - Serveur : `node server.js` (Node 20+). Aucune base locale : tout est chez Supabase et Stripe.
 - Réglages publics : `config.js`. Secrets : variables d'environnement Railway, jamais dans le code.
 
+## Mise en service en une commande
+
+1. Remplis `.env.setup` (fichier ignoré par git) avec quatre jetons : `SUPABASE_ACCESS_TOKEN` (supabase.com → compte → Access Tokens),
+   `STRIPE_SECRET_KEY` (Stripe → Développeurs → Clés API), `RAILWAY_TOKEN` (Railway → Account settings → Tokens),
+   `ANTHROPIC_API_KEY` (console.anthropic.com → API keys).
+2. `node scripts/setup.mjs` : crée le projet Supabase et son schéma, le produit, le tarif, le webhook et le portail Stripe,
+   puis enregistre toutes les variables dans Railway et vérifie le site. Rejouable sans danger.
+3. Supprime `.env.setup`.
+
+La liste manuelle ci-dessous décrit ce que fait le script, si tu préfères le faire à la main.
+
+## Mise en service en une commande
+
+1. Remplis `.env.setup` (fichier ignoré par git) avec quatre jetons : `SUPABASE_ACCESS_TOKEN` (supabase.com → compte → Access Tokens),
+   `STRIPE_SECRET_KEY` (Stripe → Développeurs → Clés API), `RAILWAY_TOKEN` (Railway → Account settings → Tokens),
+   `ANTHROPIC_API_KEY` (console.anthropic.com → API keys).
+2. `node scripts/setup.mjs` : crée le projet Supabase et son schéma, le produit, le tarif, le webhook et le portail Stripe,
+   puis enregistre toutes les variables dans Railway et vérifie le site. Rejouable sans danger.
+3. Supprime `.env.setup`.
+
+La liste manuelle ci-dessous décrit ce que fait le script, si tu préfères le faire à la main.
+
 ## Mise en service : la liste à cocher
 
 ### 1. Comptes (Supabase)

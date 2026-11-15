@@ -190,6 +190,8 @@
     <div class="panel">
       <h2>Ta semaine en bref</h2>
       <div class="recap" id="recap"></div>
+      <button class="ghost big-cta" id="shareBtn" type="button">📤 Partager ma progression</button>
+      <p class="small muted">Une image avec ta série, ton grade et ta semaine. Jamais tes calories ni ton poids.</p>
     </div>
     <div class="panel">
       <div class="row"><h2>Badges</h2><span class="num" id="badgeCount"></span></div>
@@ -334,6 +336,15 @@
     <p class="note" id="photoNote"></p>
   </div>
   <div class="grid2"><button class="ghost" id="photoCancel" type="button">Annuler</button><button class="primary" id="photoAdd" type="button" disabled>Ajouter</button></div>
+</div>
+
+<div class="sheet-bg" id="shareBg" hidden></div>
+<div class="sheet" id="shareSheet" role="dialog" aria-modal="true" aria-labelledby="shareTitle" hidden>
+  <h3 id="shareTitle">Ta carte de progression</h3>
+  <p class="small muted" id="shareState" aria-live="polite">Préparation de l'image…</p>
+  <img id="shareImg" class="share-img" alt="Carte de progression Bon'Assiette : série, grade et bilan de la semaine">
+  <div class="grid2"><button class="ghost" id="shareClose" type="button">Fermer</button><button class="primary" id="shareGo" type="button" disabled>Partager</button></div>
+  <a class="linkbtn" id="shareDl" download="bonassiette.png" hidden>Enregistrer l'image</a>
 </div>
 
 <div class="sheet-bg" id="premBg" hidden></div>

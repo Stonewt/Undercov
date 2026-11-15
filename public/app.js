@@ -886,6 +886,86 @@
     $("badges").innerHTML = BADGES.map(b => `<div class="badge ${badges[b.id] ? "on" : ""}"><span class="bt">${esc(b.t)}</span><span class="bd">${esc(b.d)}</span></div>`).join("");
   }
 
+  // ---------- Carte de partage ----------
+  // Une image générée sur l'appareil (jamais envoyée au serveur) : série, grade, points et bilan de la semaine.
+  // Volontairement sans calories ni poids : ce n'est pas le genre de chose à mettre sur les réseaux.
+  let shareFile = null;
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+  async function drawShareCard() {
+    const W = 1080, H = 1350, c = document.createElement("canvas");
+    c.width = W; c.height = H;
+    const ctx = c.getContext("2d");
+    try {
+      await Promise.all(['800 150px "Bricolage Grotesque"', '700 36px "Bricolage Grotesque"', '500 30px "Figtree"', '600 44px "Figtree"', '500 30px "DM Mono"']
+        .map(f => document.fonts.load(f)));
+    } catch { /* polices système en secours */ }
+    const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, "#2f6b3c"); g.addColorStop(1, "#1c4526");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    roundRect(ctx, 60, 60, W - 120, H - 120, 48); ctx.fillStyle = "#f2f4ef"; ctx.fill();
+    const st = streak(), lv = levelOf(xp), t = targets(P());
+    let daysOk = 0, mealsN = 0, protOk = 0;
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(today); d.setDate(d.getDate() - i);
+      const l = days[keyOf(d)] || [];
+      if (l.length) daysOk++; mealsN += l.length; if (l.length && sum(l).prot >= t.prot) protOk++;
+    }
+    const got = BADGES.filter(b => badges[b.id]).length, tw = trainsWeek();
+    ctx.textBaseline = "top";
+    ctx.fillStyle = "#2f6b3c"; ctx.font = '800 56px "Bricolage Grotesque"'; ctx.fillText("Bon'Assiette", 120, 130);
+    ctx.fillStyle = "#56635a"; ctx.font = '500 30px "DM Mono"';
+    ctx.fillText(new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }).toUpperCase(), 120, 204);
+    ctx.fillStyle = "#18201b"; ctx.font = '800 150px "Bricolage Grotesque"'; ctx.fillText(`🔥 ${st}`, 120, 280);
+    ctx.fillStyle = "#56635a"; ctx.font = '600 44px "Figtree"'; ctx.fillText(st === 1 ? "jour d'affilée" : "jours d'affilée", 120, 455);
+    roundRect(ctx, 120, 560, W - 240, 160, 28); ctx.fillStyle = "#e2eee3"; ctx.fill();
+    ctx.fillStyle = "#2f6b3c"; ctx.font = '500 30px "DM Mono"'; ctx.fillText(`GRADE ${lv.n} · ${nb(xp)} XP`, 160, 592);
+    ctx.fillStyle = "#18201b"; ctx.font = '800 60px "Bricolage Grotesque"'; ctx.fillText(lv.name, 160, 634);
+    const stats = [[`${daysOk}/7`, "jours notés"], [String(mealsN), mealsN > 1 ? "repas cette semaine" : "repas cette semaine"],
+      [String(protOk), "jours protéines OK"], [String(tw), tw > 1 ? "séances de sport" : "séance de sport"],
+      [`${waterWeek()}/7`, "jours eau OK"], [`${got}/${BADGES.length}`, "badges"]];
+    stats.forEach(([v, l], i) => {
+      const x = 120 + (i % 2) * 430, y = 770 + Math.floor(i / 2) * 140;
+      ctx.fillStyle = "#18201b"; ctx.font = '800 64px "Bricolage Grotesque"'; ctx.fillText(v, x, y);
+      ctx.fillStyle = "#56635a"; ctx.font = '500 30px "Figtree"'; ctx.fillText(l, x, y + 78);
+    });
+    ctx.fillStyle = "#2f6b3c"; ctx.font = '700 36px "Bricolage Grotesque"'; ctx.fillText("bonassiette.fr", 120, 1190);
+    ctx.fillStyle = "#56635a"; ctx.font = '500 30px "Figtree"'; ctx.fillText("Compteur de calories gratuit et français", 120, 1238);
+    return c;
+  }
+  const closeShare = () => { $("shareBg").hidden = true; $("shareSheet").hidden = true; shareFile = null; };
+  $("shareBtn").addEventListener("click", async () => {
+    track("partage_ouvert");
+    $("shareImg").removeAttribute("src"); $("shareDl").hidden = true; $("shareGo").disabled = true; shareFile = null;
+    $("shareState").textContent = "Préparation de l'image…";
+    $("shareBg").hidden = false; $("shareSheet").hidden = false;
+    try {
+      const c = await drawShareCard();
+      const url = c.toDataURL("image/png");
+      $("shareImg").src = url; $("shareDl").href = url; $("shareDl").hidden = false;
+      const blob = await new Promise(r => c.toBlob(r, "image/png"));
+      shareFile = blob ? new File([blob], "bonassiette.png", { type: "image/png" }) : null;
+      const can = Boolean(shareFile && navigator.canShare && navigator.canShare({ files: [shareFile] }));
+      $("shareGo").textContent = can ? "Partager" : "Enregistrer l'image";
+      $("shareGo").disabled = false;
+      $("shareState").textContent = can ? "Envoie-la sur Instagram, Snap, WhatsApp… où tu veux." : "Enregistre l'image, puis publie-la où tu veux.";
+    } catch {
+      $("shareState").textContent = "L'image n'a pas pu être créée sur cet appareil.";
+    }
+  });
+  $("shareGo").addEventListener("click", async () => {
+    if (shareFile && navigator.canShare && navigator.canShare({ files: [shareFile] })) {
+      try {
+        await navigator.share({ files: [shareFile], title: "Ma progression Bon'Assiette", text: "Ma série et mon grade sur Bon'Assiette, le compteur de calories gratuit · bonassiette.fr" });
+        track("partage", { mode: "partage" });
+      } catch { /* partage annulé */ }
+    } else if (!$("shareDl").hidden) { $("shareDl").click(); track("partage", { mode: "image" }); }
+  });
+  $("shareClose").addEventListener("click", closeShare);
+  $("shareBg").addEventListener("click", closeShare);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("shareSheet").hidden) closeShare(); });
+
   // ---------- Suivi du corps : une mesure par semaine au maximum ----------
   const MEASURE_GAP_DAYS = 7;
   const fmtDate = (k) => new Date(k + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long" });

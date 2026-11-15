@@ -8,5 +8,8 @@ export default {
   adsEnabled: false,
   adSlots: { jour: "", recettes: "" },
   // Google Analytics 4 : identifiant de mesure, par exemple "G-ABCDEF1234".
-  gaId: ""
+  gaId: "",
+  // Abonnement Bon'Assiette+ : prix AFFICHÉ dans l'appli. Le prix réellement facturé est celui du tarif Stripe
+  // (variable STRIPE_PRICE_ID dans Railway) : les deux doivent correspondre.
+  premiumPrice: "2,99 €/mois"
 };

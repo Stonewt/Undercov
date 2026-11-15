@@ -1,5 +1,6 @@
-// Bon'Assiette : serveur minimal. Il ne fait qu'envoyer des fichiers publics.
-// Pas de base de données, pas de compte, pas de formulaire : rien à voler ni à injecter.
+// Bon'Assiette : serveur minimal. Il envoie des fichiers publics et expose quatre adresses d'API :
+// l'analyse photo (abonnés), la suppression de compte, et le paiement de l'abonnement (Stripe).
+// Aucune donnée n'est stockée ici : les comptes sont chez Supabase, les paiements chez Stripe.
 import express from "express";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
@@ -7,6 +8,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import Stripe from "stripe";
 import CONFIG from "./config.js";
 import { analyseHandler, photoEnabled } from "./analyse.js";
 
@@ -33,6 +35,48 @@ const SB_ANON = /^[A-Za-z0-9._-]{20,500}$/.test(process.env.SUPABASE_ANON_KEY ||
 const SB_SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const ACCOUNTS_ON = Boolean(SB_URL && SB_ANON);
 
+// Abonnement Bon'Assiette+ (Stripe) : actif seulement si les comptes le sont et si les trois variables Railway
+// STRIPE_SECRET_KEY (secrète), STRIPE_WEBHOOK_SECRET (secrète) et STRIPE_PRICE_ID (identifiant du tarif) sont réglées.
+const STRIPE_KEY = /^sk_(live|test)_[A-Za-z0-9]{10,}$/.test(process.env.STRIPE_SECRET_KEY || "") ? process.env.STRIPE_SECRET_KEY : "";
+const STRIPE_WH = /^whsec_[A-Za-z0-9]{10,}$/.test(process.env.STRIPE_WEBHOOK_SECRET || "") ? process.env.STRIPE_WEBHOOK_SECRET : "";
+const STRIPE_PRICE = /^price_[A-Za-z0-9]{10,}$/.test(process.env.STRIPE_PRICE_ID || "") ? process.env.STRIPE_PRICE_ID : "";
+const PREMIUM_ON = Boolean(ACCOUNTS_ON && SB_SERVICE && STRIPE_KEY && STRIPE_WH && STRIPE_PRICE);
+const stripe = PREMIUM_ON ? new Stripe(STRIPE_KEY, { timeout: 15_000, maxNetworkRetries: 1 }) : null;
+if (ACCOUNTS_ON && !PREMIUM_ON) console.log("Abonnement Bon'Assiette+ inactif : variables Stripe ou SUPABASE_SERVICE_ROLE_KEY manquantes.");
+
+// Qui est connecté ? Le navigateur envoie son jeton Supabase ; on le fait vérifier par Supabase.
+async function userFromRequest(req) {
+  const m = /^Bearer ([A-Za-z0-9._-]{20,4000})$/.exec(req.get("authorization") || "");
+  if (!m) return null;
+  const who = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_ANON, authorization: `Bearer ${m[1]}` } });
+  if (!who.ok) return null;
+  const { id, email } = await who.json();
+  return /^[0-9a-f-]{36}$/.test(id || "") ? { id, email: typeof email === "string" ? email : "" } : null;
+}
+// Lecture et écriture de la table subscriptions avec la clé secrète (les utilisateurs ne peuvent que la lire).
+const sbAdmin = { apikey: SB_SERVICE, authorization: `Bearer ${SB_SERVICE}`, "content-type": "application/json" };
+async function subscriptionOf(userId) {
+  const r = await fetch(`${SB_URL}/rest/v1/subscriptions?user_id=eq.${userId}&select=status,current_period_end,provider_ref`, { headers: sbAdmin });
+  if (!r.ok) throw new Error(`subscriptions: ${r.status}`);
+  return (await r.json())[0] || null;
+}
+async function saveSubscription(row) {
+  const r = await fetch(`${SB_URL}/rest/v1/subscriptions`, {
+    method: "POST", headers: { ...sbAdmin, prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(row)
+  });
+  if (!r.ok) throw new Error(`subscriptions: ${r.status}`);
+}
+// Abonné = statut actif (ou paiement en retard, avec 3 jours de tolérance avant la coupure).
+const isActive = (s) => Boolean(s) && (s.status === "active" || s.status === "past_due")
+  && (!s.current_period_end || Date.parse(s.current_period_end) + 3 * 86_400_000 > Date.now());
+// Statut Stripe -> statut Bon'Assiette.
+const mapStatus = (st) => (st === "active" || st === "trialing") ? "active" : st === "past_due" ? "past_due"
+  : (st === "canceled" || st === "unpaid" || st === "incomplete_expired") ? "canceled" : "inactive";
+const periodEnd = (sub) => {
+  const t = sub?.items?.data?.[0]?.current_period_end ?? sub?.current_period_end;
+  return t ? new Date(t * 1000).toISOString() : null;
+};
+
 // La page d'accueil est lue une fois ; un code unique (nonce) y est inséré à chaque affichage.
 const INDEX_HTML = fs.readFileSync(path.join(PUBLIC_DIR, "index.html"), "utf8");
 
@@ -41,11 +85,11 @@ app.disable("x-powered-by");
 app.disable("etag");
 app.set("trust proxy", 1); // Railway place un proxy devant : on lit la vraie IP du visiteur
 
-// 1. Le site ne fait que lire : toute autre méthode HTTP est refusée,
-//    sauf l'envoi d'une photo à analyser, sur une seule adresse.
+// 1. Le site ne fait que lire : toute autre méthode HTTP est refusée, sauf les quelques envois (POST) de l'API.
+const POST_PATHS = new Set(["/api/analyse", "/api/account/delete", "/api/checkout", "/api/portal", "/api/stripe/webhook"]);
 app.use((req, res, next) => {
   if (req.method === "GET" || req.method === "HEAD") return next();
-  if (req.method === "POST" && (req.path === "/api/analyse" || req.path === "/api/account/delete")) return next();
+  if (req.method === "POST" && POST_PATHS.has(req.path)) return next();
   res.set("Allow", "GET, HEAD").status(405).end();
 });
 
@@ -123,8 +167,7 @@ app.use(
   })
 );
 
-// Analyse photo : réservée aux requêtes venant du site, 6 par jour et par visiteur, photo de 1,5 Mo max.
-app.get("/api/status", (req, res) => res.set("Cache-Control", "no-store").json({ photo: photoEnabled() }));
+app.get("/api/status", (req, res) => res.set("Cache-Control", "no-store").json({ photo: photoEnabled(), premium: PREMIUM_ON }));
 // Les envois (POST) ne sont acceptés que s'ils viennent du site lui-même.
 const sameOrigin = (req, res, next) => {
   const origin = req.get("origin");
@@ -134,6 +177,27 @@ const sameOrigin = (req, res, next) => {
   }
   next();
 };
+// Connexion obligatoire : met l'utilisateur dans req.user.
+const requireUser = async (req, res, next) => {
+  if (!ACCOUNTS_ON || !SB_SERVICE) return res.status(503).json({ error: "Les comptes ne sont pas encore activés." });
+  if (!req.get("authorization")) return res.status(401).json({ error: "Connexion requise." });
+  try {
+    req.user = await userFromRequest(req);
+    if (!req.user) return res.status(401).json({ error: "Connexion expirée. Reconnecte-toi." });
+    next();
+  } catch (e) { console.error("auth:", e?.message); res.status(502).json({ error: "Vérification impossible. Réessaie." }); }
+};
+// Abonnement obligatoire : met l'abonnement dans req.subscription.
+const requireSubscriber = async (req, res, next) => {
+  if (!PREMIUM_ON) return res.status(503).json({ error: "L'abonnement Bon'Assiette+ n'est pas encore ouvert." });
+  try {
+    req.subscription = await subscriptionOf(req.user.id);
+    if (!isActive(req.subscription)) return res.status(402).json({ error: "L'analyse photo est réservée aux abonnés Bon'Assiette+." });
+    next();
+  } catch (e) { console.error("abonnement:", e?.message); res.status(502).json({ error: "Vérification impossible. Réessaie." }); }
+};
+
+// Analyse photo : abonnés connectés uniquement, 6 par jour et par compte, photo de 1,5 Mo max.
 app.post(
   "/api/analyse",
   sameOrigin,
@@ -141,9 +205,12 @@ app.post(
     if (!req.is("application/json")) return res.status(415).json({ error: "Format refusé." });
     next();
   },
+  requireUser,
+  requireSubscriber,
   rateLimit({
     windowMs: 24 * 60 * 60 * 1000,
     limit: 6,
+    keyGenerator: (req) => req.user.id,
     standardHeaders: "draft-8",
     legacyHeaders: false,
     handler: (req, res) => res.status(429).json({ error: "Tu as utilisé tes 6 analyses photo du jour. Reviens demain, ou ajoute ton repas à la main." })
@@ -152,6 +219,75 @@ app.post(
   analyseHandler
 );
 
+// Abonnement : le navigateur demande une page de paiement Stripe, puis y est envoyé.
+const siteUrl = (req) => `${req.protocol}://${req.get("host")}`;
+const payLimit = rateLimit({ windowMs: 60 * 60 * 1000, limit: 10, standardHeaders: "draft-8", legacyHeaders: false,
+  handler: (req, res) => res.status(429).json({ error: "Trop de tentatives. Réessaie dans une heure." }) });
+app.post("/api/checkout", sameOrigin, payLimit, requireUser, async (req, res) => {
+  if (!PREMIUM_ON) return res.status(503).json({ error: "L'abonnement Bon'Assiette+ n'est pas encore ouvert." });
+  try {
+    const current = await subscriptionOf(req.user.id);
+    if (isActive(current)) return res.status(409).json({ error: "Tu es déjà abonné." });
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      line_items: [{ price: STRIPE_PRICE, quantity: 1 }],
+      client_reference_id: req.user.id,
+      // Même client Stripe si la personne s'est déjà abonnée par le passé, sinon Stripe en crée un avec son e-mail.
+      ...(current?.provider_ref ? { customer: current.provider_ref } : { customer_email: req.user.email || undefined }),
+      subscription_data: { metadata: { user_id: req.user.id } },
+      locale: "fr",
+      success_url: `${siteUrl(req)}/?abonnement=ok`,
+      cancel_url: `${siteUrl(req)}/?abonnement=annule`
+    });
+    res.set("Cache-Control", "no-store").json({ url: session.url });
+  } catch (e) {
+    console.error("checkout:", e?.message);
+    res.status(502).json({ error: "Le paiement n'a pas pu démarrer. Réessaie dans un moment." });
+  }
+});
+// Gestion de l'abonnement (changer de carte, résilier) : page sécurisée de Stripe.
+app.post("/api/portal", sameOrigin, payLimit, requireUser, async (req, res) => {
+  if (!PREMIUM_ON) return res.status(503).json({ error: "L'abonnement Bon'Assiette+ n'est pas encore ouvert." });
+  try {
+    const current = await subscriptionOf(req.user.id);
+    if (!current?.provider_ref) return res.status(404).json({ error: "Aucun abonnement trouvé pour ce compte." });
+    const portal = await stripe.billingPortal.sessions.create({ customer: current.provider_ref, return_url: `${siteUrl(req)}/` });
+    res.set("Cache-Control", "no-store").json({ url: portal.url });
+  } catch (e) {
+    console.error("portail:", e?.message);
+    res.status(502).json({ error: "La page de gestion n'a pas pu s'ouvrir. Réessaie dans un moment." });
+  }
+});
+// Stripe prévient le serveur de chaque paiement, renouvellement ou résiliation : c'est la seule source de vérité.
+// Chaque message est signé avec STRIPE_WEBHOOK_SECRET ; un message mal signé est refusé.
+app.post("/api/stripe/webhook", express.raw({ type: "application/json", limit: "1mb" }), async (req, res) => {
+  if (!PREMIUM_ON) return res.status(503).end();
+  let event;
+  try { event = stripe.webhooks.constructEvent(req.body, req.get("stripe-signature") || "", STRIPE_WH); }
+  catch (e) { console.error("webhook: signature refusée", e?.message); return res.status(400).end(); }
+  try {
+    const obj = event.data.object;
+    if (event.type === "checkout.session.completed" && obj.mode === "subscription" && obj.subscription) {
+      const sub = await stripe.subscriptions.retrieve(obj.subscription);
+      const userId = obj.client_reference_id || sub.metadata?.user_id;
+      if (/^[0-9a-f-]{36}$/.test(userId || "")) {
+        await saveSubscription({ user_id: userId, status: mapStatus(sub.status), current_period_end: periodEnd(sub),
+          provider_ref: String(sub.customer), updated_at: new Date().toISOString() });
+      }
+    } else if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
+      const userId = obj.metadata?.user_id;
+      if (/^[0-9a-f-]{36}$/.test(userId || "")) {
+        await saveSubscription({ user_id: userId, status: event.type.endsWith("deleted") ? "canceled" : mapStatus(obj.status),
+          current_period_end: periodEnd(obj), provider_ref: String(obj.customer), updated_at: new Date().toISOString() });
+      }
+    }
+    res.status(200).end();
+  } catch (e) {
+    console.error("webhook:", event.type, e?.message);
+    res.status(500).end(); // Stripe réessaiera plus tard
+  }
+});
+
 // Suppression de compte (droit à l'effacement, RGPD) : le visiteur prouve qui il est avec son jeton de connexion,
 // puis le serveur supprime le compte avec la clé secrète. Ses données sauvegardées partent avec (ON DELETE CASCADE).
 app.post(
@@ -159,15 +295,18 @@ app.post(
   sameOrigin,
   rateLimit({ windowMs: 60 * 60 * 1000, limit: 5, standardHeaders: "draft-8", legacyHeaders: false,
     handler: (req, res) => res.status(429).json({ error: "Trop de tentatives. Réessaie dans une heure." }) }),
+  requireUser,
   async (req, res) => {
-    if (!ACCOUNTS_ON || !SB_SERVICE) return res.status(503).json({ error: "Les comptes ne sont pas encore activés." });
-    const m = /^Bearer ([A-Za-z0-9._-]{20,4000})$/.exec(req.get("authorization") || "");
-    if (!m) return res.status(401).json({ error: "Connexion requise." });
+    const { id } = req.user;
     try {
-      const who = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_ANON, authorization: `Bearer ${m[1]}` } });
-      if (!who.ok) return res.status(401).json({ error: "Connexion expirée. Reconnecte-toi." });
-      const { id } = await who.json();
-      if (!/^[0-9a-f-]{36}$/.test(id || "")) return res.status(401).json({ error: "Connexion invalide." });
+      // Un abonnement en cours est résilié chez Stripe avant la suppression du compte.
+      if (PREMIUM_ON) {
+        const current = await subscriptionOf(id).catch(() => null);
+        if (current?.provider_ref) {
+          const list = await stripe.subscriptions.list({ customer: current.provider_ref, status: "all", limit: 10 });
+          for (const s of list.data) if (s.status !== "canceled") await stripe.subscriptions.cancel(s.id);
+        }
+      }
       const del = await fetch(`${SB_URL}/auth/v1/admin/users/${id}`, {
         method: "DELETE", headers: { apikey: SB_SERVICE, authorization: `Bearer ${SB_SERVICE}` }
       });
@@ -183,7 +322,8 @@ app.post(
 // 7. Page d'accueil avec son code unique.
 const PUBLIC_CONFIG = JSON.stringify({
   adsClient: ADS_ON ? CONFIG.adsClient : "", adSlots: ADS_ON ? CONFIG.adSlots : {}, gaId: GA_ON ? CONFIG.gaId : "",
-  supabase: ACCOUNTS_ON ? { url: SB_URL, key: SB_ANON } : null
+  supabase: ACCOUNTS_ON ? { url: SB_URL, key: SB_ANON } : null,
+  premium: PREMIUM_ON ? { price: String(CONFIG.premiumPrice || "") } : null
 }).replace(/</g, "\\u003c");
 const HEAD_EXTRA = /^ca-pub-\d{10,20}$/.test(CONFIG.adsClient)
   ? `<meta name="google-adsense-account" content="${CONFIG.adsClient}">` : "";

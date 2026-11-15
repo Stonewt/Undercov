@@ -9,9 +9,9 @@ const MAX_IMAGE_BYTES = 1_500_000;
 
 export const photoEnabled = () => Boolean(process.env.ANTHROPIC_API_KEY);
 
-// Fonction réservée aux abonnés Bon'Assiette+. Tant que le paiement n'existe pas, personne n'y a accès :
-// aucune analyse n'est payée par le site pour un visiteur non abonné.
-const isSubscriber = (_req) => false;
+// Fonction réservée aux abonnés Bon'Assiette+ : le serveur vérifie l'abonnement avant d'arriver ici
+// (req.subscription, voir server.js). Aucune analyse n'est payée par le site pour un visiteur non abonné.
+const isSubscriber = (req) => Boolean(req.user?.id && req.subscription);
 
 let day = "", countToday = 0;
 function takeGlobalSlot() {

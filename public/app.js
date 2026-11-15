@@ -8,8 +8,11 @@
   const ADS = { client: CFG.adsClient || "", slots: CFG.adSlots || {} };
   const GA_ID = /^G-[A-Z0-9]{6,12}$/.test(CFG.gaId || "") ? CFG.gaId : "";
   const NONCE = document.querySelector("script[nonce]")?.nonce || "";
-  // L'abonnement sera vérifié par le serveur ; en attendant, personne n'est abonné.
-  const isSubscriber = () => false;
+  // Abonnement Bon'Assiette+ : l'état vient de la base (table subscriptions) après connexion.
+  // Le serveur revérifie de son côté à chaque analyse photo ; ici, ça ne sert qu'à l'affichage.
+  const PREMIUM = CFG.premium && typeof CFG.premium.price === "string" ? CFG.premium : null;
+  let subActive = false;
+  const isSubscriber = () => subActive;
 
   const DATA = window.GAMELLE_DATA || { foods: [], recipes: [] };
   const FOODS = DATA.foods, RECIPES = DATA.recipes;
@@ -475,17 +478,55 @@
   // ---------- Photo de l'assiette ----------
   // La photo est réduite sur le téléphone, envoyée au serveur Bon'Assiette qui la fait analyser, puis oubliée.
   let photo = null, photoRun = 0, photoFocus = null, photoReady = false;
-  // Réservé aux abonnés Bon'Assiette+ : les autres voient ce que fait la fonction et l'arrivée de l'abonnement.
+  // Réservé aux abonnés Bon'Assiette+ : les autres voient ce que fait la fonction et peuvent s'abonner.
   $("photoBtn").addEventListener("click", () => {
-    if (isSubscriber() && photoReady) { $("photoIn").click(); return; }
+    if (isSubscriber()) {
+      if (photoReady) $("photoIn").click(); else toast("L'analyse photo est momentanément indisponible. Réessaie plus tard.");
+      return;
+    }
     track("premium_interet", { fonction: "photo" });
     photoFocus = document.activeElement;
-    $("premBg").hidden = false; $("premSheet").hidden = false; $("premOk").focus();
+    renderPremSheet();
+    $("premBg").hidden = false; $("premSheet").hidden = false; ($("premSub").hidden ? $("premOk") : $("premSub")).focus();
   });
+  // Contenu de la fenêtre selon la situation : abonnement pas encore ouvert, pas connecté, ou prêt à payer.
+  function renderPremSheet() {
+    const ready = Boolean(PREMIUM && sb);
+    $("premSub").hidden = !ready;
+    if (!ready) {
+      $("premNote").textContent = "L'abonnement Bon'Assiette+ arrive bientôt. En attendant, tout le reste de l'appli reste gratuit.";
+      $("premOk").textContent = "J'ai compris";
+      return;
+    }
+    $("premSub").textContent = sbUser ? `S'abonner · ${PREMIUM.price}` : "Créer un compte pour s'abonner";
+    $("premNote").textContent = sbUser
+      ? `${PREMIUM.price}, sans engagement : tu résilies quand tu veux depuis Profil. Paiement sécurisé par Stripe. Le reste de l'appli reste gratuit.`
+      : `${PREMIUM.price}, sans engagement. Il te faut d'abord un compte (gratuit, sans mot de passe) pour retrouver ton abonnement sur tous tes appareils.`;
+    $("premOk").textContent = "Plus tard";
+  }
   const closePrem = () => { $("premBg").hidden = true; $("premSheet").hidden = true; photoFocus?.focus?.(); };
   $("premOk").addEventListener("click", closePrem);
   $("premBg").addEventListener("click", closePrem);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("premSheet").hidden) closePrem(); });
+  $("premSub").addEventListener("click", async () => {
+    if (!sbUser) { closePrem(); show("profil"); $("accEmail")?.focus(); return; }
+    $("premSub").disabled = true;
+    const r = await apiPost("/api/checkout");
+    $("premSub").disabled = false;
+    if (r?.url) { track("abonnement_debut"); location.assign(r.url); } else toast(r?.error || "Le paiement n'a pas pu démarrer. Réessaie.");
+  });
+  // Appel d'une adresse de l'API avec le jeton de connexion.
+  async function apiPost(url, body) {
+    const { data } = await sb.auth.getSession().catch(() => ({ data: null }));
+    const token = data?.session?.access_token;
+    if (!token) return { error: "Reconnecte-toi d'abord." };
+    const headers = { authorization: `Bearer ${token}` };
+    if (body) headers["content-type"] = "application/json";
+    const r = await fetch(url, { method: "POST", headers, body: body ? JSON.stringify(body) : undefined }).catch(() => null);
+    if (!r) return { error: navigator.onLine === false ? "Pas de connexion internet." : "Le serveur ne répond pas. Réessaie." };
+    const j = await r.json().catch(() => ({}));
+    return r.ok ? j : { error: j.error || "Ça n'a pas marché. Réessaie.", status: r.status };
+  }
   fetch("/api/status", { cache: "no-store" })
     .then(r => (r.ok ? r.json() : null))
     .then(s => { photoReady = Boolean(s?.photo); })
@@ -572,13 +613,12 @@
     $("photoImg").src = dataUrl; $("photoImg").hidden = false;
     photoState("Analyse en cours… quelques secondes", "wait");
     try {
-      const r = await fetch("/api/analyse", {
-        method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ image: dataUrl.slice(dataUrl.indexOf(",") + 1), mime: "image/jpeg" })
-      });
-      const res = await r.json().catch(() => ({}));
+      const res = await apiPost("/api/analyse", { image: dataUrl.slice(dataUrl.indexOf(",") + 1), mime: "image/jpeg" });
       if (run !== photoRun) return;
-      if (!r.ok) throw new Error(res.error || "L'analyse n'a pas abouti. Réessaie dans un moment.");
+      if (res.error) {
+        if (res.status === 402) { subActive = false; renderPremium(); }
+        throw new Error(res.error);
+      }
       if (!res.est_un_repas || !Array.isArray(res.aliments)) throw new Error("On ne voit pas de repas sur cette photo. Cadre bien ton assiette et réessaie.");
       photo = { nom: res.nom, conf: res.confiance, rem: res.remarque, items: res.aliments.map(a => ({ ...a, g0: a.grammes, g: a.grammes })) };
       track("photo_analysee", { aliments: photo.items.length, confiance: photo.conf });
@@ -679,7 +719,39 @@
     $("accOut").hidden = Boolean(sbUser); $("accIn").hidden = !sbUser;
     $("accDelConfirm").hidden = true;
     if (sbUser) $("accWho").textContent = sbUser.email || "ton e-mail"; else syncLabel("");
+    renderPremium();
   }
+  // ---------- Abonnement Bon'Assiette+ : lecture de l'état et affichage ----------
+  function renderPremium() {
+    $("accSub").hidden = !(sbUser && subActive);
+    const badge = $("photoBtn").querySelector(".plus"); if (badge) badge.hidden = subActive;
+    if (subActive) document.querySelectorAll("[id^='ad-']").forEach(b => { b.hidden = true; });
+  }
+  async function refreshSub() {
+    if (!sb || !sbUser || !PREMIUM) { subActive = false; renderPremium(); return false; }
+    const { data } = await sb.from("subscriptions").select("status,current_period_end").eq("user_id", sbUser.id).maybeSingle();
+    const end = data?.current_period_end ? Date.parse(data.current_period_end) + 3 * 86400000 : Infinity;
+    subActive = Boolean(data) && (data.status === "active" || data.status === "past_due") && end > Date.now();
+    renderPremium();
+    return subActive;
+  }
+  // Retour de la page de paiement : l'abonnement peut mettre quelques secondes à être confirmé par Stripe.
+  const backFromPay = new URLSearchParams(location.search).get("abonnement");
+  if (backFromPay) history.replaceState(null, "", "/");
+  async function afterPayment() {
+    if (backFromPay !== "ok") { if (backFromPay === "annule") toast("Paiement annulé. Rien n'a été débité."); return; }
+    for (let i = 0; i < 6; i++) {
+      if (await refreshSub()) { toast("Merci ! Bon'Assiette+ est activé 🎉"); track("abonnement_actif"); show("jour"); return; }
+      await new Promise(r => setTimeout(r, 2000));
+    }
+    toast("Paiement reçu. L'activation prend parfois une minute : appuie sur Synchroniser dans Profil.");
+  }
+  $("accPortal").addEventListener("click", async () => {
+    $("accPortal").disabled = true;
+    const r = await apiPost("/api/portal");
+    $("accPortal").disabled = false;
+    if (r?.url) location.assign(r.url); else toast(r?.error || "La page de gestion n'a pas pu s'ouvrir.");
+  });
   async function initAccount() {
     if (!SB) return;
     $("accountPanel").hidden = false;
@@ -701,10 +773,12 @@
         if (sbUser && sbUser.id !== before) {
           if (event === "SIGNED_IN") { track("connexion_compte"); toast("Connecté · tes données sont sauvegardées"); }
           await syncAll();
-        }
+          if (backFromPay) await afterPayment(); else await refreshSub();
+        } else if (!sbUser && before) { subActive = false; renderPremium(); }
       }, 0);
     });
   }
+  $("accSyncNow").addEventListener("click", () => { if (sbUser) refreshSub(); });
   $("accSend").addEventListener("click", async () => {
     const email = $("accEmail").value.trim();
     if (!/^[^\s@]{1,64}@[^\s@]{1,190}\.[a-z]{2,24}$/i.test(email)) { accMsg("Cette adresse e-mail ne semble pas valide."); return; }

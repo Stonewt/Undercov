@@ -318,3 +318,6 @@ nav.tabs svg{width:22px;height:22px}
 /* Carte de partage */
 .share-img{display:block;width:100%;aspect-ratio:4/5;border-radius:14px;border:1px solid var(--line);background:var(--sunk);object-fit:cover;margin:8px 0 12px}
 #shareDl{display:block;text-align:center;margin-top:4px}
+.grams{margin-top:12px}
+.grams-in{display:flex;align-items:center;gap:8px}
+.grams-in input{flex:1}

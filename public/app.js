@@ -281,7 +281,7 @@
 
     $("mealCount").textContent = list.length ? `${list.length} REPAS` : "";
     $("meals").innerHTML = list.length ? list.map((m, i) => `
-      <div class="meal"><span class="t">${esc(m.name)}${m.qty && m.qty !== 1 ? ` <span class="muted">× ${esc(String(m.qty).replace(".", ","))}</span>` : ""}</span><span class="k">${nb(m.kcal)} kcal</span>
+      <div class="meal"><span class="t">${esc(m.name)}${m.grams ? ` <span class="muted">${nb(m.grams)} g</span>` : m.qty && m.qty !== 1 ? ` <span class="muted">× ${esc(String(m.qty).replace(".", ","))}</span>` : ""}</span><span class="k">${nb(m.kcal)} kcal</span>
       <div class="sub"><span>${esc(m.time)}</span><span>P ${r0(m.prot)} g</span><span>G ${r0(m.gluc)} g</span><span>L ${r0(m.lip)} g</span>
       <button class="del" type="button" data-i="${i}">Retirer</button></div></div>`).join("")
       : `<div class="empty"><h3>Rien de noté pour l'instant</h3><p class="small muted">Cherche ce que tu as mangé dans « Ajouter un repas » : un geste suffit, et ta série démarre.</p></div>`;
@@ -295,7 +295,7 @@
   function renderRecent() {
     const seen = new Map();
     Object.keys(days).sort().reverse().forEach(k => (days[k] || []).slice().reverse().forEach(m => {
-      const key = m.name + "|" + (m.qty || 1);
+      const key = m.name + "|" + (m.grams ? m.grams + "g" : (m.qty || 1));
       if (!seen.has(key)) seen.set(key, { ...m, n: 0 });
       seen.get(key).n++;
     }));
@@ -309,7 +309,7 @@
     const d = new Date();
     const item = {
       name: String(m.name).slice(0, 80), kcal: r0(m.kcal), prot: r0(m.prot), gluc: r0(m.gluc), lip: r0(m.lip),
-      time: `${pad(d.getHours())}h${pad(d.getMinutes())}`, qty: m.qty || 1, ...(m.recipe ? { recipe: true } : {})
+      time: `${pad(d.getHours())}h${pad(d.getMinutes())}`, qty: m.qty || 1, ...(m.grams > 0 ? { grams: r0(m.grams) } : {}), ...(m.recipe ? { recipe: true } : {})
     };
     days[TODAY] = [...meals(), item];
     saveDays();
@@ -352,9 +352,12 @@
   $("results").addEventListener("click", (e) => { const b = e.target.closest("[data-f]"); if (b) openSheet(FOODS[Number(b.dataset.f)]); });
 
   // ---------- Feuille de portion ----------
-  let sheetFood = null, sheetQty = 1, lastFocus = null;
+  // Poids de la portion de référence (somme des ingrédients Ciqual) : sert à passer des grammes aux macros.
+  let sheetFood = null, sheetQty = 1, sheetGrams = 0, lastFocus = null;
+  const portionG = (f) => f.src.reduce((a, s) => a + (Number(s[1]) || 0), 0);
   function openSheet(f) {
-    sheetFood = f; sheetQty = 1; lastFocus = document.activeElement;
+    sheetFood = f; sheetQty = 1; sheetGrams = 0; lastFocus = document.activeElement;
+    $("sheetGrams").value = "";
     $("sheetTitle").textContent = f.name;
     $("sheetPortion").textContent = "Portion de référence : " + f.portion;
     $("sheetSrc").innerHTML = `<p>Table Ciqual 2025, ANSES. Valeurs calculées pour la portion :</p><ul>${f.src.map(([code, g, nm]) => `<li>${esc(nm)} — ${g} g <span class="mono">(code ${esc(code)})</span></li>`).join("")}</ul><p class="mono">${esc(ciqUrl(f.src[0][0]).replace("https://", ""))}</p>`;
@@ -362,24 +365,31 @@
     $("sheetBg").hidden = false; $("sheet").hidden = false;
     $("sheetAdd").focus();
   }
-  function setQty(q) {
-    sheetQty = q;
-    $("sheetQty").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(Number(b.dataset.q) === q)));
+  function setQty(q, grams = 0) {
+    sheetQty = q; sheetGrams = grams;
+    $("sheetQty").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(!grams && Number(b.dataset.q) === q)));
+    if (!grams) { const pg = portionG(sheetFood); $("sheetGrams").placeholder = pg ? `ex. ${r0(pg * q)}` : "ex. 180"; }
     const f = sheetFood;
     $("sheetVals").innerHTML = `
-      <div class="line tot"><span>Calories</span><span>${nb(f.kcal * q)} kcal</span></div>
+      <div class="line tot"><span>Calories${grams ? ` pour ${nb(grams)} g` : ""}</span><span>${nb(f.kcal * q)} kcal</span></div>
       <div class="line"><span><i class="dot d-p"></i>Protéines</span><span>${r0(f.prot * q)} g</span></div>
       <div class="line"><span><i class="dot d-g"></i>Glucides</span><span>${r0(f.gluc * q)} g</span></div>
       <div class="line"><span><i class="dot d-l"></i>Lipides</span><span>${r0(f.lip * q)} g</span></div>`;
   }
   function closeSheet() { $("sheetBg").hidden = true; $("sheet").hidden = true; sheetFood = null; lastFocus?.focus?.(); }
-  $("sheetQty").addEventListener("click", (e) => { const b = e.target.closest("[data-q]"); if (b) setQty(Number(b.dataset.q)); });
+  $("sheetQty").addEventListener("click", (e) => { const b = e.target.closest("[data-q]"); if (b) { $("sheetGrams").value = ""; setQty(Number(b.dataset.q)); } });
+  // Saisie au gramme : 180 g de pâtes = 180 / poids de la portion de référence.
+  $("sheetGrams").addEventListener("input", () => {
+    const g = Math.min(3000, Math.max(0, Number($("sheetGrams").value) || 0)), pg = portionG(sheetFood);
+    if (g > 0 && pg > 0) setQty(g / pg, g); else setQty(1);
+  });
+  $("sheetGrams").addEventListener("keydown", (e) => { if (e.key === "Enter") $("sheetAdd").click(); });
   $("sheetCancel").addEventListener("click", closeSheet);
   $("sheetBg").addEventListener("click", closeSheet);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("sheet").hidden) closeSheet(); });
   $("sheetAdd").addEventListener("click", () => {
-    const f = sheetFood, q = sheetQty; if (!f) return;
-    addMeal({ name: f.name, kcal: f.kcal * q, prot: f.prot * q, gluc: f.gluc * q, lip: f.lip * q, qty: q });
+    const f = sheetFood, q = sheetQty; if (!f || !(q > 0)) return;
+    addMeal({ name: f.name, kcal: f.kcal * q, prot: f.prot * q, gluc: f.gluc * q, lip: f.lip * q, qty: sheetGrams ? 1 : q, grams: sheetGrams });
     closeSheet(); $("search").value = ""; renderResults();
   });
 

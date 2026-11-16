@@ -29,7 +29,7 @@ const PREMIUM_CENTS = Number(E.PREMIUM_CENTS) || 299;
 const EMAIL_ONLY = process.argv.includes("--email");
 const SB_TOKEN = need("SUPABASE_ACCESS_TOKEN");
 const STRIPE_KEY = EMAIL_ONLY ? "" : need("STRIPE_SECRET_KEY"), RW_TOKEN = EMAIL_ONLY ? "" : need("RAILWAY_TOKEN");
-if (EMAIL_ONLY) need("SUPABASE_PROJECT_REF");
+if (EMAIL_ONLY) { need("SUPABASE_PROJECT_REF"); need("BREVO_SMTP_LOGIN"); need("BREVO_SMTP_KEY"); }
 const ANTHROPIC_KEY = E.ANTHROPIC_API_KEY || "";
 const log = (s) => console.log(s);
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -178,7 +178,12 @@ async function railway() {
 function emailConfig() {
   const html = fs.readFileSync(path.join(ROOT, "supabase", "email-code.html"), "utf8");
   const subject = "Ton code Bon'Assiette : {{ .Token }}";
-  return { mailer_otp_length: 6, mailer_otp_exp: 3600,
+  // Envoi par Brevo (SMTP) : obligatoire chez Supabase pour personnaliser l'e-mail, et bien moins limité.
+  const smtp = E.BREVO_SMTP_LOGIN && E.BREVO_SMTP_KEY ? {
+    smtp_host: "smtp-relay.brevo.com", smtp_port: "587", smtp_user: E.BREVO_SMTP_LOGIN, smtp_pass: E.BREVO_SMTP_KEY,
+    smtp_admin_email: E.SENDER_EMAIL || "connexion@bonassiette.fr", smtp_sender_name: "Bon'Assiette", rate_limit_email_sent: 100
+  } : {};
+  return { ...smtp, mailer_otp_length: 6, mailer_otp_exp: 3600,
     mailer_subjects_magic_link: subject, mailer_templates_magic_link_content: html,
     mailer_subjects_confirmation: subject, mailer_templates_confirmation_content: html };
 }

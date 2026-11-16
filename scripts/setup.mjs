@@ -27,7 +27,9 @@ const SITE = (E.SITE_URL || "https://www.bonassiette.fr").replace(/\/+$/, "");
 const HOST = new URL(SITE).host;
 const PREMIUM_CENTS = Number(E.PREMIUM_CENTS) || 299;
 const EMAIL_ONLY = process.argv.includes("--email");
-const SB_TOKEN = need("SUPABASE_ACCESS_TOKEN");
+// --stripe : Stripe + Railway seulement (passage en paiements réels), sans toucher à Supabase.
+const STRIPE_ONLY = process.argv.includes("--stripe");
+const SB_TOKEN = STRIPE_ONLY ? "" : need("SUPABASE_ACCESS_TOKEN");
 const STRIPE_KEY = EMAIL_ONLY ? "" : need("STRIPE_SECRET_KEY"), RW_TOKEN = EMAIL_ONLY ? "" : need("RAILWAY_TOKEN");
 if (EMAIL_ONLY) { need("SUPABASE_PROJECT_REF"); need("BREVO_SMTP_LOGIN"); need("BREVO_SMTP_KEY"); }
 const ANTHROPIC_KEY = E.ANTHROPIC_API_KEY || "";
@@ -212,7 +214,7 @@ if (EMAIL_ONLY) {
   process.exit(0);
 }
 try {
-  await supabase();
+  if (!STRIPE_ONLY) await supabase();
   await stripeSetup();
   await railway();
   await verify();

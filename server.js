@@ -249,12 +249,15 @@ app.post("/api/checkout", sameOrigin, payLimit, requireUser, async (req, res) =>
   try {
     const current = await subscriptionOf(req.user.id);
     if (isActive(current)) return res.status(409).json({ error: "Tu es déjà abonné." });
+    // Même client Stripe si la personne s'est déjà abonnée par le passé, sinon Stripe en crée un avec son e-mail.
+    // Un client qui n'existe plus (ex. créé en mode test) est ignoré.
+    let customer = current?.provider_ref || "";
+    if (customer) { try { const c = await stripe.customers.retrieve(customer); if (c.deleted) customer = ""; } catch { customer = ""; } }
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       line_items: [{ price: STRIPE_PRICE, quantity: 1 }],
       client_reference_id: req.user.id,
-      // Même client Stripe si la personne s'est déjà abonnée par le passé, sinon Stripe en crée un avec son e-mail.
-      ...(current?.provider_ref ? { customer: current.provider_ref } : { customer_email: req.user.email || undefined }),
+      ...(customer ? { customer } : { customer_email: req.user.email || undefined }),
       subscription_data: { metadata: { user_id: req.user.id } },
       locale: "fr",
       success_url: `${siteUrl(req)}/?abonnement=ok`,

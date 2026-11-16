@@ -137,13 +137,20 @@ async function stripeSetup() {
 }
 
 // ---------- 3. Railway ----------
-const rwApi = (query, variables) => api("https://backboard.railway.com/graphql/v2", { method: "POST", headers: { authorization: `Bearer ${RW_TOKEN}` }, body: { query, variables } })
+// Jeton de compte (Bearer) ou jeton de projet (en-tête Project-Access-Token) : les deux sont acceptés.
+let rwHeaders = { authorization: `Bearer ${RW_TOKEN}` };
+const rwApi = (query, variables) => api("https://backboard.railway.com/graphql/v2", { method: "POST", headers: rwHeaders, body: { query, variables } })
   .then(d => { if (d.errors) throw new Error("Railway : " + d.errors.map(e => e.message).join(" / ")); return d.data; });
 async function railway() {
   log("\n[3/3] Railway");
   const Q = `{ id name environments { edges { node { id name } } } services { edges { node { id name } } } }`;
-  let projects = [];
-  try { projects = (await rwApi(`query { me { projects { edges { node ${Q} } } } }`)).me.projects.edges.map(e => e.node); }
+  let projects = [], scoped = null;
+  try {
+    rwHeaders = { "project-access-token": RW_TOKEN };
+    scoped = (await rwApi(`query { projectToken { projectId environmentId } }`)).projectToken;
+  } catch { rwHeaders = { authorization: `Bearer ${RW_TOKEN}` }; }
+  if (scoped) projects = [(await rwApi(`query($id: String!) { project(id: $id) ${Q} }`, { id: scoped.projectId })).project];
+  else try { projects = (await rwApi(`query { me { projects { edges { node ${Q} } } } }`)).me.projects.edges.map(e => e.node); }
   catch { projects = (await rwApi(`query { projects { edges { node ${Q} } } }`)).projects.edges.map(e => e.node); }
   const withServices = projects.filter(p => p.services.edges.length);
   if (!withServices.length) throw new Error("Aucun projet Railway avec un service sur ce compte.");
@@ -154,7 +161,7 @@ async function railway() {
     : (services.length === 1 ? services[0] : services.find(s => /bon|assiette|undercov|intrus|gamelle|web/i.test(s.name)) || services[0]);
   if (!service) throw new Error(`Service Railway « ${E.RAILWAY_SERVICE} » introuvable. Services : ${services.map(s => s.name).join(", ")}`);
   const envs = project.environments.edges.map(e => e.node);
-  const env = envs.find(e => e.name === "production") || envs[0];
+  const env = (scoped && envs.find(e => e.id === scoped.environmentId)) || envs.find(e => e.name === "production") || envs[0];
   log(`  Projet « ${project.name} », service « ${service.name} », environnement « ${env.name} ».`);
   if (ANTHROPIC_KEY) vars.ANTHROPIC_API_KEY = ANTHROPIC_KEY; else log("  (pas de clé Anthropic : l'analyse photo restera indisponible)");
   vars.CANONICAL_HOST = HOST;

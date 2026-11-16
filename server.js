@@ -56,7 +56,9 @@ async function userFromRequest(req) {
   return /^[0-9a-f-]{36}$/.test(id || "") ? { id, email: typeof email === "string" ? email : "" } : null;
 }
 // Lecture et écriture de la table subscriptions avec la clé secrète (les utilisateurs ne peuvent que la lire).
-const sbAdmin = { apikey: SB_SERVICE, authorization: `Bearer ${SB_SERVICE}`, "content-type": "application/json" };
+// Nouvelles clés secrètes (sb_secret_…) : seulement dans l'en-tête apikey. Anciennes clés JWT (eyJ…) : aussi en Authorization.
+const sbKeyHeaders = (key) => (key.startsWith("eyJ") ? { apikey: key, authorization: `Bearer ${key}` } : { apikey: key });
+const sbAdmin = { ...sbKeyHeaders(SB_SERVICE), "content-type": "application/json" };
 async function subscriptionOf(userId) {
   const r = await fetch(`${SB_URL}/rest/v1/subscriptions?user_id=eq.${userId}&select=status,current_period_end,provider_ref`, { headers: sbAdmin });
   if (!r.ok) throw new Error(`subscriptions: ${r.status}`);
@@ -312,7 +314,7 @@ app.post(
         }
       }
       const del = await fetch(`${SB_URL}/auth/v1/admin/users/${id}`, {
-        method: "DELETE", headers: { apikey: SB_SERVICE, authorization: `Bearer ${SB_SERVICE}` }
+        method: "DELETE", headers: sbKeyHeaders(SB_SERVICE)
       });
       if (!del.ok) { console.error("suppression compte:", del.status); return res.status(502).json({ error: "La suppression a échoué. Réessaie plus tard." }); }
       res.set("Cache-Control", "no-store").json({ ok: true });

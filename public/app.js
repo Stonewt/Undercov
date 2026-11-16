@@ -530,11 +530,14 @@
       if (photoReady) $("photoIn").click(); else toast("L'analyse photo est momentanément indisponible. Réessaie plus tard.");
       return;
     }
-    track("premium_interet", { fonction: "photo" });
+    openPrem("photo");
+  });
+  function openPrem(fonction) {
+    track("premium_interet", { fonction });
     photoFocus = document.activeElement;
     renderPremSheet();
     $("premBg").hidden = false; $("premSheet").hidden = false; ($("premSub").hidden ? $("premOk") : $("premSub")).focus();
-  });
+  }
   // Contenu de la fenêtre selon la situation : abonnement pas encore ouvert, pas connecté, ou prêt à payer.
   function renderPremSheet() {
     const ready = Boolean(PREMIUM && sb);
@@ -794,6 +797,7 @@
     $("accSub").hidden = !(sbUser && subActive);
     $("accGoPlus").hidden = !(sbUser && PREMIUM && !subActive);
     const badge = $("photoBtn").querySelector(".plus"); if (badge) badge.hidden = subActive;
+    document.querySelectorAll(".plus-tag").forEach(t => { t.hidden = subActive; });
     if (subActive) document.querySelectorAll("[id^='ad-']").forEach(b => { b.hidden = true; });
   }
   async function refreshSub() {
@@ -870,7 +874,7 @@
     $("accVerify").disabled = false;
     if (error) { accMsg(error.status === 429 ? "Trop d'essais. Réessaie dans quelques minutes." : "Code incorrect ou expiré. Vérifie-le, ou redemande un code."); return; }
     accMsg(""); $("accCodeBox").hidden = true;
-    if (wantPlus) { wantPlus = false; setTimeout(() => $("photoBtn").click(), 1200); }
+    if (wantPlus) { wantPlus = false; setTimeout(() => { if (!subActive) openPrem("connexion"); }, 1500); }
   }
   $("accVerify").addEventListener("click", verifyCode);
   $("accCode").addEventListener("keydown", (e) => { if (e.key === "Enter") verifyCode(); });
@@ -896,8 +900,60 @@
     }
   });
 
+  // ---------- Bon'Assiette+ : un repas avec ce qu'il y a dans le frigo ----------
+  // Objectif du repas : une part de ce qu'il reste aujourd'hui (jamais toute une journée d'un coup), ou un repas / en-cas type.
+  function frigoTarget() {
+    const t = targets(P()), s = sum(meals()), mode = $("frigoFor").value;
+    const rest = { kcal: t.kcal - s.kcal, prot: t.prot - s.prot, gluc: t.gluc - s.gluc, lip: t.lip - s.lip };
+    let share = mode === "encas" ? 0.12 : mode === "repas" ? 0.33 : null, base = t;
+    if (share === null) {
+      if (rest.kcal < 250) { share = 0.12; }
+      else { base = rest; share = Math.min(1, (t.kcal * 0.35) / rest.kcal); }
+    }
+    const c = (v) => Math.max(0, r0(v * share));
+    return { kcal: Math.max(150, c(base.kcal)), prot: c(base.prot), gluc: c(base.gluc), lip: c(base.lip) };
+  }
+  function renderFrigoTarget() {
+    const c = frigoTarget();
+    $("frigoTarget").textContent = `Objectif de ce repas : environ ${nb(c.kcal)} kcal · ${c.prot} g de protéines · ${c.gluc} g de glucides · ${c.lip} g de lipides.`;
+  }
+  $("frigoFor").addEventListener("change", renderFrigoTarget);
+  let frigoLast = null;
+  async function frigoAsk() {
+    if (!isSubscriber()) { openPrem("frigo"); return; }
+    const ingredients = $("frigoIn").value.trim();
+    if (ingredients.length < 3) { $("frigoMsg").textContent = "Écris au moins un ingrédient."; $("frigoIn").focus(); return; }
+    const cible = frigoTarget();
+    $("frigoGo").disabled = true; $("frigoAgain").disabled = true;
+    $("frigoMsg").textContent = "Le chef réfléchit… (10 secondes environ)";
+    const r = await apiPost("/api/frigo", { ingredients, cible, cuisine: [...kitchen], temps: Number($("time").value) || 30 });
+    $("frigoGo").disabled = false; $("frigoAgain").disabled = false;
+    if (!r || r.error) { $("frigoMsg").textContent = r?.error || "Ça n'a pas marché. Réessaie."; return; }
+    frigoLast = r; track("frigo_idee");
+    $("frigoMsg").textContent = "";
+    $("frigoOut").innerHTML = `
+      <div class="head">${esc(r.nom)}</div>
+      <div class="line"><span>${r0(r.temps_min)} min</span><span>${nb(r.kcal)} kcal <span class="vs">/ ${nb(cible.kcal)}</span></span></div>
+      <div class="line"><span>P ${r0(r.prot)} g <span class="vs">/ ${cible.prot}</span></span><span>G ${r0(r.gluc)} g · L ${r0(r.lip)} g</span></div>
+      <div class="rule"></div>
+      <ul>${r.ingredients.map(i => `<li>${esc(i.nom)} — ${nb(i.grammes)} g${i.du_frigo ? "" : ` <span class="vs">(placard)</span>`}</li>`).join("")}</ul>
+      <div class="rule"></div>
+      <ol>${r.etapes.map(e => `<li>${esc(e)}</li>`).join("")}</ol>
+      ${r.conseil ? `<p class="small muted">${esc(r.conseil)}</p>` : ""}
+      <p class="small muted">Valeurs estimées par l'IA : vérifie les quantités si tu suis tes macros au gramme près.</p>`;
+    $("frigoOut").hidden = false; $("frigoActs").hidden = false;
+  }
+  $("frigoGo").addEventListener("click", frigoAsk);
+  $("frigoAgain").addEventListener("click", frigoAsk);
+  $("frigoAdd").addEventListener("click", () => {
+    const r = frigoLast; if (!r) return;
+    addMeal({ name: r.nom, kcal: r.kcal, prot: r.prot, gluc: r.gluc, lip: r.lip });
+    $("frigoActs").hidden = true;
+  });
+
   // ---------- Vue Pas cher ----------
   function renderRecipes() {
+    renderFrigoTarget();
     const t = targets(P()), s = sum(meals());
     const kc = r0(t.kcal - s.kcal), pr = r0(t.prot - s.prot);
     $("needLine").textContent = kc > 0

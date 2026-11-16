@@ -162,6 +162,28 @@
 
   <!-- RECETTES -->
   <section id="view-recettes" class="view" hidden>
+    <div class="panel frigo" id="frigoPanel">
+      <div class="row"><h2>Avec ce que j'ai dans le frigo</h2><b class="plus-tag">Bon'Assiette+</b></div>
+      <p class="small muted">Dis ce que tu as sous la main : l'IA te propose un repas qui rentre dans tes calories et tes macros, avec les quantités et les étapes.</p>
+      <label class="f" for="frigoIn">Dans mon frigo et mes placards
+        <textarea id="frigoIn" rows="3" maxlength="600" placeholder="Ex. : 3 œufs, riz, thon en boîte, tomates, fromage râpé"></textarea>
+      </label>
+      <label class="f" for="frigoFor">Ce repas doit faire
+        <select id="frigoFor">
+          <option value="reste">Ce qu'il me reste à manger aujourd'hui</option>
+          <option value="repas">Un repas classique</option>
+          <option value="encas">Un en-cas</option>
+        </select>
+      </label>
+      <p class="small muted" id="frigoTarget"></p>
+      <button class="primary" id="frigoGo" type="button">Trouve-moi un repas</button>
+      <p class="small muted" id="frigoMsg" aria-live="polite"></p>
+      <div class="ticket" id="frigoOut" hidden></div>
+      <div class="grid2" id="frigoActs" hidden>
+        <button class="ghost" id="frigoAgain" type="button">Une autre idée</button>
+        <button class="primary" id="frigoAdd" type="button">Je le mange</button>
+      </div>
+    </div>
     <div class="panel">
       <h2>Repas pas chers</h2>
       <p class="small muted" id="needLine"></p>
@@ -243,7 +265,7 @@
           <div class="grid2"><button class="ghost" id="accSyncNow" type="button">Synchroniser</button><button class="ghost" id="accLogout" type="button">Se déconnecter</button></div>
           <button class="primary" id="accGoPlus" type="button" hidden>Passer à Bon'Assiette+</button>
           <div id="accSub" class="stack" hidden>
-            <p class="small">Abonné à <strong>Bon'Assiette+</strong> : analyse photo de tes repas (6 par jour) et aucune publicité. Merci !</p>
+            <p class="small">Abonné à <strong>Bon'Assiette+</strong> : analyse photo de tes repas (6 par jour), idées de repas avec ton frigo (8 par jour) et aucune publicité. Merci !</p>
             <button class="ghost" id="accPortal" type="button">Gérer ou résilier mon abonnement</button>
           </div>
           <button class="linkbtn" id="accDelete" type="button">Supprimer mon compte</button>
@@ -381,8 +403,12 @@
 <div class="sheet-bg" id="premBg" hidden></div>
 <div class="sheet" id="premSheet" role="dialog" aria-modal="true" aria-labelledby="premTitle" hidden>
   <div class="eyebrow">Bon'Assiette+</div>
-  <h3 id="premTitle">Ton assiette en photo, analysée aliment par aliment</h3>
-  <p>Prends ton repas en photo : chaque aliment est reconnu et pesé, par exemple 150 g de pâtes, 60 g de béchamel, 15 g d'emmental, avec ses calories et ses macros. Tu corriges les grammes si besoin, et c'est noté.</p>
+  <h3 id="premTitle">L'IA qui t'aide à bien manger, tous les jours</h3>
+  <ul class="prem-list">
+    <li><strong>Ton assiette en photo</strong> : chaque aliment est reconnu et pesé (150 g de pâtes, 60 g de béchamel…), avec ses calories et ses macros.</li>
+    <li><strong>Un repas avec ce que tu as dans le frigo</strong>, qui rentre pile dans tes calories et tes protéines, avec les quantités et les étapes.</li>
+    <li><strong>Aucune publicité.</strong></li>
+  </ul>
   <p class="note" id="premNote">L'abonnement Bon'Assiette+ arrive bientôt. En attendant, tout le reste de l'appli reste gratuit.</p>
   <button class="primary big-cta" id="premSub" type="button" hidden>S'abonner</button>
   <button class="ghost big-cta" id="premOk" type="button">J'ai compris</button>

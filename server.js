@@ -12,6 +12,7 @@ import Stripe from "stripe";
 import CONFIG from "./config.js";
 import { analyseHandler, photoEnabled } from "./analyse.js";
 import { suggestHandler } from "./suggest.js";
+import { fridgeHandler } from "./fridge.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, "public");
@@ -93,7 +94,7 @@ app.disable("etag");
 app.set("trust proxy", 1); // Railway place un proxy devant : on lit la vraie IP du visiteur
 
 // 1. Le site ne fait que lire : toute autre méthode HTTP est refusée, sauf les quelques envois (POST) de l'API.
-const POST_PATHS = new Set(["/api/analyse", "/api/account/delete", "/api/checkout", "/api/portal", "/api/stripe/webhook", "/api/suggest", "/api/contact"]);
+const POST_PATHS = new Set(["/api/analyse", "/api/account/delete", "/api/checkout", "/api/portal", "/api/stripe/webhook", "/api/suggest", "/api/contact", "/api/frigo"]);
 app.use((req, res, next) => {
   if (req.method === "GET" || req.method === "HEAD") return next();
   if (req.method === "POST" && POST_PATHS.has(req.path)) return next();
@@ -199,7 +200,7 @@ const requireSubscriber = async (req, res, next) => {
   if (!PREMIUM_ON) return res.status(503).json({ error: "L'abonnement Bon'Assiette+ n'est pas encore ouvert." });
   try {
     req.subscription = await subscriptionOf(req.user.id);
-    if (!isActive(req.subscription)) return res.status(402).json({ error: "L'analyse photo est réservée aux abonnés Bon'Assiette+." });
+    if (!isActive(req.subscription)) return res.status(402).json({ error: "Cette fonction est réservée aux abonnés Bon'Assiette+." });
     next();
   } catch (e) { console.error("abonnement:", e?.message); res.status(502).json({ error: "Vérification impossible. Réessaie." }); }
 };
@@ -224,6 +225,21 @@ app.post(
   }),
   express.json({ limit: "2.1mb", strict: true }),
   analyseHandler
+);
+
+// Idée de repas avec ce qu'il y a dans le frigo : abonnés uniquement, 8 par jour et par compte.
+app.post(
+  "/api/frigo",
+  sameOrigin,
+  (req, res, next) => (req.is("application/json") ? next() : res.status(415).json({ error: "Format refusé." })),
+  requireUser,
+  requireSubscriber,
+  rateLimit({
+    windowMs: 24 * 60 * 60 * 1000, limit: 8, keyGenerator: (req) => req.user.id, standardHeaders: "draft-8", legacyHeaders: false,
+    handler: (req, res) => res.status(429).json({ error: "Tu as utilisé tes 8 idées de repas du jour. Reviens demain !" })
+  }),
+  express.json({ limit: "4kb", strict: true }),
+  fridgeHandler
 );
 
 // Proposition d'un repas par un utilisateur connecté : 10 par jour et par compte, validée ensuite à la main.

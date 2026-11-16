@@ -862,7 +862,7 @@
   });
   // Connexion par code à 6 chiffres : marche même si l'e-mail est ouvert sur un autre appareil ou navigateur.
   async function verifyCode() {
-    const email = $("accEmail").value.trim(), token = $("accCode").value.replace(/D/g, "");
+    const email = $("accEmail").value.trim(), token = $("accCode").value.replace(/\D/g, "");
     if (token.length < 6) { accMsg("Tape les chiffres du code reçu par e-mail."); return; }
     if (!sb) return;
     $("accVerify").disabled = true; accMsg("Vérification…");
@@ -874,7 +874,7 @@
   }
   $("accVerify").addEventListener("click", verifyCode);
   $("accCode").addEventListener("keydown", (e) => { if (e.key === "Enter") verifyCode(); });
-  $("accCode").addEventListener("input", () => { if ($("accCode").value.replace(/D/g, "").length === 6) verifyCode(); });
+  $("accCode").addEventListener("input", () => { if ($("accCode").value.replace(/\D/g, "").length === 6) verifyCode(); });
   $("accGoPlus").addEventListener("click", () => $("photoBtn").click());
   $("accSyncNow").addEventListener("click", () => { if (sbUser) syncAll(); });
   $("accLogout").addEventListener("click", async () => { await sb?.auth.signOut({ scope: "local" }); sbUser = null; renderAccount(); toast("Déconnecté. Tes données restent sur ce téléphone."); });

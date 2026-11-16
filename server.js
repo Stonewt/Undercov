@@ -93,7 +93,7 @@ app.disable("etag");
 app.set("trust proxy", 1); // Railway place un proxy devant : on lit la vraie IP du visiteur
 
 // 1. Le site ne fait que lire : toute autre méthode HTTP est refusée, sauf les quelques envois (POST) de l'API.
-const POST_PATHS = new Set(["/api/analyse", "/api/account/delete", "/api/checkout", "/api/portal", "/api/stripe/webhook", "/api/suggest"]);
+const POST_PATHS = new Set(["/api/analyse", "/api/account/delete", "/api/checkout", "/api/portal", "/api/stripe/webhook", "/api/suggest", "/api/contact"]);
 app.use((req, res, next) => {
   if (req.method === "GET" || req.method === "HEAD") return next();
   if (req.method === "POST" && POST_PATHS.has(req.path)) return next();
@@ -240,8 +240,41 @@ app.post(
   suggestHandler({ sbUrl: SB_URL, sbAdmin })
 );
 
+// Page Contact : message libre (idée, bug, abonnement…), enregistré dans la table feedback de Supabase.
+// Sans compte, 5 messages par heure et par adresse IP ; le champ « website » invisible piège les robots.
+const KINDS = new Set(["idee", "probleme", "abonnement", "compte", "autre"]);
+app.post(
+  "/api/contact",
+  sameOrigin,
+  (req, res, next) => (req.is("application/json") ? next() : res.status(415).json({ error: "Format refusé." })),
+  rateLimit({ windowMs: 60 * 60 * 1000, limit: 5, standardHeaders: "draft-8", legacyHeaders: false,
+    handler: (req, res) => res.status(429).json({ error: "Tu as déjà envoyé plusieurs messages. Réessaie dans une heure." }) }),
+  express.json({ limit: "8kb", strict: true }),
+  async (req, res) => {
+    if (!SB_URL || !SB_SERVICE) return res.status(503).json({ error: "Le formulaire n'est pas encore activé. Écris à gamelle.support@gmail.com." });
+    const b = req.body || {};
+    if (typeof b.website === "string" && b.website.trim()) return res.json({ ok: true }); // robot : on fait semblant
+    const kind = KINDS.has(b.kind) ? b.kind : "autre";
+    const message = String(b.message ?? "").replace(/[\u0000-\u0008\u000b-\u001f]/g, "").trim().slice(0, 2000);
+    const email = String(b.email ?? "").trim().slice(0, 254);
+    if (message.length < 10) return res.status(400).json({ error: "Ton message est un peu court : dis-nous en un peu plus." });
+    if (email && !/^[^\s@]{1,64}@[^\s@]{1,190}\.[a-z]{2,24}$/i.test(email)) return res.status(400).json({ error: "Cette adresse e-mail ne semble pas valide." });
+    try {
+      const r = await fetch(`${SB_URL}/rest/v1/feedback`, {
+        method: "POST", headers: { ...sbAdmin, prefer: "return=minimal" },
+        body: JSON.stringify({ kind, message, email: email || null, page: "contact" })
+      });
+      if (!r.ok) throw new Error(`feedback: ${r.status}`);
+      res.set("Cache-Control", "no-store").json({ ok: true });
+    } catch (e) {
+      console.error("contact:", e?.message);
+      res.status(502).json({ error: "L'envoi a échoué. Réessaie plus tard, ou écris à gamelle.support@gmail.com." });
+    }
+  }
+);
+
 // Abonnement : le navigateur demande une page de paiement Stripe, puis y est envoyé.
-const siteUrl = (req) => `${req.protocol}://${req.get("host")}`;
+const siteUrl = (req) => (CANONICAL_HOST && IS_PROD ? `https://${CANONICAL_HOST}` : `${req.protocol}://${req.get("host")}`);
 const payLimit = rateLimit({ windowMs: 60 * 60 * 1000, limit: 10, standardHeaders: "draft-8", legacyHeaders: false,
   handler: (req, res) => res.status(429).json({ error: "Trop de tentatives. Réessaie dans une heure." }) });
 app.post("/api/checkout", sameOrigin, payLimit, requireUser, async (req, res) => {
@@ -301,10 +334,15 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json", limit: "
           provider_ref: String(sub.customer), updated_at: new Date().toISOString() });
       }
     } else if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
-      const userId = obj.metadata?.user_id;
-      if (/^[0-9a-f-]{36}$/.test(userId || "")) {
-        await saveSubscription({ user_id: userId, status: event.type.endsWith("deleted") ? "canceled" : mapStatus(obj.status),
-          current_period_end: periodEnd(obj), provider_ref: String(obj.customer), updated_at: new Date().toISOString() });
+      // État relu chez Stripe : les événements peuvent arriver dans le désordre, seul l'état actuel compte.
+      const sub = event.type.endsWith("deleted") ? obj : await stripe.subscriptions.retrieve(obj.id);
+      const userId = sub.metadata?.user_id;
+      // Un ancien abonnement résilié ne doit pas couper un abonnement plus récent du même client.
+      const other = event.type.endsWith("deleted")
+        ? (await stripe.subscriptions.list({ customer: String(sub.customer), status: "active", limit: 1 })).data.length > 0 : false;
+      if (!other && /^[0-9a-f-]{36}$/.test(userId || "")) {
+        await saveSubscription({ user_id: userId, status: event.type.endsWith("deleted") ? "canceled" : mapStatus(sub.status),
+          current_period_end: periodEnd(sub), provider_ref: String(sub.customer), updated_at: new Date().toISOString() });
       }
     }
     res.status(200).end();
@@ -362,6 +400,11 @@ const sendIndex = (req, res) => {
   );
 };
 app.get(["/", "/index.html"], sendIndex);
+// Page Contact : son script porte aussi le code unique.
+const CONTACT_HTML = fs.readFileSync(path.join(PUBLIC_DIR, "contact.html"), "utf8");
+app.get(["/contact", "/contact.html"], (req, res) => {
+  res.set("Cache-Control", "no-cache").type("html").send(CONTACT_HTML.replaceAll("__NONCE__", res.locals.nonce));
+});
 
 // ads.txt : déclare qui a le droit de vendre la publicité du site.
 app.get("/ads.txt", (req, res) => {

@@ -65,3 +65,17 @@ create policy "lire les repas validés" on public.meal_suggestions
 -- Seules les colonnes utiles à l'appli sont lisibles (jamais l'auteur de la proposition).
 revoke all on public.meal_suggestions from anon, authenticated;
 grant select (id, name, portion_g, kcal, prot, gluc, lip, price, status) on public.meal_suggestions to anon, authenticated;
+
+-- 4. Messages de la page Contact (idées, bugs, questions). Écriture et lecture UNIQUEMENT par le serveur
+--    et par toi dans Table Editor > feedback. Aucune policy = aucun accès pour les visiteurs.
+create table if not exists public.feedback (
+  id         bigint generated always as identity primary key,
+  kind       text not null check (kind in ('idee', 'probleme', 'abonnement', 'compte', 'autre')),
+  message    text not null check (char_length(message) between 10 and 2000),
+  email      text check (email is null or char_length(email) <= 254),
+  page       text,
+  done       boolean not null default false,
+  created_at timestamptz not null default now()
+);
+alter table public.feedback enable row level security;
+revoke all on public.feedback from anon, authenticated;

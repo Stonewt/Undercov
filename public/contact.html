@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Contact · Bon'Assiette</title>
+<meta name="description" content="Une question, un problème ou une idée pour améliorer Bon'Assiette ? Écris-nous.">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<main class="wrap doc">
+<a class="back" href="/">← Retour à Bon'Assiette</a>
+<h1 class="brand">Contact et idées</h1>
+<p class="muted">Une question, un souci avec l'appli ou ton abonnement, ou une idée pour rendre Bon'Assiette meilleur ? Écris-nous ici : chaque message est lu.</p>
+
+<form id="contactForm" class="stack" novalidate>
+  <label class="f" for="kind">C'est à propos de
+    <select id="kind" required>
+      <option value="idee">Une idée pour améliorer l'appli</option>
+      <option value="probleme">Un problème, un bug</option>
+      <option value="abonnement">Mon abonnement ou un paiement</option>
+      <option value="compte">Mon compte ou mes données</option>
+      <option value="autre">Autre chose</option>
+    </select>
+  </label>
+  <label class="f" for="message">Ton message
+    <textarea id="message" rows="7" maxlength="2000" required placeholder="Explique-nous en quelques phrases. Pour un bug : ce que tu faisais, et ce qui s'est passé."></textarea>
+  </label>
+  <label class="f" for="email">Ton e-mail, si tu veux une réponse
+    <input type="email" id="email" maxlength="254" autocomplete="email" inputmode="email" placeholder="toi@exemple.fr (facultatif)">
+  </label>
+  <label class="hp" for="website" aria-hidden="true">Ne pas remplir<input type="text" id="website" tabindex="-1" autocomplete="off"></label>
+  <button class="primary big-cta" id="send" type="submit">Envoyer</button>
+  <p class="small muted" id="msg" aria-live="polite"></p>
+</form>
+
+<p class="small muted">Tu peux aussi écrire à gamelle.support@gmail.com. Pour proposer un plat qui manque, utilise plutôt « Il manque un repas ? » dans l'appli : il sera ajouté pour tout le monde après vérification.</p>
+<p class="small muted">Ton message et ton e-mail (si tu le donnes) servent uniquement à te répondre. Ils sont supprimés au bout d'un an. <a href="/confidentialite">Confidentialité</a></p>
+</main>
+<script src="/contact.js" nonce="__NONCE__"></script>
+</body>
+</html>

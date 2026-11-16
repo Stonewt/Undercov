@@ -508,10 +508,10 @@
       $("premOk").textContent = "J'ai compris";
       return;
     }
-    $("premSub").textContent = sbUser ? `S'abonner · ${PREMIUM.price}` : "Créer un compte pour s'abonner";
+    $("premSub").textContent = sbUser ? `S'abonner · ${PREMIUM.price}` : "Se connecter pour s'abonner";
     $("premNote").textContent = sbUser
       ? `${PREMIUM.price}, sans engagement : tu résilies quand tu veux depuis Profil. Paiement sécurisé par Stripe. Le reste de l'appli reste gratuit.`
-      : `${PREMIUM.price}, sans engagement. Il te faut d'abord un compte (gratuit, sans mot de passe) pour retrouver ton abonnement sur tous tes appareils.`;
+      : `${PREMIUM.price}, sans engagement. Connecte-toi d'abord (ou crée ton compte gratuit, sans mot de passe) pour retrouver ton abonnement sur tous tes appareils.`;
     $("premOk").textContent = "Plus tard";
   }
   const closePrem = () => { $("premBg").hidden = true; $("premSheet").hidden = true; photoFocus?.focus?.(); };

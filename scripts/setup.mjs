@@ -33,6 +33,8 @@ if (EMAIL_ONLY) { need("SUPABASE_PROJECT_REF"); need("BREVO_SMTP_LOGIN"); need("
 const ANTHROPIC_KEY = E.ANTHROPIC_API_KEY || "";
 const log = (s) => console.log(s);
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+// Code fiscal Stripe exigé pour le paiement : logiciel en ligne (SaaS), usage personnel.
+const TAX_CODE = "txcd_10103000";
 const vars = {}; // variables finales pour Railway
 
 async function api(url, { method = "GET", headers = {}, body, form } = {}) {
@@ -100,10 +102,13 @@ async function stripeSetup() {
   if (!product) {
     product = await stripeApi("/products", { method: "POST", form: {
       name: "Bon'Assiette+", description: "Analyse photo de tes repas (6 par jour) et aucune publicité. Sans engagement.",
-      "metadata[app]": "bonassiette", statement_descriptor: "BONASSIETTE PLUS", url: SITE
+      "metadata[app]": "bonassiette", statement_descriptor: "BONASSIETTE PLUS", url: SITE, tax_code: TAX_CODE
     } });
     log("  Produit Bon'Assiette+ créé.");
-  } else log("  Produit Bon'Assiette+ déjà présent.");
+  } else {
+    if (product.tax_code !== TAX_CODE) await stripeApi(`/products/${product.id}`, { method: "POST", form: { tax_code: TAX_CODE } });
+    log("  Produit Bon'Assiette+ déjà présent.");
+  }
   let price = (await stripeApi(`/prices?product=${product.id}&active=true&limit=100`)).data
     .find(p => p.currency === "eur" && p.recurring?.interval === "month" && p.unit_amount === PREMIUM_CENTS);
   if (!price) {

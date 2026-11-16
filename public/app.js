@@ -340,7 +340,7 @@
     $("results").innerHTML = hits.length ? hits.map(f => `
       <button class="res" type="button" data-f="${FOODS.indexOf(f)}"><span>${esc(f.name)}</span><span class="k">${nb(f.kcal)} kcal</span>
       <span class="sub">${esc(f.portion)} · P ${f.prot} g · G ${f.gluc} g · L ${f.lip} g</span></button>`).join("")
-      : `<p class="small muted pad6">Pas trouvé. Utilise « Saisir un repas à la main » avec les valeurs de l'étiquette.</p>`;
+      : `<p class="small muted pad6">Pas trouvé. Saisis-le à la main, ou propose-le plus bas pour tout le monde.</p>`;
   }
   $("search").addEventListener("input", () => {
     if ($("search").value.trim() && cat !== "Tout") {
@@ -360,7 +360,7 @@
     $("sheetGrams").value = "";
     $("sheetTitle").textContent = f.name;
     $("sheetPortion").textContent = "Portion de référence : " + f.portion;
-    $("sheetSrc").innerHTML = `<p>Table Ciqual 2025, ANSES. Valeurs calculées pour la portion :</p><ul>${f.src.map(([code, g, nm]) => `<li>${esc(nm)} — ${g} g <span class="mono">(code ${esc(code)})</span></li>`).join("")}</ul><p class="mono">${esc(ciqUrl(f.src[0][0]).replace("https://", ""))}</p>`;
+    $("sheetSrc").innerHTML = f.community ? `<p>Repas proposé par un utilisateur, vérifié par Bon'Assiette. Valeurs approximatives pour une portion${f.price ? ` · environ ${euro(f.price)}` : ""}.</p>` : `<p>Table Ciqual 2025, ANSES. Valeurs calculées pour la portion :</p><ul>${f.src.map(([code, g, nm]) => `<li>${esc(nm)} — ${g} g <span class="mono">(code ${esc(code)})</span></li>`).join("")}</ul><p class="mono">${esc(ciqUrl(f.src[0][0]).replace("https://", ""))}</p>`;
     setQty(1);
     $("sheetBg").hidden = false; $("sheet").hidden = false;
     $("sheetAdd").focus();
@@ -402,6 +402,42 @@
     addMeal({ name, kcal, prot: v("cP", 300), gluc: v("cG", 500), lip: v("cL", 300) });
     ["cName", "cK", "cP", "cG", "cL"].forEach(id => $(id).value = "");
     $("customBox").hidden = true;
+  });
+
+  // Proposition d'un repas pour tout le monde : envoyé au serveur, qui estime les valeurs manquantes.
+  let sugLast = null;
+  $("sugBtn").addEventListener("click", () => {
+    $("sugBox").hidden = !$("sugBox").hidden;
+    if ($("sugBox").hidden) return;
+    $("sMsg").textContent = sbUser ? "" : "Connecte-toi dans Profil pour proposer un repas (gratuit, sans mot de passe).";
+    $("sName").value = $("sName").value || $("search").value.trim(); $("sName").focus();
+  });
+  $("sSend").addEventListener("click", async () => {
+    if (!sb || !sbUser) { $("sMsg").textContent = "Connecte-toi dans Profil pour proposer un repas."; return; }
+    const name = $("sName").value.trim();
+    if (name.length < 3) { $("sMsg").textContent = "Donne un nom au repas."; return; }
+    const body = { name };
+    for (const [id, k] of [["sPortion", "portion_g"], ["sK", "kcal"], ["sP", "prot"], ["sG", "gluc"], ["sL", "lip"], ["sPrice", "price"]]) {
+      const v = $(id).value.trim(); if (v !== "") body[k] = Number(v.replace(",", "."));
+    }
+    $("sSend").disabled = true; $("sMsg").textContent = "Envoi et estimation…"; $("sResult").hidden = true;
+    const r = await apiPost("/api/suggest", body);
+    $("sSend").disabled = false;
+    if (r?.error) { $("sMsg").textContent = r.error; return; }
+    sugLast = r; track("repas_propose");
+    const est = new Set(r.estimated || []);
+    const row = (label, k, unit) => r[k] == null ? "" : `<div class="line"><span>${label}</span><span>${est.has(k) ? "≈ " : ""}${k === "price" ? euro(r[k]) : nb(r[k]) + unit}</span></div>`;
+    $("sVals").innerHTML = `<div class="head">${esc(r.name)}</div>` + row("Portion", "portion_g", " g") + row("Calories", "kcal", " kcal")
+      + row("Protéines", "prot", " g") + row("Glucides", "gluc", " g") + row("Lipides", "lip", " g") + row("Prix", "price", "");
+    $("sMsg").textContent = est.size ? "Merci ! Proposition envoyée. Les valeurs avec ≈ sont estimées : on les vérifie avant publication." : "Merci ! Proposition envoyée, on la vérifie avant publication.";
+    $("sAddDay").hidden = !(r.kcal > 0);
+    $("sResult").hidden = false;
+    ["sName", "sPortion", "sK", "sP", "sG", "sL", "sPrice"].forEach(id => $(id).value = "");
+  });
+  $("sAddDay").addEventListener("click", () => {
+    const r = sugLast; if (!r || !(r.kcal > 0)) return;
+    addMeal({ name: r.name, kcal: r.kcal, prot: r.prot || 0, gluc: r.gluc || 0, lip: r.lip || 0 });
+    $("sAddDay").hidden = true;
   });
 
   $("meals").addEventListener("click", (e) => {
@@ -665,6 +701,28 @@
   // Connexion sans mot de passe (lien par e-mail). Sauvegarde : repas, points, série, badges, eau, séances.
   // Le profil (poids, taille, âge) et les mesures du corps ne quittent jamais l'appareil.
   const SB = CFG.supabase && /^https:\/\/[a-z0-9]{20}\.supabase\.co$/.test(CFG.supabase.url || "") ? CFG.supabase : null;
+  // Repas proposés par les utilisateurs et validés : ajoutés à la recherche, dans la catégorie « Communauté ».
+  (async () => {
+    if (!SB) return;
+    try {
+      const r = await fetch(`${SB.url}/rest/v1/meal_suggestions?status=eq.approved&select=id,name,portion_g,kcal,prot,gluc,lip,price&order=name&limit=2000`,
+        { headers: { apikey: SB.key, authorization: `Bearer ${SB.key}` } });
+      if (!r.ok) return;
+      const rows = (await r.json()).filter(m => m && typeof m.name === "string" && Number(m.kcal) > 0);
+      if (!rows.length) return;
+      const has = new Set(FOODS.map(f => norm(f.name)));
+      for (const m of rows) {
+        if (has.has(norm(m.name))) continue;
+        const g = Number(m.portion_g) || 0;
+        FOODS.push({ name: m.name.slice(0, 80), cat: "Communauté", portion: g ? `1 portion, ${r0(g)} g` : "1 portion", tags: "communaute",
+          src: [["communaute", g, m.name]], kcal: Number(m.kcal), prot: Number(m.prot) || 0, gluc: Number(m.gluc) || 0, lip: Number(m.lip) || 0,
+          price: Number(m.price) || 0, community: true });
+      }
+      if (!$("cats").querySelector('[data-c="Communauté"]'))
+        $("cats").insertAdjacentHTML("beforeend", `<button class="chip" type="button" data-c="Communauté" aria-pressed="false">Communauté</button>`);
+      renderResults();
+    } catch { /* hors ligne : la recherche garde la table Ciqual */ }
+  })();
   const SYNC_KEYS = ["g-days", "g-badges", "g-frozen", "g-freezes", "g-xp", "g-xpday", "g-miles", "g-defis",
     "g-freeze-at", "g-water", "g-water-xp", "g-train", "g-train-xp"];
   let sb = null, sbUser = null, pushTimer = null, applyingRemote = false;

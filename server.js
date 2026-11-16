@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import Stripe from "stripe";
 import CONFIG from "./config.js";
 import { analyseHandler, photoEnabled } from "./analyse.js";
+import { suggestHandler } from "./suggest.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, "public");
@@ -92,7 +93,7 @@ app.disable("etag");
 app.set("trust proxy", 1); // Railway place un proxy devant : on lit la vraie IP du visiteur
 
 // 1. Le site ne fait que lire : toute autre méthode HTTP est refusée, sauf les quelques envois (POST) de l'API.
-const POST_PATHS = new Set(["/api/analyse", "/api/account/delete", "/api/checkout", "/api/portal", "/api/stripe/webhook"]);
+const POST_PATHS = new Set(["/api/analyse", "/api/account/delete", "/api/checkout", "/api/portal", "/api/stripe/webhook", "/api/suggest"]);
 app.use((req, res, next) => {
   if (req.method === "GET" || req.method === "HEAD") return next();
   if (req.method === "POST" && POST_PATHS.has(req.path)) return next();
@@ -223,6 +224,20 @@ app.post(
   }),
   express.json({ limit: "2.1mb", strict: true }),
   analyseHandler
+);
+
+// Proposition d'un repas par un utilisateur connecté : 10 par jour et par compte, validée ensuite à la main.
+app.post(
+  "/api/suggest",
+  sameOrigin,
+  (req, res, next) => (req.is("application/json") ? next() : res.status(415).json({ error: "Format refusé." })),
+  requireUser,
+  rateLimit({
+    windowMs: 24 * 60 * 60 * 1000, limit: 10, keyGenerator: (req) => req.user.id, standardHeaders: "draft-8", legacyHeaders: false,
+    handler: (req, res) => res.status(429).json({ error: "Merci pour tes 10 propositions du jour ! Reviens demain pour en ajouter d'autres." })
+  }),
+  express.json({ limit: "4kb", strict: true }),
+  suggestHandler({ sbUrl: SB_URL, sbAdmin })
 );
 
 // Abonnement : le navigateur demande une page de paiement Stripe, puis y est envoyé.

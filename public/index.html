@@ -139,6 +139,23 @@
           <label class="f" for="cL">Lipides (g)<input type="number" id="cL" inputmode="decimal" min="0" max="300"></label>
           <button class="primary full" id="cAdd" type="button">Ajouter</button>
         </div>
+        <button class="linkbtn" id="sugBtn" type="button">Il manque un repas ? Propose-le pour tout le monde</button>
+        <div id="sugBox" hidden class="grid2">
+          <p class="small muted full">On vérifie chaque proposition avant de l'ajouter à la recherche. Remplis ce que tu sais pour une portion : on estime le reste.</p>
+          <label class="f full" for="sName">Nom du repas<input type="text" id="sName" maxlength="80" placeholder="Ex. : tacos 2 viandes, bowl poulet avocat"></label>
+          <label class="f" for="sPortion">Portion (g)<input type="number" id="sPortion" inputmode="numeric" min="1" max="3000" placeholder="facultatif"></label>
+          <label class="f" for="sPrice">Prix (€)<input type="number" id="sPrice" inputmode="decimal" min="0" max="100" step="0.01" placeholder="facultatif"></label>
+          <label class="f" for="sK">Calories (kcal)<input type="number" id="sK" inputmode="numeric" min="0" max="4000" placeholder="facultatif"></label>
+          <label class="f" for="sP">Protéines (g)<input type="number" id="sP" inputmode="decimal" min="0" max="300" placeholder="facultatif"></label>
+          <label class="f" for="sG">Glucides (g)<input type="number" id="sG" inputmode="decimal" min="0" max="500" placeholder="facultatif"></label>
+          <label class="f" for="sL">Lipides (g)<input type="number" id="sL" inputmode="decimal" min="0" max="300" placeholder="facultatif"></label>
+          <button class="primary full" id="sSend" type="button">Envoyer ma proposition</button>
+          <p class="small muted full" id="sMsg" aria-live="polite"></p>
+          <div class="full stack" id="sResult" hidden>
+            <div class="ticket" id="sVals"></div>
+            <button class="ghost" id="sAddDay" type="button">L'ajouter aussi à ma journée</button>
+          </div>
+        </div>
       </div>
     </div>
   </section>

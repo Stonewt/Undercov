@@ -422,6 +422,11 @@ app.get(["/contact", "/contact.html"], (req, res) => {
   res.set("Cache-Control", "no-cache").type("html").send(CONTACT_HTML.replaceAll("__NONCE__", res.locals.nonce));
 });
 
+// favicon.ico : demandé d'office par les navigateurs.
+app.get("/favicon.ico", (req, res) => {
+  res.set("Cache-Control", "public, max-age=604800").sendFile(path.join(PUBLIC_DIR, "icon-192.png"));
+});
+
 // ads.txt : déclare qui a le droit de vendre la publicité du site.
 app.get("/ads.txt", (req, res) => {
   const m = /^ca-pub-(\d{10,20})$/.exec(CONFIG.adsClient);
@@ -456,9 +461,14 @@ app.use((req, res) => res.status(404).sendFile(path.join(PUBLIC_DIR, "404.html")
 
 // 12. Erreur : aucun détail technique n'est montré au visiteur.
 app.use((err, req, res, _next) => {
-  console.error(err?.message || err);
+  const status = err?.status >= 400 && err?.status < 500 ? err.status : 500;
+  if (status === 500) console.error(err?.message || err);
   if (res.headersSent) return;
-  res.status(err?.status === 403 ? 403 : 500).type("text/plain").send("Erreur");
+  if (req.path.startsWith("/api/")) {
+    const msg = status === 413 ? "Envoi trop volumineux." : status === 400 ? "Requête illisible." : status === 403 ? "Requête refusée." : "Erreur du serveur. Réessaie dans un moment.";
+    return res.status(status).json({ error: msg });
+  }
+  res.status(status).type("text/plain").send("Erreur");
 });
 
 const server = app.listen(PORT, () => console.log(`Bon'Assiette en ligne sur le port ${PORT}`));

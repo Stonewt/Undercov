@@ -43,6 +43,8 @@ const STRIPE_PRICE = /^price_[A-Za-z0-9]{10,}$/.test(process.env.STRIPE_PRICE_ID
 // Facultatif : configuration du portail client créée par scripts/setup.mjs (sinon, celle par défaut du tableau de bord Stripe).
 const STRIPE_PORTAL = /^bpc_[A-Za-z0-9]{10,}$/.test(process.env.STRIPE_PORTAL_CONFIG_ID || "") ? process.env.STRIPE_PORTAL_CONFIG_ID : "";
 const PREMIUM_ON = Boolean(ACCOUNTS_ON && SB_SERVICE && STRIPE_KEY && STRIPE_WH && STRIPE_PRICE);
+// En mode test uniquement, la cause exacte d'un échec est affichée pour pouvoir la corriger (jamais en mode réel).
+const testDetail = (e) => (STRIPE_KEY.startsWith("sk_test_") ? ` [test : ${String(e?.message || e).slice(0, 220)}]` : "");
 const stripe = PREMIUM_ON ? new Stripe(STRIPE_KEY, { timeout: 15_000, maxNetworkRetries: 1 }) : null;
 if (ACCOUNTS_ON && !PREMIUM_ON) console.log("Abonnement Bon'Assiette+ inactif : variables Stripe ou SUPABASE_SERVICE_ROLE_KEY manquantes.");
 
@@ -246,7 +248,7 @@ app.post("/api/checkout", sameOrigin, payLimit, requireUser, async (req, res) =>
     res.set("Cache-Control", "no-store").json({ url: session.url });
   } catch (e) {
     console.error("checkout:", e?.message);
-    res.status(502).json({ error: "Le paiement n'a pas pu démarrer. Réessaie dans un moment." });
+    res.status(502).json({ error: "Le paiement n'a pas pu démarrer. Réessaie dans un moment." + testDetail(e) });
   }
 });
 // Gestion de l'abonnement (changer de carte, résilier) : page sécurisée de Stripe.
@@ -261,7 +263,7 @@ app.post("/api/portal", sameOrigin, payLimit, requireUser, async (req, res) => {
     res.set("Cache-Control", "no-store").json({ url: portal.url });
   } catch (e) {
     console.error("portail:", e?.message);
-    res.status(502).json({ error: "La page de gestion n'a pas pu s'ouvrir. Réessaie dans un moment." });
+    res.status(502).json({ error: "La page de gestion n'a pas pu s'ouvrir. Réessaie dans un moment." + testDetail(e) });
   }
 });
 // Stripe prévient le serveur de chaque paiement, renouvellement ou résiliation : c'est la seule source de vérité.

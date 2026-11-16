@@ -1167,7 +1167,7 @@
 
   // ---------- Toast ----------
   let tt;
-  function toast(msg) { const el = $("toast"); el.textContent = msg; el.hidden = false; clearTimeout(tt); tt = setTimeout(() => el.hidden = true, 2200); }
+  function toast(msg) { const el = $("toast"); el.textContent = msg; el.hidden = false; clearTimeout(tt); tt = setTimeout(() => el.hidden = true, Math.max(2200, String(msg).length * 70)); }
 
   // ---------- Installation ----------
   let deferred = null;

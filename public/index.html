@@ -211,14 +211,19 @@
       <div class="panel" id="accountPanel" hidden>
         <div class="row"><h2>Mon compte</h2><span class="num" id="accSync"></span></div>
         <div id="accOut" class="stack">
-          <p class="small muted">Crée un compte gratuit pour sauvegarder tes repas, tes points et ta série, et les retrouver sur un autre téléphone. Pas de mot de passe : tu reçois un lien de connexion par e-mail. Ton poids et ton tour de taille restent sur ton appareil.</p>
+          <p class="small muted">Crée un compte gratuit pour sauvegarder tes repas, tes points et ta série, et les retrouver sur un autre téléphone. Pas de mot de passe : tu reçois un code à 6 chiffres par e-mail. Ton poids et ton tour de taille restent sur ton appareil.</p>
           <label class="f" for="accEmail">Ton adresse e-mail<input type="email" id="accEmail" autocomplete="email" inputmode="email" maxlength="254" placeholder="toi@exemple.fr"></label>
-          <button class="primary" id="accSend" type="button">Recevoir mon lien de connexion</button>
+          <button class="primary" id="accSend" type="button">Recevoir mon code</button>
+          <div id="accCodeBox" class="stack" hidden>
+            <label class="f" for="accCode">Code reçu par e-mail<input type="text" id="accCode" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="123456"></label>
+            <button class="primary" id="accVerify" type="button">Me connecter</button>
+          </div>
           <p class="small muted" id="accMsg" aria-live="polite"></p>
         </div>
         <div id="accIn" class="stack" hidden>
           <p class="small">Connecté avec <strong id="accWho"></strong>. Tes repas, tes points et ta série sont sauvegardés automatiquement.</p>
           <div class="grid2"><button class="ghost" id="accSyncNow" type="button">Synchroniser</button><button class="ghost" id="accLogout" type="button">Se déconnecter</button></div>
+          <button class="primary" id="accGoPlus" type="button" hidden>Passer à Bon'Assiette+</button>
           <div id="accSub" class="stack" hidden>
             <p class="small">Abonné à <strong>Bon'Assiette+</strong> : analyse photo de tes repas (6 par jour) et aucune publicité. Merci !</p>
             <button class="ghost" id="accPortal" type="button">Gérer ou résilier mon abonnement</button>

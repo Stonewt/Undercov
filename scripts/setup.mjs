@@ -26,7 +26,10 @@ const need = (k) => { if (!E[k]) { console.error(`Il manque ${k} dans .env.setup
 const SITE = (E.SITE_URL || "https://www.bonassiette.fr").replace(/\/+$/, "");
 const HOST = new URL(SITE).host;
 const PREMIUM_CENTS = Number(E.PREMIUM_CENTS) || 299;
-const SB_TOKEN = need("SUPABASE_ACCESS_TOKEN"), STRIPE_KEY = need("STRIPE_SECRET_KEY"), RW_TOKEN = need("RAILWAY_TOKEN");
+const EMAIL_ONLY = process.argv.includes("--email");
+const SB_TOKEN = need("SUPABASE_ACCESS_TOKEN");
+const STRIPE_KEY = EMAIL_ONLY ? "" : need("STRIPE_SECRET_KEY"), RW_TOKEN = EMAIL_ONLY ? "" : need("RAILWAY_TOKEN");
+if (EMAIL_ONLY) need("SUPABASE_PROJECT_REF");
 const ANTHROPIC_KEY = E.ANTHROPIC_API_KEY || "";
 const log = (s) => console.log(s);
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -77,7 +80,7 @@ async function supabase() {
   log("  Schéma (tables user_data et subscriptions, RLS) appliqué.");
   await sbApi(`/projects/${ref}/config/auth`, { method: "PATCH", body: {
     site_url: SITE, uri_allow_list: `${SITE}/,${SITE}/*`, external_email_enabled: true, external_anonymous_users_enabled: false,
-    mailer_autoconfirm: false, disable_signup: false
+    mailer_autoconfirm: false, disable_signup: false, ...emailConfig()
   } });
   log("  Authentification réglée : lien par e-mail, adresse du site, redirections.");
   const keys = await sbApi(`/projects/${ref}/api-keys?reveal=true`);
@@ -171,6 +174,15 @@ async function railway() {
   log(`  ${Object.keys(vars).length} variables enregistrées : ${Object.keys(vars).join(", ")}. Railway redéploie.`);
 }
 
+// E-mail de connexion : code à 6 chiffres, aux couleurs du site (supabase/email-code.html).
+function emailConfig() {
+  const html = fs.readFileSync(path.join(ROOT, "supabase", "email-code.html"), "utf8");
+  const subject = "Ton code Bon'Assiette : {{ .Token }}";
+  return { mailer_otp_length: 6, mailer_otp_exp: 3600,
+    mailer_subjects_magic_link: subject, mailer_templates_magic_link_content: html,
+    mailer_subjects_confirmation: subject, mailer_templates_confirmation_content: html };
+}
+
 async function verify() {
   process.stdout.write("\nVérification du site");
   for (let i = 0; i < 24; i++) {
@@ -183,6 +195,12 @@ async function verify() {
   log("\nLe site ne répond pas encore avec l'abonnement ouvert. Regarde les journaux Railway, puis ouvre " + SITE + "/api/status");
 }
 
+if (EMAIL_ONLY) {
+  // Mise à jour du seul e-mail de connexion : il suffit de SUPABASE_ACCESS_TOKEN et SUPABASE_PROJECT_REF.
+  await sbApi(`/projects/${E.SUPABASE_PROJECT_REF}/config/auth`, { method: "PATCH", body: emailConfig() });
+  log("E-mail de connexion mis à jour (code à 6 chiffres). Supprime maintenant le fichier .env.setup.");
+  process.exit(0);
+}
 try {
   await supabase();
   await stripeSetup();

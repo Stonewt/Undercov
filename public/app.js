@@ -487,7 +487,7 @@
 
   // ---------- Photo de l'assiette ----------
   // La photo est réduite sur le téléphone, envoyée au serveur Bon'Assiette qui la fait analyser, puis oubliée.
-  let photo = null, photoRun = 0, photoFocus = null, photoReady = false;
+  let wantPlus = false, photo = null, photoRun = 0, photoFocus = null, photoReady = false;
   // Réservé aux abonnés Bon'Assiette+ : les autres voient ce que fait la fonction et peuvent s'abonner.
   $("photoBtn").addEventListener("click", () => {
     if (isSubscriber()) {
@@ -519,7 +519,7 @@
   $("premBg").addEventListener("click", closePrem);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("premSheet").hidden) closePrem(); });
   $("premSub").addEventListener("click", async () => {
-    if (!sbUser) { closePrem(); show("profil"); $("accEmail")?.focus(); return; }
+    if (!sbUser) { wantPlus = true; closePrem(); show("profil"); $("accEmail")?.focus(); return; }
     $("premSub").disabled = true;
     const r = await apiPost("/api/checkout");
     $("premSub").disabled = false;
@@ -734,6 +734,7 @@
   // ---------- Abonnement Bon'Assiette+ : lecture de l'état et affichage ----------
   function renderPremium() {
     $("accSub").hidden = !(sbUser && subActive);
+    $("accGoPlus").hidden = !(sbUser && PREMIUM && !subActive);
     const badge = $("photoBtn").querySelector(".plus"); if (badge) badge.hidden = subActive;
     if (subActive) document.querySelectorAll("[id^='ad-']").forEach(b => { b.hidden = true; });
   }
@@ -798,9 +799,25 @@
     $("accSend").disabled = false;
     accMsg(error
       ? (error.status === 429 ? "Trop de demandes. Réessaie dans quelques minutes." : "L'envoi a échoué. Vérifie l'adresse et réessaie.")
-      : "C'est envoyé ! Ouvre le lien reçu par e-mail sur cet appareil, dans ce navigateur.");
-    if (!error) track("demande_lien_connexion");
+      : "C'est envoyé ! Tape le code reçu par e-mail (pense à regarder dans les spams).");
+    if (!error) { track("demande_lien_connexion"); $("accCodeBox").hidden = false; $("accCode").value = ""; $("accCode").focus(); }
   });
+  // Connexion par code à 6 chiffres : marche même si l'e-mail est ouvert sur un autre appareil ou navigateur.
+  async function verifyCode() {
+    const email = $("accEmail").value.trim(), token = $("accCode").value.replace(/D/g, "");
+    if (token.length < 6) { accMsg("Tape les chiffres du code reçu par e-mail."); return; }
+    if (!sb) return;
+    $("accVerify").disabled = true; accMsg("Vérification…");
+    const { error } = await sb.auth.verifyOtp({ email, token, type: "email" });
+    $("accVerify").disabled = false;
+    if (error) { accMsg(error.status === 429 ? "Trop d'essais. Réessaie dans quelques minutes." : "Code incorrect ou expiré. Vérifie-le, ou redemande un code."); return; }
+    accMsg(""); $("accCodeBox").hidden = true;
+    if (wantPlus) { wantPlus = false; setTimeout(() => $("photoBtn").click(), 1200); }
+  }
+  $("accVerify").addEventListener("click", verifyCode);
+  $("accCode").addEventListener("keydown", (e) => { if (e.key === "Enter") verifyCode(); });
+  $("accCode").addEventListener("input", () => { if ($("accCode").value.replace(/D/g, "").length === 6) verifyCode(); });
+  $("accGoPlus").addEventListener("click", () => $("photoBtn").click());
   $("accSyncNow").addEventListener("click", () => { if (sbUser) syncAll(); });
   $("accLogout").addEventListener("click", async () => { await sb?.auth.signOut({ scope: "local" }); sbUser = null; renderAccount(); toast("Déconnecté. Tes données restent sur ce téléphone."); });
   $("accDelete").addEventListener("click", () => { $("accDelConfirm").hidden = false; });

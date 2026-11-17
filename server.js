@@ -108,7 +108,7 @@ app.set("trust proxy", 1); // Railway place un proxy devant : on lit la vraie IP
 
 // 1. Le site ne fait que lire : toute autre méthode HTTP est refusée, sauf les quelques envois (POST) de l'API.
 const POST_PATHS = new Set(["/api/analyse", "/api/account/delete", "/api/checkout", "/api/portal", "/api/stripe/webhook", "/api/suggest", "/api/contact", "/api/frigo",
-  "/api/coffre", "/api/ligue/rejoindre", "/api/ligue/quitter", "/api/ligue/score", "/api/push/abonner", "/api/push/etat", "/api/push/desabonner"]);
+  "/api/coffre", "/api/bienvenue", "/api/ligue/rejoindre", "/api/ligue/quitter", "/api/ligue/score", "/api/push/abonner", "/api/push/etat", "/api/push/desabonner"]);
 app.use((req, res, next) => {
   if (req.method === "GET" || req.method === "HEAD") return next();
   if (req.method === "POST" && POST_PATHS.has(req.path)) return next();
@@ -209,29 +209,30 @@ const requireUser = async (req, res, next) => {
     next();
   } catch (e) { console.error("auth:", e?.message); res.status(502).json({ error: "Vérification impossible. Réessaie." }); }
 };
-// Accès aux fonctions IA : abonnement actif (req.subscription), sinon une utilisation du pack est décomptée (req.credit).
-// Si l'appel échoue ensuite (panne, plafond du jour, rien d'exploitable), l'utilisation est rendue.
+// Accès aux fonctions IA : abonnement actif (req.subscription), sinon une analyse du solde est décomptée (req.credit).
+// Le solde vient des analyses offertes (création de compte, coffre) ou d'un pack acheté.
+// Si l'appel échoue ensuite (panne, plafond du jour, rien d'exploitable), l'analyse est rendue.
+const CREDITS_ON = Boolean(ACCOUNTS_ON && SB_SERVICE);
 const requireAccess = async (req, res, next) => {
-  if (!PREMIUM_ON) return res.status(503).json({ error: "Bon'Assiette+ n'est pas encore ouvert." });
+  if (!CREDITS_ON) return res.status(503).json({ error: "Cette fonction n'est pas encore ouverte." });
   try {
-    req.subscription = await subscriptionOf(req.user.id);
+    req.subscription = PREMIUM_ON ? await subscriptionOf(req.user.id) : null;
     if (isActive(req.subscription)) return next();
     req.subscription = null;
-    if (PACK_ON && (await rpc("use_credit", { uid: req.user.id })) === true) {
+    if ((await rpc("use_credit", { uid: req.user.id })) === true) {
       req.credit = true;
       res.on("finish", () => {
         if (res.statusCode >= 500 || res.statusCode === 429 || res.statusCode === 422) {
-          rpc("add_credits", { uid: req.user.id, n: 1 }).catch(e => console.error("utilisation rendue :", e?.message));
+          rpc("add_credits", { uid: req.user.id, n: 1 }).catch(e => console.error("analyse rendue :", e?.message));
         }
       });
       return next();
     }
-    res.status(402).json({ error: PACK_ON
-      ? "Cette fonction fait partie de Bon'Assiette+ : abonne-toi, ou prends un pack d'utilisations."
-      : "Cette fonction est réservée aux abonnés Bon'Assiette+." });
+    res.status(402).json({ error: PREMIUM_ON
+      ? "Tu n'as plus d'analyse disponible. Passe à Bon'Assiette+, ou gagne-en une dans le coffre du jour."
+      : "Tu n'as plus d'analyse disponible. Reviens demain : le coffre du jour peut t'en offrir une." });
   } catch (e) { console.error("accès:", e?.message); res.status(502).json({ error: "Vérification impossible. Réessaie." }); }
 };
-
 // Analyse photo : abonnés connectés uniquement, 6 par jour et par compte, photo de 1,5 Mo max.
 app.post(
   "/api/analyse",
@@ -265,6 +266,7 @@ const perIp = (limit, windowMs) => rateLimit({ windowMs, limit, standardHeaders:
   handler: (req, res) => res.status(429).json({ error: "Trop de demandes. Réessaie plus tard." }) });
 const smallJson = express.json({ limit: "4kb", strict: true });
 
+app.post("/api/bienvenue", sameOrigin, needEngage, requireUser, perUser(10, 60 * 60 * 1000, "Réessaie dans une heure."), (req, res) => ENGAGE.welcome(req, res));
 app.post("/api/coffre", sameOrigin, needEngage, requireUser, perUser(5, 60 * 60 * 1000, "Réessaie dans une heure."), (req, res) => ENGAGE.chest(req, res));
 app.get("/api/ligue", needEngage, requireUser, perUser(120, 60 * 60 * 1000, "Réessaie dans un moment."), (req, res) => ENGAGE.board(req, res));
 app.post("/api/ligue/rejoindre", sameOrigin, jsonOnly, needEngage, requireUser, perUser(10, 60 * 60 * 1000, "Réessaie dans une heure."), smallJson, (req, res) => ENGAGE.join(req, res));
@@ -475,7 +477,7 @@ app.post(
 const PUBLIC_CONFIG = JSON.stringify({
   adsClient: ADS_ON ? CONFIG.adsClient : "", adSlots: ADS_ON ? CONFIG.adSlots : {}, gaId: GA_ON ? CONFIG.gaId : "",
   supabase: ACCOUNTS_ON ? { url: SB_URL, key: SB_ANON } : null,
-  engage: ENGAGE ? { ligue: true, push: ENGAGE.PUSH_ON } : null,
+  engage: ENGAGE ? { ligue: true, push: ENGAGE.PUSH_ON, welcome: ENGAGE.WELCOME, chestMeals: ENGAGE.CHEST_MEALS } : null,
   premium: PREMIUM_ON ? { price: String(CONFIG.premiumPrice || ""), pack: PACK_ON ? { price: String(CONFIG.packPrice || ""), credits: PACK_CREDITS } : null } : null
 }).replace(/</g, "\\u003c");
 const HEAD_EXTRA = /^ca-pub-\d{10,20}$/.test(CONFIG.adsClient)

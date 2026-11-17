@@ -16,9 +16,9 @@ export default {
   // du tarif Stripe STRIPE_PACK_PRICE_ID (créé par scripts/setup.mjs avec PACK_CENTS) : les deux doivent correspondre.
   packPrice: "1,49 €",
   packCredits: 5,
-  // Coffre du jour : chance de gagner une analyse photo offerte (0.03 = 3 % par coffre ouvert), au plus une tous les
-  // chestPhotoCooldownDays jours, et seulement pour les comptes de plus de chestMinAccountDays jours, non abonnés.
-  chestPhotoChance: 0.03,
-  chestPhotoCooldownDays: 30,
-  chestMinAccountDays: 3
+  // Analyses photo offertes une seule fois à la création du compte.
+  welcomeCredits: 3,
+  // Coffre du jour (gratuit, comptes connectés, journée remplie : 3 repas) : chance de gagner une analyse photo
+  // (0.1 = 10 %), sinon des points. Les abonnés reçoivent toujours des points.
+  chestPhotoChance: 0.1
 };

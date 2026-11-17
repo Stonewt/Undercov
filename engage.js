@@ -42,39 +42,52 @@ export function createEngage({ sbUrl, sbAdmin, rpc, subscriptionOf, isActive, co
     const t = await r.text();
     return t ? JSON.parse(t) : null;
   };
-  const CHANCE = Math.min(0.5, Math.max(0, Number(config.chestPhotoChance ?? 0.03)));
-  const COOLDOWN = Math.max(1, Number(config.chestPhotoCooldownDays ?? 30));
-  const MIN_AGE = Math.max(0, Number(config.chestMinAccountDays ?? 3));
+  const CHANCE = Math.min(0.5, Math.max(0, Number(config.chestPhotoChance ?? 0.1)));
+  const WELCOME = Math.max(0, Math.min(10, Math.round(Number(config.welcomeCredits ?? 3))));
+  const CHEST_MEALS = 3;
+
+  // ---------- Analyses offertes à la création du compte ----------
+  // Une seule fois par compte (table welcome_grants), y compris pour les comptes créés avant cette fonction.
+  async function welcome(req, res) {
+    try {
+      if (!(WELCOME > 0)) return res.json({ granted: 0 });
+      const ins = await rest("welcome_grants", {
+        method: "POST", headers: { prefer: "resolution=ignore-duplicates,return=representation" },
+        body: JSON.stringify({ user_id: req.user.id, credits: WELCOME })
+      });
+      if (!ins?.length) return res.json({ granted: 0 });
+      await rpc("add_credits", { uid: req.user.id, n: WELCOME });
+      res.set("Cache-Control", "no-store").json({ granted: WELCOME });
+    } catch (e) { console.error("bienvenue:", e?.message); res.status(502).json({ error: "Réessaie dans un moment." }); }
+  }
 
   // ---------- Coffre du jour ----------
-  // Un tirage par compte et par jour. L'analyse offerte : compte d'au moins 3 jours, non abonné, pas déjà gagnée
-  // dans les 30 derniers jours, puis 3 % de chance. En moyenne : moins d'une analyse offerte par mois et par joueur assidu.
+  // Comptes connectés uniquement, gratuit, un par jour. Le serveur vérifie la journée remplie (au moins 3 repas
+  // dans la sauvegarde du compte), puis tire la récompense : 10 % une analyse photo, sinon des points.
+  // Un abonné (analyses déjà incluses) reçoit toujours des points.
   async function chest(req, res) {
     try {
       const day = parisDay();
+      const saved = (await rest(`user_data?user_id=eq.${req.user.id}&select=data`))[0]?.data || {};
+      const list = saved["g-days"]?.[day];
+      const n = Array.isArray(list) ? list.length : 0;
+      if (n < CHEST_MEALS) return res.status(409).json({ error: `Note encore ${CHEST_MEALS - n} repas pour ouvrir le coffre.`, missing: CHEST_MEALS - n });
       const ins = await rest("chest_rolls", {
         method: "POST", headers: { prefer: "resolution=ignore-duplicates,return=representation" },
         body: JSON.stringify({ user_id: req.user.id, day })
       });
-      if (!ins?.length) return res.json({ already: true, photo: false });
+      if (!ins?.length) return res.json({ already: true });
+      const sub = await subscriptionOf(req.user.id).catch(() => null);
       let photo = false;
-      const ageDays = req.user.created_at ? (Date.now() - Date.parse(req.user.created_at)) / 86400000 : 0;
-      if (CHANCE > 0 && ageDays >= MIN_AGE) {
-        const sub = await subscriptionOf(req.user.id).catch(() => null);
-        if (!isActive(sub)) {
-          const since = shiftDay(day, -COOLDOWN);
-          const won = await rest(`chest_rolls?user_id=eq.${req.user.id}&won=eq.true&day=gt.${since}&select=day&limit=1`);
-          if (!won.length && crypto.randomInt(1_000_000) < CHANCE * 1_000_000) {
-            await rpc("add_credits", { uid: req.user.id, n: 1 });
-            await rest(`chest_rolls?user_id=eq.${req.user.id}&day=eq.${day}`, { method: "PATCH", body: JSON.stringify({ won: true }) });
-            photo = true;
-          }
-        }
+      if (!isActive(sub) && CHANCE > 0 && crypto.randomInt(1_000_000) < CHANCE * 1_000_000) {
+        await rpc("add_credits", { uid: req.user.id, n: 1 });
+        await rest(`chest_rolls?user_id=eq.${req.user.id}&day=eq.${day}`, { method: "PATCH", body: JSON.stringify({ won: true }) });
+        photo = true;
       }
-      res.set("Cache-Control", "no-store").json({ already: false, photo });
+      const xp = photo ? 0 : 15 + crypto.randomInt(26); // 15 à 40 points
+      res.set("Cache-Control", "no-store").json({ already: false, photo, xp });
     } catch (e) { console.error("coffre:", e?.message); res.status(502).json({ error: "Le coffre est coincé. Réessaie dans un moment." }); }
   }
-
   // ---------- Ligues ----------
   const cleanPseudo = (v) => String(v ?? "").normalize("NFC").replace(/\s+/g, " ").trim();
   const validPseudo = (p) => /^[\p{L}\p{N}_.\- ]{3,20}$/u.test(p) && !BANNED.test(p) && !BANNED.test(p.replace(/[\s_.\-0-9]/g, ""));
@@ -244,5 +257,5 @@ export function createEngage({ sbUrl, sbAdmin, rpc, subscriptionOf, isActive, co
   }
   if (PUSH_ON) { const t = setInterval(sendReminders, 5 * 60 * 1000); t.unref?.(); }
 
-  return { chest, join, quit, score, board, pushKey, pushSave, pushState, pushDelete, PUSH_ON };
+  return { welcome, chest, join, quit, score, board, pushKey, pushSave, pushState, pushDelete, PUSH_ON, WELCOME, CHEST_MEALS };
 }

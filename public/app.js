@@ -61,7 +61,9 @@
     if (p.goal === "muscle") kcal *= 1.10;
     if (p.goal === "perte") kcal *= 0.85;
     kcal = Math.max(kcal, p.sex === "h" ? 1800 : 1500);
-    const prot = p.weight * (p.goal === "muscle" ? 1.8 : p.goal === "perte" ? 1.6 : 1.2);
+    // Au-delà d'un IMC de 30, les protéines se calculent sur le poids d'un IMC de 25 (sinon le besoin est surestimé).
+    const h2 = (p.height / 100) ** 2, refW = p.weight / h2 >= 30 ? 25 * h2 : p.weight;
+    const prot = refW * (p.goal === "muscle" ? 1.8 : p.goal === "perte" ? 1.6 : 1.2);
     const lip = kcal * 0.35 / 9;
     const gluc = Math.max(0, (kcal - prot * 4 - lip * 9) / 4);
     return { kcal: r0(kcal), prot: r0(prot), gluc: r0(gluc), lip: r0(lip), bmr: r0(bmr) };
@@ -292,6 +294,7 @@
     renderWater();
     renderTrain();
     renderChest();
+    renderPhotoHero();
     renderRemind();
     checkBadges();
   }
@@ -536,6 +539,7 @@
       if (photoReady) $("photoIn").click(); else toast("L'analyse photo est momentanément indisponible. Réessaie plus tard.");
       return;
     }
+    if (!sbUser && SB && CFG.engage?.welcome) { toast(`Crée ton compte gratuit : ${CFG.engage.welcome} analyses photo offertes`); show("profil"); $("accEmail")?.focus(); return; }
     openPrem("photo");
   });
   function openPrem(fonction) {
@@ -579,7 +583,7 @@
     if (subActive || credits <= 0) return;
     credits--; renderPremium();
     try { localStorage.setItem("g-credits", String(credits)); } catch { /* stockage indisponible */ }
-    toast(credits > 0 ? `Il te reste ${credits} utilisation${credits > 1 ? "s" : ""}` : "C'était ta dernière utilisation. Abonne-toi ou reprends un pack dans Profil.");
+    toast(credits > 0 ? `Il te reste ${credits} analyse${credits > 1 ? "s" : ""}` : "C'était ta dernière analyse. Le coffre du jour peut t'en offrir une, ou passe à Bon'Assiette+.");
   }
   $("premBg").addEventListener("click", closePrem);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("premSheet").hidden) closePrem(); });
@@ -824,26 +828,26 @@
     $("accSub").hidden = !(sbUser && subActive);
     $("accGoPlus").hidden = !(sbUser && PREMIUM && !subActive);
     const pack = PREMIUM?.pack;
-    $("accCredits").hidden = !(sbUser && !subActive && (credits > 0 || pack));
+    $("accCredits").hidden = !(sbUser && !subActive);
     $("accCreditsTxt").textContent = credits > 0
-      ? `Il te reste ${credits} utilisation${credits > 1 ? "s" : ""} de Bon'Assiette+ (photo ou frigo), sans date limite.`
-      : "Pas envie de t'abonner ? Un pack d'utilisations se prend une fois, sans limite de temps.";
+      ? `Il te reste ${credits} analyse${credits > 1 ? "s" : ""} (photo ou idée frigo), sans date limite.`
+      : "Plus d'analyse disponible. Le coffre du jour peut t'en offrir, ou prends un pack (achat unique, sans abonnement).";
     $("accBuyPack").hidden = !pack;
     if (pack) $("accBuyPack").textContent = `${credits > 0 ? "Reprendre" : "Prendre"} ${pack.credits} utilisations · ${pack.price}`;
-    const badge = $("photoBtn").querySelector(".plus"); if (badge) badge.hidden = subActive;
+    renderPhotoHero();
     document.querySelectorAll(".plus-tag").forEach(t => { t.hidden = subActive; });
     if (subActive) document.querySelectorAll("[id^='ad-']").forEach(b => { b.hidden = true; });
   }
   async function refreshSub() {
-    if (!sb || !sbUser || !PREMIUM) { subActive = false; credits = 0; renderPremium(); return false; }
-    const { data } = await sb.from("subscriptions").select("status,current_period_end").eq("user_id", sbUser.id).maybeSingle();
-    const end = data?.current_period_end ? Date.parse(data.current_period_end) + 3 * 86400000 : Infinity;
-    subActive = Boolean(data) && (data.status === "active" || data.status === "past_due") && end > Date.now();
-    if (PREMIUM.pack) {
-      const c = await sb.from("credits").select("balance").eq("user_id", sbUser.id).maybeSingle();
-      credits = Math.max(0, Math.round(Number(c.data?.balance)) || 0);
-      try { localStorage.setItem("g-credits", String(credits)); } catch { /* stockage indisponible */ }
-    } else credits = 0;
+    if (!sb || !sbUser) { subActive = false; credits = 0; renderPremium(); return false; }
+    if (PREMIUM) {
+      const { data } = await sb.from("subscriptions").select("status,current_period_end").eq("user_id", sbUser.id).maybeSingle();
+      const end = data?.current_period_end ? Date.parse(data.current_period_end) + 3 * 86400000 : Infinity;
+      subActive = Boolean(data) && (data.status === "active" || data.status === "past_due") && end > Date.now();
+    } else subActive = false;
+    const c = await sb.from("credits").select("balance").eq("user_id", sbUser.id).maybeSingle();
+    credits = Math.max(0, Math.round(Number(c.data?.balance)) || 0);
+    try { localStorage.setItem("g-credits", String(credits)); } catch { /* stockage indisponible */ }
     renderPremium();
     return subActive;
   }
@@ -898,6 +902,8 @@
           if (event === "SIGNED_IN") { track("connexion_compte"); toast("Connecté · tes données sont sauvegardées"); }
           await syncAll();
           if (backFromPay || backFromPack) await afterPayment(); else await refreshSub();
+          await claimWelcome();
+          renderDay();
         } else if (!sbUser && before) { subActive = false; renderPremium(); }
       }, 0);
     });
@@ -1004,48 +1010,76 @@
   });
 
   // ---------- Coffre du jour ----------
-  // S'ouvre après 3 repas notés, une fois par jour. Points ou protection de série, et parfois (tirage côté serveur,
-  // rare) une analyse photo offerte.
-  const CHEST_MEALS = 3;
+  // Comptes connectés, gratuit, un par jour, après une journée remplie (3 repas). Le serveur vérifie la journée
+  // et tire la récompense : 10 % une analyse photo, sinon des points.
+  const CHEST_MEALS = CFG.engage?.chestMeals || 3;
   function renderChest() {
-    const n = meals().length, opened = LS.get("g-chest", "") === TODAY, ready = n >= CHEST_MEALS && !opened;
-    $("chestTxt").textContent = opened ? "Ouvert aujourd'hui. Un nouveau coffre t'attend demain !"
-      : ready ? "Ton coffre est prêt, ouvre-le !"
+    const on = Boolean(CFG.engage && SB);
+    $("chest").hidden = !on;
+    if (!on) return;
+    const n = meals().length, opened = LS.get("g-chest", "") === TODAY, ready = Boolean(sbUser) && n >= CHEST_MEALS && !opened;
+    $("chestTxt").textContent = !sbUser ? "Connecte-toi pour ouvrir un coffre chaque jour : il peut contenir une analyse photo."
+      : opened ? "Ouvert aujourd'hui. Un nouveau coffre t'attend demain !"
+      : ready ? "Ta journée est remplie : ouvre ton coffre !"
       : `Note encore ${CHEST_MEALS - n} repas pour l'ouvrir`;
     $("chestBar").style.width = (opened ? 100 : Math.min(n, CHEST_MEALS) / CHEST_MEALS * 100) + "%";
-    $("chestOpen").hidden = !ready;
+    $("chestOpen").hidden = !(ready || !sbUser);
+    $("chestOpen").textContent = sbUser ? "Ouvrir" : "Me connecter";
     $("chest").classList.toggle("ready", ready);
     $("chest").classList.toggle("done", opened);
     $("chestIco").textContent = opened ? "✓" : "🎁";
   }
   $("chestOpen").addEventListener("click", async () => {
+    if (!sbUser) { show("profil"); $("accEmail")?.focus(); return; }
     if (LS.get("g-chest", "") === TODAY || meals().length < CHEST_MEALS) return;
-    LS.set("g-chest", TODAY);
     $("chestOpen").disabled = true; $("chestIco").classList.add("shake");
-    // Tirage de l'analyse offerte côté serveur (comptes connectés, non abonnés), pendant l'animation.
-    const canWin = Boolean(sb && sbUser && PREMIUM?.pack && !subActive && CFG.engage);
-    const [server] = await Promise.all([canWin ? apiPost("/api/coffre").catch(() => null) : null, new Promise(r => setTimeout(r, 1100))]);
+    await pushNow(); // le serveur vérifie les repas du jour dans la sauvegarde du compte
+    const [r] = await Promise.all([apiPost("/api/coffre"), new Promise(ok => setTimeout(ok, 1100))]);
     $("chestIco").classList.remove("shake"); $("chestOpen").disabled = false;
-    let title, text, icon, gain;
-    if (server?.photo) {
+    if (!r || r.error) { toast(r?.error || "Le coffre est coincé. Réessaie dans un moment."); return; }
+    LS.set("g-chest", TODAY);
+    if (r.already) { toast("Tu as déjà ouvert ton coffre aujourd'hui."); renderDay(); return; }
+    let title, text, icon;
+    if (r.photo) {
       await refreshSub();
-      title = "Jackpot !"; icon = "📸"; gain = "photo";
-      text = "Une analyse photo offerte ! Prends ton prochain repas en photo : chaque aliment est reconnu et pesé.";
-    } else if (freezes < 2 && Math.random() < 0.2) {
-      freezes++; LS.set("g-freezes", freezes);
-      title = "Une protection de série"; icon = "🧊"; gain = "protection";
-      text = "Si tu oublies un jour, ta série est sauvée automatiquement.";
+      title = "Une analyse photo !"; icon = "📸";
+      text = "Prends ton prochain repas en photo : chaque aliment est reconnu et pesé, avec ses calories et ses macros.";
     } else {
-      const n = 15 + Math.floor(Math.random() * 26);
-      bonusXP(n);
-      title = `+${n} XP`; icon = "✨"; gain = "xp";
-      text = "Bonus du coffre, en plus de tes points du jour.";
+      bonusXP(Math.max(0, Math.min(60, Math.round(Number(r.xp) || 0))));
+      title = `+${r.xp} XP`; icon = "✨"; text = "Bonus du coffre, en plus de tes points du jour. Demain, peut-être une analyse photo !";
     }
-    if (!sbUser && PREMIUM?.pack) text += " Astuce : connecte-toi, le coffre peut aussi contenir une analyse photo offerte.";
-    track("coffre_ouvert", { gain });
+    track("coffre_ouvert", { gain: r.photo ? "photo" : "xp" });
     renderDay();
     celebrate(title, text, icon);
   });
+
+  // Bouton Photo de l'accueil : analyses restantes, et Bon'Assiette+ quand il n'y en a plus.
+  function renderPhotoHero() {
+    const left = $("photoLeft"), plus = $("photoPlus");
+    const welcome = CFG.engage?.welcome || 0;
+    plus.hidden = true;
+    if (subActive) { left.textContent = "Bon'Assiette+ : jusqu'à 6 analyses par jour"; return; }
+    if (!sbUser) {
+      left.textContent = SB && welcome ? `${welcome} analyses offertes en créant ton compte gratuit` : "";
+      return;
+    }
+    if (credits > 0) { left.textContent = `${credits} analyse${credits > 1 ? "s" : ""} restante${credits > 1 ? "s" : ""}`; return; }
+    left.textContent = "Plus d'analyse disponible";
+    plus.hidden = !PREMIUM;
+  }
+  $("photoPlus").addEventListener("click", () => openPrem("plus_vide"));
+  // Analyses offertes à la création du compte (une seule fois par compte, décidé par le serveur).
+  async function claimWelcome() {
+    if (!sbUser || !CFG.engage?.welcome || LS.get("g-welcome", "") === sbUser.id) return;
+    const r = await apiPost("/api/bienvenue").catch(() => null);
+    if (!r || r.error) return;
+    LS.set("g-welcome", sbUser.id);
+    if (r.granted > 0) {
+      await refreshSub();
+      track("analyses_offertes", { n: r.granted });
+      celebrate(`${r.granted} analyses photo offertes`, "Prends ton repas en photo depuis l'accueil : chaque aliment est reconnu et pesé, avec ses calories et ses macros.", "📸");
+    }
+  }
 
   // ---------- Points de la semaine (pour la ligue) ----------
   function weekKey(d = new Date()) {

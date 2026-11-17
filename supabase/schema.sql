@@ -176,3 +176,12 @@ create table if not exists public.push_subs (
 create index if not exists push_subs_due on public.push_subs (last_meal_day);
 alter table public.push_subs enable row level security;
 revoke all on public.push_subs from anon, authenticated;
+
+-- 10. Analyses photo offertes à la création du compte : accordées une seule fois par compte.
+create table if not exists public.welcome_grants (
+  user_id    uuid primary key references auth.users (id) on delete cascade,
+  credits    integer not null,
+  created_at timestamptz not null default now()
+);
+alter table public.welcome_grants enable row level security;
+revoke all on public.welcome_grants from anon, authenticated;

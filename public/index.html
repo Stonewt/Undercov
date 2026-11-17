@@ -58,6 +58,11 @@
     <div class="col-a">
       <p class="date" id="today"></p>
       <div class="alert" id="streakAlert" role="status" hidden></div>
+      <div class="panel photo-hero" id="photoHero">
+        <button class="photo-btn big" id="photoBtn" type="button"><span class="ph-ico" aria-hidden="true">📷</span><span class="ph-t">Prends ton repas en photo</span><small>Chaque aliment reconnu et pesé, avec ses calories et ses macros</small></button>
+        <input type="file" id="photoIn" accept="image/jpeg,image/png,image/webp,image/heic,image/*" class="sr">
+        <div class="ph-foot"><span class="small" id="photoLeft" aria-live="polite"></span><button class="linkbtn" id="photoPlus" type="button" hidden>Passer à Bon'Assiette+ →</button></div>
+      </div>
       <div class="panel">
         <div class="day">
           <div class="ring" aria-hidden="true">
@@ -128,10 +133,6 @@
     <div class="col-b">
       <div class="panel">
         <h2>Ajouter un repas</h2>
-        <div id="photoWrap">
-          <button class="photo-btn" id="photoBtn" type="button"><span>📷 Prendre mon assiette en photo <b class="plus">Bon'Assiette+</b></span><small>Calories et macros calculées aliment par aliment</small></button>
-          <input type="file" id="photoIn" accept="image/jpeg,image/png,image/webp,image/heic,image/*" class="sr">
-        </div>
         <div id="recentWrap" hidden>
           <div class="eyebrow mb8">Tes plats habituels</div>
           <div class="chips" id="recent"></div>
@@ -350,7 +351,7 @@
       <p>L'Autorité européenne de sécurité des aliments (EFSA) conseille environ 2 L d'eau par jour pour une femme et 2,5 L pour un homme, dont à peu près 20 % viennent des aliments. Il reste environ 1,6 L à boire pour une femme et 2 L pour un homme : 7 ou 8 verres de 25 cl. Bois davantage s'il fait chaud ou si tu fais du sport.</p>
 
       <h3>L'analyse photo</h3>
-      <p>La photo est envoyée à un service d'intelligence artificielle (Claude, d'Anthropic) qui reconnaît les aliments et estime les quantités. C'est une estimation : vérifie toujours les grammes. La photo n'est pas conservée par Bon'Assiette. Cette fonction fait partie de l'abonnement Bon'Assiette+ (sans engagement, résiliable à tout moment depuis Profil). Tout le reste de l'appli est gratuit.</p>
+      <p>La photo est envoyée à un service d'intelligence artificielle (Claude, d'Anthropic) qui reconnaît les aliments et estime les quantités. C'est une estimation : vérifie toujours les grammes. La photo n'est pas conservée par Bon'Assiette. Tu as 3 analyses offertes en créant ton compte, et le coffre du jour (gratuit, une fois par jour quand ta journée est remplie) peut t'en faire gagner d'autres. Avec Bon'Assiette+, tu en as jusqu'à 6 par jour. Tout le reste de l'appli est gratuit.</p>
 
       <h3>D'où viennent les valeurs nutritionnelles ?</h3>
       <p>De la <strong>table Ciqual 2025</strong> de l'ANSES (Agence nationale de sécurité sanitaire), la référence officielle française. Chaque plat indique sa portion et l'aliment Ciqual utilisé : appuie sur « Source » pour le voir. Les recettes sont calculées ingrédient par ingrédient.</p>
@@ -358,12 +359,25 @@
 
       <h3>Comment ton objectif est calculé</h3>
       <ul>
-        <li><strong>Calories</strong> : dépense au repos estimée avec la formule de Mifflin-St Jeor (âge, sexe, poids, taille), multipliée par ton niveau d'activité. Objectif « prendre du muscle » : +10 %. Objectif « perdre un peu » : −15 % au maximum, avec un minimum de 1 500 kcal (femme) ou 1 800 kcal (homme).</li>
-        <li><strong>Protéines</strong> : 1,2 g par kg de poids corporel pour garder la forme, 1,6 g pour perdre un peu, 1,8 g pour prendre du muscle.</li>
-        <li><strong>Lipides</strong> : 35 % des calories, dans la fourchette de 35 à 40 % recommandée par l'ANSES pour les adultes.</li>
-        <li><strong>Glucides</strong> : le reste des calories.</li>
+        <li><strong>Dépense au repos</strong> : formule de Mifflin-St Jeor<sup>1</sup>. Homme : 10 × poids (kg) + 6,25 × taille (cm) − 5 × âge + 5. Femme : même calcul, −161 au lieu de +5.</li>
+        <li><strong>Calories du jour</strong> : dépense au repos × niveau d'activité (1,375 peu active, 1,55 moyenne, 1,725 élevée), des facteurs proches des niveaux d'activité physique de la FAO et de l'OMS<sup>2</sup>. Objectif « prendre du muscle » : +10 % (léger surplus). Objectif « perdre un peu » : −15 % (déficit modéré, pour une perte progressive). Jamais moins de 1 500 kcal (femme) ou 1 800 kcal (homme), un plancher prudent choisi par Bon'Assiette.</li>
+        <li><strong>Protéines</strong> : 1,2 g par kg pour garder la forme (au-dessus du besoin de base de 0,83 g/kg fixé par l'ANSES<sup>3</sup>), 1,6 g/kg pour perdre un peu et 1,8 g/kg pour prendre du muscle, dans la fourchette de 1,4 à 2 g/kg conseillée aux sportifs<sup>4,5</sup>. Au-delà d'un IMC de 30, le calcul utilise le poids correspondant à un IMC de 25, pour ne pas surestimer le besoin.</li>
+        <li><strong>Lipides</strong> : 35 % des calories, dans la fourchette de 35 à 40 % de l'ANSES pour les adultes<sup>3</sup>.</li>
+        <li><strong>Glucides</strong> : le reste des calories, en général entre 40 et 55 %, la fourchette de l'ANSES<sup>3</sup>.</li>
+        <li><strong>Calories des aliments</strong> : valeurs de la table Ciqual<sup>6</sup>, calculées pour la portion. Elles respectent les coefficients d'Atwater<sup>7</sup> : 4 kcal par gramme de protéines ou de glucides, 9 par gramme de lipides, 7 par gramme d'alcool. En saisie au gramme, les valeurs sont proportionnelles au poids de la portion.</li>
       </ul>
       <p class="note">Ce sont des repères généraux. Bon'Assiette n'est pas un outil médical. En cas de maladie, de grossesse, de troubles alimentaires ou de doute, demande conseil à un médecin ou à un diététicien.</p>
+      <details class="src"><summary>Sources</summary>
+        <ol class="small">
+          <li>Mifflin MD, St Jeor ST et al. A new predictive equation for resting energy expenditure in healthy individuals. <em>American Journal of Clinical Nutrition</em>, 1990, 51(2):241-247. <a href="https://doi.org/10.1093/ajcn/51.2.241" rel="noopener" target="_blank">doi.org/10.1093/ajcn/51.2.241</a></li>
+          <li>FAO, OMS, UNU. <em>Human energy requirements</em>. Rapport d'experts, Rome, 2004. <a href="https://www.fao.org/3/y5686e/y5686e00.htm" rel="noopener" target="_blank">fao.org</a></li>
+          <li>ANSES. <em>Actualisation des repères du PNNS : élaboration des références nutritionnelles</em>, 2016. <a href="https://www.anses.fr/fr/system/files/NUT2012SA0103Ra-1.pdf" rel="noopener" target="_blank">anses.fr</a></li>
+          <li>Jäger R et al. International Society of Sports Nutrition position stand: protein and exercise. <em>Journal of the International Society of Sports Nutrition</em>, 2017, 14:20. <a href="https://doi.org/10.1186/s12970-017-0177-8" rel="noopener" target="_blank">doi.org/10.1186/s12970-017-0177-8</a></li>
+          <li>Morton RW et al. A systematic review, meta-analysis and meta-regression of the effect of protein supplementation on resistance training-induced gains in muscle mass and strength. <em>British Journal of Sports Medicine</em>, 2018, 52(6):376-384. <a href="https://doi.org/10.1136/bjsports-2017-097608" rel="noopener" target="_blank">doi.org/10.1136/bjsports-2017-097608</a></li>
+          <li>ANSES. Table de composition nutritionnelle des aliments Ciqual 2025. <a href="https://ciqual.anses.fr" rel="noopener" target="_blank">ciqual.anses.fr</a></li>
+          <li>FAO. <em>Food energy – methods of analysis and conversion factors</em>. Étude FAO Alimentation et nutrition n° 77, 2003. <a href="https://www.fao.org/3/y5022e/y5022e00.htm" rel="noopener" target="_blank">fao.org</a></li>
+        </ol>
+      </details>
 
       <h3>Pourquoi une seule pesée par semaine ?</h3>
       <p>Le poids bouge de 1 à 2 kg d'un jour à l'autre sans que rien ne change vraiment (eau, sel, digestion). Se peser tous les jours ne montre que ce bruit et peut devenir une source de stress. Une mesure par semaine, ou mieux une par mois, montre la vraie tendance. C'est pour ça que Bon'Assiette bloque la mesure suivante pendant 7 jours.</p>

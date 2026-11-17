@@ -120,3 +120,12 @@ revoke execute on function public.add_credits(uuid, integer) from public, anon, 
 revoke execute on function public.use_credit(uuid) from public, anon, authenticated;
 grant execute on function public.add_credits(uuid, integer) to service_role;
 grant execute on function public.use_credit(uuid) to service_role;
+
+-- 6. Droits au plus juste. Visiteurs non connectés (anon) : aucun accès à ces tables.
+--    Utilisateurs connectés : lecture de leur abonnement et de leur solde ; lecture, création et
+--    modification de leurs propres données (les policies RLS ci-dessus limitent toujours à leurs lignes).
+--    Le serveur (service_role) n'est pas concerné.
+revoke all on public.user_data, public.subscriptions, public.credits from anon;
+revoke all on public.user_data, public.subscriptions, public.credits from authenticated;
+grant select on public.subscriptions, public.credits to authenticated;
+grant select, insert, update on public.user_data to authenticated;

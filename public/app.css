@@ -7,9 +7,9 @@
 @font-face{font-family:"Figtree";font-weight:600;font-display:swap;src:url(/fonts/figtree-latin-600-normal.woff2) format("woff2")}
 
 :root{
-  --bg:#faf6f0; --surface:#ffffff; --sunk:#f5efe6; --ink:#1f1a17; --muted:#6b5f56; --line:#ebe2d6;
-  --accent:#c2410c; --accent-ink:#ffffff; --accent-soft:#fdeadd;
-  --prot:#c0264b; --gluc:#c98a10; --lip:#2f6fb0; --flame:#e8590c;
+  --bg:#f3f5f0; --surface:#ffffff; --sunk:#f6f8f4; --ink:#18201b; --muted:#56635a; --line:#dde3dc;
+  --accent:#2f6b3c; --accent-ink:#ffffff; --accent-soft:#e2eee3;
+  --prot:#c2453b; --gluc:#c98a10; --lip:#3d6fb0; --flame:#d9661f;
   --note-bg:#fdf3dc; --note-ink:#5e4100; --danger:#b3261e; --danger-ink:#ffffff;
   --shadow:none;
   --display:"Bricolage Grotesque","Avenir Next",system-ui,sans-serif;
@@ -19,9 +19,9 @@
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){:root{
-  --bg:#15120f; --surface:#1f1b17; --sunk:#191612; --ink:#f3ede6; --muted:#b0a498; --line:#352e27;
-  --accent:#fb8a4c; --accent-ink:#1a0f08; --accent-soft:#3a2416;
-  --prot:#f07a92; --gluc:#f2c14e; --lip:#7fb0ea; --flame:#fb8a4c;
+  --bg:#111613; --surface:#1a211c; --sunk:#151b17; --ink:#e7ede8; --muted:#9eaba1; --line:#2b352e;
+  --accent:#6fbf7d; --accent-ink:#0f1a12; --accent-soft:#203a26;
+  --prot:#ec7a6f; --gluc:#f0bd55; --lip:#7fa8e3; --flame:#f29a55;
   --note-bg:#3a2f12; --note-ink:#f3d58f; --danger:#f2867d; --danger-ink:#2a0906;
   --shadow:none; color-scheme:dark}}
 
@@ -362,7 +362,7 @@ textarea{font:400 16px var(--body);color:var(--ink);background:var(--sunk);borde
 
 /* Bouton Photo de l'accueil */
 .photo-hero{display:flex;flex-direction:column;gap:10px}
-.photo-btn.big{border-style:solid;padding:22px 16px;gap:4px;background:var(--accent);color:var(--accent-ink);border-color:var(--accent);box-shadow:0 6px 20px rgba(194,65,12,.3)}
+.photo-btn.big{border-style:solid;padding:22px 16px;gap:4px;background:var(--accent);color:var(--accent-ink);border-color:var(--accent);box-shadow:0 6px 20px rgba(47,107,60,.25)}
 .photo-btn.big .ph-ico{font-size:34px;line-height:1}
 .photo-btn.big .ph-t{font:800 20px/1.2 var(--display)}
 .photo-btn.big small{color:var(--accent-ink);opacity:.85}
@@ -392,7 +392,7 @@ textarea{font:400 16px var(--body);color:var(--ink);background:var(--sunk);borde
 .streak{font:700 14px var(--body)}
 /* Bouton Photo : un vrai bloc d'appel, hors des cartes. */
 .panel.photo-hero{background:none;border:0;padding:0;gap:8px}
-.photo-btn.big{flex-direction:row;justify-content:flex-start;text-align:left;gap:16px;padding:20px;border-radius:22px;box-shadow:0 10px 24px -10px rgba(194,65,12,.55)}
+.photo-btn.big{flex-direction:row;justify-content:flex-start;text-align:left;gap:16px;padding:20px;border-radius:22px;box-shadow:0 10px 24px -10px rgba(47,107,60,.45)}
 .photo-btn.big .ph-ico{display:grid;place-items:center;width:56px;height:56px;border-radius:16px;background:rgba(255,255,255,.18);flex:none}
 .photo-btn.big .ph-ico .ic{width:30px;height:30px}
 .photo-btn.big .ph-txt{display:flex;flex-direction:column;gap:2px}

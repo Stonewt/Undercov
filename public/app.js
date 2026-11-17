@@ -1352,9 +1352,9 @@
       await Promise.all(['800 150px "Bricolage Grotesque"', '700 36px "Bricolage Grotesque"', '500 30px "Figtree"', '600 44px "Figtree"', '600 30px "Figtree"']
         .map(f => document.fonts.load(f)));
     } catch { /* polices système en secours */ }
-    const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, "#e8590c"); g.addColorStop(1, "#9a3412");
+    const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, "#2f6b3c"); g.addColorStop(1, "#1c4526");
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    roundRect(ctx, 60, 60, W - 120, H - 120, 48); ctx.fillStyle = "#faf6f0"; ctx.fill();
+    roundRect(ctx, 60, 60, W - 120, H - 120, 48); ctx.fillStyle = "#f3f5f0"; ctx.fill();
     const st = streak(), lv = levelOf(xp), t = targets(P());
     let daysOk = 0, mealsN = 0, protOk = 0;
     for (let i = 0; i < 7; i++) {
@@ -1364,24 +1364,24 @@
     }
     const got = BADGES.filter(b => badges[b.id]).length, tw = trainsWeek();
     ctx.textBaseline = "top";
-    ctx.fillStyle = "#c2410c"; ctx.font = '800 56px "Bricolage Grotesque"'; ctx.fillText("Bon'Assiette", 120, 130);
-    ctx.fillStyle = "#6b5f56"; ctx.font = '600 30px "Figtree"';
+    ctx.fillStyle = "#2f6b3c"; ctx.font = '800 56px "Bricolage Grotesque"'; ctx.fillText("Bon'Assiette", 120, 130);
+    ctx.fillStyle = "#56635a"; ctx.font = '600 30px "Figtree"';
     ctx.fillText(new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }), 120, 204);
-    ctx.fillStyle = "#1f1a17"; ctx.font = '800 150px "Bricolage Grotesque"'; ctx.fillText(String(st), 120, 280);
-    ctx.fillStyle = "#6b5f56"; ctx.font = '600 44px "Figtree"'; ctx.fillText(st === 1 ? "jour de série" : "jours de série", 120, 455);
-    roundRect(ctx, 120, 560, W - 240, 160, 28); ctx.fillStyle = "#fdeadd"; ctx.fill();
-    ctx.fillStyle = "#c2410c"; ctx.font = '600 30px "Figtree"'; ctx.fillText(`Grade ${lv.n} · ${nb(xp)} XP`, 160, 592);
-    ctx.fillStyle = "#1f1a17"; ctx.font = '800 60px "Bricolage Grotesque"'; ctx.fillText(lv.name, 160, 634);
+    ctx.fillStyle = "#18201b"; ctx.font = '800 150px "Bricolage Grotesque"'; ctx.fillText(String(st), 120, 280);
+    ctx.fillStyle = "#56635a"; ctx.font = '600 44px "Figtree"'; ctx.fillText(st === 1 ? "jour de série" : "jours de série", 120, 455);
+    roundRect(ctx, 120, 560, W - 240, 160, 28); ctx.fillStyle = "#e2eee3"; ctx.fill();
+    ctx.fillStyle = "#2f6b3c"; ctx.font = '600 30px "Figtree"'; ctx.fillText(`Grade ${lv.n} · ${nb(xp)} XP`, 160, 592);
+    ctx.fillStyle = "#18201b"; ctx.font = '800 60px "Bricolage Grotesque"'; ctx.fillText(lv.name, 160, 634);
     const stats = [[`${daysOk}/7`, "jours notés"], [String(mealsN), mealsN > 1 ? "repas cette semaine" : "repas cette semaine"],
       [String(protOk), "jours protéines OK"], [String(tw), tw > 1 ? "séances de sport" : "séance de sport"],
       [`${waterWeek()}/7`, "jours eau OK"], [`${got}/${BADGES.length}`, "badges"]];
     stats.forEach(([v, l], i) => {
       const x = 120 + (i % 2) * 430, y = 770 + Math.floor(i / 2) * 140;
-      ctx.fillStyle = "#1f1a17"; ctx.font = '800 64px "Bricolage Grotesque"'; ctx.fillText(v, x, y);
-      ctx.fillStyle = "#6b5f56"; ctx.font = '500 30px "Figtree"'; ctx.fillText(l, x, y + 78);
+      ctx.fillStyle = "#18201b"; ctx.font = '800 64px "Bricolage Grotesque"'; ctx.fillText(v, x, y);
+      ctx.fillStyle = "#56635a"; ctx.font = '500 30px "Figtree"'; ctx.fillText(l, x, y + 78);
     });
-    ctx.fillStyle = "#c2410c"; ctx.font = '700 36px "Bricolage Grotesque"'; ctx.fillText("bonassiette.fr", 120, 1190);
-    ctx.fillStyle = "#6b5f56"; ctx.font = '500 30px "Figtree"'; ctx.fillText("Compteur de calories gratuit et français", 120, 1238);
+    ctx.fillStyle = "#2f6b3c"; ctx.font = '700 36px "Bricolage Grotesque"'; ctx.fillText("bonassiette.fr", 120, 1190);
+    ctx.fillStyle = "#56635a"; ctx.font = '500 30px "Figtree"'; ctx.fillText("Compteur de calories gratuit et français", 120, 1238);
     return c;
   }
   const closeShare = () => { $("shareBg").hidden = true; $("shareSheet").hidden = true; shareFile = null; };

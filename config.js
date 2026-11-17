@@ -15,5 +15,10 @@ export default {
   // Pack d'utilisations (achat unique, sans abonnement) : prix AFFICHÉ et nombre d'utilisations. Le prix facturé est celui
   // du tarif Stripe STRIPE_PACK_PRICE_ID (créé par scripts/setup.mjs avec PACK_CENTS) : les deux doivent correspondre.
   packPrice: "1,49 €",
-  packCredits: 5
+  packCredits: 5,
+  // Coffre du jour : chance de gagner une analyse photo offerte (0.03 = 3 % par coffre ouvert), au plus une tous les
+  // chestPhotoCooldownDays jours, et seulement pour les comptes de plus de chestMinAccountDays jours, non abonnés.
+  chestPhotoChance: 0.03,
+  chestPhotoCooldownDays: 30,
+  chestMinAccountDays: 3
 };

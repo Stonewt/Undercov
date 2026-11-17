@@ -85,6 +85,18 @@
         <span class="check" id="defiState"></span>
       </div>
 
+      <div class="panel chest" id="chest">
+        <div class="chest-ico" id="chestIco" aria-hidden="true">🎁</div>
+        <div class="chest-main"><div class="eyebrow">Coffre du jour</div><h3 id="chestTxt"></h3><div class="chest-bar"><i id="chestBar"></i></div></div>
+        <button class="primary" id="chestOpen" type="button" hidden>Ouvrir</button>
+      </div>
+
+      <div class="panel remind" id="remind" hidden>
+        <h3>🔔 Ne perds plus ta série</h3>
+        <p class="small muted">Un rappel à 20 h, seulement les jours où tu n'as encore rien noté.</p>
+        <div class="grid2"><button class="ghost" id="remindLater" type="button">Plus tard</button><button class="primary" id="remindOn" type="button">Activer</button></div>
+      </div>
+
       <div class="panel" id="waterPanel">
         <div class="row"><h2>Eau</h2><span class="num" id="waterNum"></span></div>
         <div class="glasses" id="glasses" role="group" aria-label="Verres d'eau bus aujourd'hui"></div>
@@ -209,6 +221,10 @@
 
   <!-- PROGRÈS -->
   <section id="view-progres" class="view grid-2" hidden>
+    <div class="panel league" id="league" hidden>
+      <div class="row"><h2>Ligue de la semaine</h2><span class="num" id="lgDays"></span></div>
+      <div class="stack" id="lgBody"></div>
+    </div>
     <div class="panel">
       <div class="row"><h2>Ta semaine</h2><span class="num" id="weekAvg"></span></div>
       <div class="week" id="week"></div>
@@ -278,6 +294,11 @@
             <div class="grid2"><button class="ghost" id="accDelNo" type="button">Annuler</button><button class="danger" id="accDelYes" type="button">Supprimer</button></div>
           </div>
         </div>
+      </div>
+      <div class="panel" id="remindPanel" hidden>
+        <h3>Rappel du soir</h3>
+        <p class="small muted" id="remindState"></p>
+        <button class="ghost" id="remindToggle" type="button">Activer le rappel du soir</button>
       </div>
       <div class="panel">
         <h3>Une idée, un souci ?</h3>
@@ -461,7 +482,7 @@
 
 <div class="celebrate" id="celebrate" role="dialog" aria-modal="true" aria-labelledby="celTitle" hidden>
   <div class="cel-in">
-    <div class="cel-flame" aria-hidden="true">🔥</div>
+    <div class="cel-flame" id="celIcon" aria-hidden="true">🔥</div>
     <h2 id="celTitle" class="onb-title"></h2>
     <p id="celText"></p>
     <button class="primary big-cta" id="celOk" type="button">Continuer</button>

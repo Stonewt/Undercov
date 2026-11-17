@@ -13,6 +13,7 @@ import CONFIG from "./config.js";
 import { analyseHandler, photoEnabled } from "./analyse.js";
 import { suggestHandler } from "./suggest.js";
 import { fridgeHandler } from "./fridge.js";
+import { createEngage } from "./engage.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, "public");
@@ -61,8 +62,8 @@ async function userFromRequest(req) {
   if (!m) return null;
   const who = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_ANON, authorization: `Bearer ${m[1]}` } });
   if (!who.ok) return null;
-  const { id, email } = await who.json();
-  return /^[0-9a-f-]{36}$/.test(id || "") ? { id, email: typeof email === "string" ? email : "" } : null;
+  const { id, email, created_at } = await who.json();
+  return /^[0-9a-f-]{36}$/.test(id || "") ? { id, email: typeof email === "string" ? email : "", created_at: typeof created_at === "string" ? created_at : "" } : null;
 }
 // Lecture et écriture de la table subscriptions avec la clé secrète (les utilisateurs ne peuvent que la lire).
 // Nouvelles clés secrètes (sb_secret_…) : seulement dans l'en-tête apikey. Anciennes clés JWT (eyJ…) : aussi en Authorization.
@@ -106,7 +107,8 @@ app.disable("etag");
 app.set("trust proxy", 1); // Railway place un proxy devant : on lit la vraie IP du visiteur
 
 // 1. Le site ne fait que lire : toute autre méthode HTTP est refusée, sauf les quelques envois (POST) de l'API.
-const POST_PATHS = new Set(["/api/analyse", "/api/account/delete", "/api/checkout", "/api/portal", "/api/stripe/webhook", "/api/suggest", "/api/contact", "/api/frigo"]);
+const POST_PATHS = new Set(["/api/analyse", "/api/account/delete", "/api/checkout", "/api/portal", "/api/stripe/webhook", "/api/suggest", "/api/contact", "/api/frigo",
+  "/api/coffre", "/api/ligue/rejoindre", "/api/ligue/quitter", "/api/ligue/score", "/api/push/abonner", "/api/push/etat", "/api/push/desabonner"]);
 app.use((req, res, next) => {
   if (req.method === "GET" || req.method === "HEAD") return next();
   if (req.method === "POST" && POST_PATHS.has(req.path)) return next();
@@ -251,6 +253,27 @@ app.post(
   express.json({ limit: "2.1mb", strict: true }),
   analyseHandler
 );
+
+// Engagement : coffre du jour, ligues de la semaine, rappels de série. Voir engage.js.
+const ENGAGE = SB_URL && SB_SERVICE
+  ? createEngage({ sbUrl: SB_URL, sbAdmin, rpc, subscriptionOf, isActive, config: CONFIG, secret: SB_SERVICE }) : null;
+const needEngage = (req, res, next) => (ENGAGE ? next() : res.status(503).json({ error: "Fonction pas encore activée." }));
+const jsonOnly = (req, res, next) => (req.is("application/json") ? next() : res.status(415).json({ error: "Format refusé." }));
+const perUser = (limit, windowMs, msg) => rateLimit({ windowMs, limit, keyGenerator: (req) => req.user.id, standardHeaders: "draft-8", legacyHeaders: false,
+  handler: (req, res) => res.status(429).json({ error: msg }) });
+const perIp = (limit, windowMs) => rateLimit({ windowMs, limit, standardHeaders: "draft-8", legacyHeaders: false,
+  handler: (req, res) => res.status(429).json({ error: "Trop de demandes. Réessaie plus tard." }) });
+const smallJson = express.json({ limit: "4kb", strict: true });
+
+app.post("/api/coffre", sameOrigin, needEngage, requireUser, perUser(5, 60 * 60 * 1000, "Réessaie dans une heure."), (req, res) => ENGAGE.chest(req, res));
+app.get("/api/ligue", needEngage, requireUser, perUser(120, 60 * 60 * 1000, "Réessaie dans un moment."), (req, res) => ENGAGE.board(req, res));
+app.post("/api/ligue/rejoindre", sameOrigin, jsonOnly, needEngage, requireUser, perUser(10, 60 * 60 * 1000, "Réessaie dans une heure."), smallJson, (req, res) => ENGAGE.join(req, res));
+app.post("/api/ligue/quitter", sameOrigin, needEngage, requireUser, perUser(10, 60 * 60 * 1000, "Réessaie dans une heure."), (req, res) => ENGAGE.quit(req, res));
+app.post("/api/ligue/score", sameOrigin, jsonOnly, needEngage, requireUser, perUser(300, 24 * 60 * 60 * 1000, "Réessaie demain."), smallJson, (req, res) => ENGAGE.score(req, res));
+app.get("/api/push/cle", needEngage, (req, res) => ENGAGE.pushKey(req, res));
+app.post("/api/push/abonner", sameOrigin, jsonOnly, needEngage, perIp(20, 60 * 60 * 1000), smallJson, (req, res) => ENGAGE.pushSave(req, res));
+app.post("/api/push/etat", sameOrigin, jsonOnly, needEngage, perIp(200, 60 * 60 * 1000), smallJson, (req, res) => ENGAGE.pushState(req, res));
+app.post("/api/push/desabonner", sameOrigin, jsonOnly, needEngage, perIp(20, 60 * 60 * 1000), smallJson, (req, res) => ENGAGE.pushDelete(req, res));
 
 // Idée de repas avec ce qu'il y a dans le frigo : abonnés uniquement, 8 par jour et par compte.
 app.post(
@@ -452,6 +475,7 @@ app.post(
 const PUBLIC_CONFIG = JSON.stringify({
   adsClient: ADS_ON ? CONFIG.adsClient : "", adSlots: ADS_ON ? CONFIG.adSlots : {}, gaId: GA_ON ? CONFIG.gaId : "",
   supabase: ACCOUNTS_ON ? { url: SB_URL, key: SB_ANON } : null,
+  engage: ENGAGE ? { ligue: true, push: ENGAGE.PUSH_ON } : null,
   premium: PREMIUM_ON ? { price: String(CONFIG.premiumPrice || ""), pack: PACK_ON ? { price: String(CONFIG.packPrice || ""), credits: PACK_CREDITS } : null } : null
 }).replace(/</g, "\\u003c");
 const HEAD_EXTRA = /^ca-pub-\d{10,20}$/.test(CONFIG.adsClient)

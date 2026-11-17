@@ -1,7 +1,7 @@
 // Bon'Assiette : garde l'appli en cache pour qu'elle s'ouvre même sans réseau.
 // Ce fichier remplace aussi l'ancien service worker publicitaire de l'ancien site
 // chez les visiteurs qui l'avaient encore.
-const CACHE = "bonassiette-v17";
+const CACHE = "bonassiette-v19";
 const FILES = [
   "/", "/app.css", "/app.js", "/data.js", "/manifest.webmanifest", "/icon.svg",
   "/fonts/bricolage-grotesque-latin-700-normal.woff2", "/fonts/bricolage-grotesque-latin-800-normal.woff2",
@@ -36,4 +36,23 @@ self.addEventListener("fetch", (e) => {
       })
       .catch(() => caches.match(e.request).then((r) => r || caches.match("/")))
   );
+});
+
+// Rappel de série envoyé par le serveur Bon'Assiette (le soir, si aucun repas n'est noté).
+self.addEventListener("push", (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { /* message illisible */ }
+  e.waitUntil(self.registration.showNotification(d.title || "Bon'Assiette", {
+    body: d.body || "Pense à noter tes repas du jour.",
+    icon: "/icon-192.png", badge: "/icon-192.png", tag: d.tag || "bonassiette", renotify: true,
+    data: { url: typeof d.url === "string" && d.url.startsWith("/") ? d.url : "/" }
+  }));
+});
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const url = e.notification.data?.url || "/";
+  e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+    const open = list.find((c) => new URL(c.url).origin === self.location.origin);
+    return open ? open.focus() : self.clients.openWindow(url);
+  }));
 });

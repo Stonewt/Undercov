@@ -129,3 +129,50 @@ revoke all on public.user_data, public.subscriptions, public.credits from anon;
 revoke all on public.user_data, public.subscriptions, public.credits from authenticated;
 grant select on public.subscriptions, public.credits to authenticated;
 grant select, insert, update on public.user_data to authenticated;
+
+-- 7. Coffre du jour : un tirage par compte et par jour ; « won » = analyse photo offerte gagnée.
+create table if not exists public.chest_rolls (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  day     date not null,
+  won     boolean not null default false,
+  primary key (user_id, day)
+);
+alter table public.chest_rolls enable row level security;
+revoke all on public.chest_rolls from anon, authenticated;
+
+-- 8. Ligues de la semaine : pseudo (facultatif, choisi par l'utilisateur) et points de chaque semaine.
+--    Lecture et écriture UNIQUEMENT par le serveur, qui ne renvoie que le pseudo et les points du groupe.
+create table if not exists public.league_players (
+  user_id    uuid primary key references auth.users (id) on delete cascade,
+  pseudo     text not null check (char_length(pseudo) between 3 and 20),
+  tier       integer not null default 1 check (tier between 1 and 5),
+  updated_at timestamptz not null default now()
+);
+create table if not exists public.league_entries (
+  week       text not null,
+  user_id    uuid not null references auth.users (id) on delete cascade,
+  tier       integer not null check (tier between 1 and 5),
+  grp        integer not null,
+  xp         integer not null default 0 check (xp >= 0),
+  updated_at timestamptz not null default now(),
+  primary key (week, user_id)
+);
+create index if not exists league_entries_group on public.league_entries (week, tier, grp, xp desc);
+alter table public.league_players enable row level security;
+alter table public.league_entries enable row level security;
+revoke all on public.league_players, public.league_entries from anon, authenticated;
+
+-- 9. Rappels de série : abonnement aux notifications du navigateur (sans compte) et dernier jour avec un repas.
+create table if not exists public.push_subs (
+  endpoint      text primary key check (char_length(endpoint) < 1000),
+  p256dh        text not null,
+  auth          text not null,
+  last_meal_day date,
+  streak        integer not null default 0,
+  last_sent_day date,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+create index if not exists push_subs_due on public.push_subs (last_meal_day);
+alter table public.push_subs enable row level security;
+revoke all on public.push_subs from anon, authenticated;

@@ -201,6 +201,7 @@
     const before = levelOf(xp).n;
     xp += add; xpDay = { [TODAY]: already + add }; // on ne garde que le jour en cours
     LS.set("g-xp", xp); LS.set("g-xpday", xpDay);
+    bumpWeek(add);
     const after = levelOf(xp);
     if (after.n > before) setTimeout(() => celebrate(`Nouveau grade\u00a0: ${after.name}`, `Tu passes au grade ${after.n}. Ta rigueur paie, continue comme ça.`), 400);
     return add;
@@ -223,8 +224,8 @@
          renderDay();
     }
   }
-  function celebrate(title, text) {
-    $("celTitle").textContent = title; $("celText").textContent = text;
+  function celebrate(title, text, icon = "🔥") {
+    $("celTitle").textContent = title; $("celText").textContent = text; $("celIcon").textContent = icon;
     $("celebrate").hidden = false; $("celOk").focus();
   }
   $("celOk").addEventListener("click", () => { $("celebrate").hidden = true; });
@@ -290,6 +291,8 @@
     renderRecent();
     renderWater();
     renderTrain();
+    renderChest();
+    renderRemind();
     checkBadges();
   }
 
@@ -321,6 +324,8 @@
     const after = streak();
     toast(after > before && after > 1 ? `🔥 ${after} jours d'affilée` : `${item.name} ajouté${g ? ` · +${g} XP` : ""}`);
     checkMilestone();
+    pushSync();
+    if (days[TODAY].length === CHEST_MEALS) setTimeout(() => { if (LS.get("g-chest", "") !== TODAY) toast("🎁 Ton coffre du jour est prêt !"); }, 1600);
   }
 
   // Catégories et recherche
@@ -749,7 +754,7 @@
     } catch { /* hors ligne : la recherche garde la table Ciqual */ }
   })();
   const SYNC_KEYS = ["g-days", "g-badges", "g-frozen", "g-freezes", "g-xp", "g-xpday", "g-miles", "g-defis",
-    "g-freeze-at", "g-water", "g-water-xp", "g-train", "g-train-xp"];
+    "g-freeze-at", "g-water", "g-water-xp", "g-train", "g-train-xp", "g-chest"];
   let sb = null, sbUser = null, pushTimer = null, applyingRemote = false;
   const accMsg = (t) => { $("accMsg").textContent = t; };
   const syncLabel = (t) => { $("accSync").textContent = t; };
@@ -997,6 +1002,211 @@
     addMeal({ name: r.nom, kcal: r.kcal, prot: r.prot, gluc: r.gluc, lip: r.lip });
     $("frigoActs").hidden = true;
   });
+
+  // ---------- Coffre du jour ----------
+  // S'ouvre après 3 repas notés, une fois par jour. Points ou protection de série, et parfois (tirage côté serveur,
+  // rare) une analyse photo offerte.
+  const CHEST_MEALS = 3;
+  function renderChest() {
+    const n = meals().length, opened = LS.get("g-chest", "") === TODAY, ready = n >= CHEST_MEALS && !opened;
+    $("chestTxt").textContent = opened ? "Ouvert aujourd'hui. Un nouveau coffre t'attend demain !"
+      : ready ? "Ton coffre est prêt, ouvre-le !"
+      : `Note encore ${CHEST_MEALS - n} repas pour l'ouvrir`;
+    $("chestBar").style.width = (opened ? 100 : Math.min(n, CHEST_MEALS) / CHEST_MEALS * 100) + "%";
+    $("chestOpen").hidden = !ready;
+    $("chest").classList.toggle("ready", ready);
+    $("chest").classList.toggle("done", opened);
+    $("chestIco").textContent = opened ? "✓" : "🎁";
+  }
+  $("chestOpen").addEventListener("click", async () => {
+    if (LS.get("g-chest", "") === TODAY || meals().length < CHEST_MEALS) return;
+    LS.set("g-chest", TODAY);
+    $("chestOpen").disabled = true; $("chestIco").classList.add("shake");
+    // Tirage de l'analyse offerte côté serveur (comptes connectés, non abonnés), pendant l'animation.
+    const canWin = Boolean(sb && sbUser && PREMIUM?.pack && !subActive && CFG.engage);
+    const [server] = await Promise.all([canWin ? apiPost("/api/coffre").catch(() => null) : null, new Promise(r => setTimeout(r, 1100))]);
+    $("chestIco").classList.remove("shake"); $("chestOpen").disabled = false;
+    let title, text, icon, gain;
+    if (server?.photo) {
+      await refreshSub();
+      title = "Jackpot !"; icon = "📸"; gain = "photo";
+      text = "Une analyse photo offerte ! Prends ton prochain repas en photo : chaque aliment est reconnu et pesé.";
+    } else if (freezes < 2 && Math.random() < 0.2) {
+      freezes++; LS.set("g-freezes", freezes);
+      title = "Une protection de série"; icon = "🧊"; gain = "protection";
+      text = "Si tu oublies un jour, ta série est sauvée automatiquement.";
+    } else {
+      const n = 15 + Math.floor(Math.random() * 26);
+      bonusXP(n);
+      title = `+${n} XP`; icon = "✨"; gain = "xp";
+      text = "Bonus du coffre, en plus de tes points du jour.";
+    }
+    if (!sbUser && PREMIUM?.pack) text += " Astuce : connecte-toi, le coffre peut aussi contenir une analyse photo offerte.";
+    track("coffre_ouvert", { gain });
+    renderDay();
+    celebrate(title, text, icon);
+  });
+
+  // ---------- Points de la semaine (pour la ligue) ----------
+  function weekKey(d = new Date()) {
+    const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), 12));
+    const dow = (t.getUTCDay() + 6) % 7; t.setUTCDate(t.getUTCDate() - dow + 3);
+    const y = t.getUTCFullYear(), jan4 = new Date(Date.UTC(y, 0, 4));
+    const w = 1 + Math.round(((t - jan4) / 86400000 - 3 + ((jan4.getUTCDay() + 6) % 7)) / 7);
+    return `${y}-W${String(w).padStart(2, "0")}`;
+  }
+  const weekXP = () => { const w = LS.get("g-xpweek", null); return w && w.w === weekKey() ? w.xp : 0; };
+  function bumpWeek(n) {
+    if (!(n > 0)) return;
+    LS.set("g-xpweek", { w: weekKey(), xp: weekXP() + n });
+    clearTimeout(scoreTimer); scoreTimer = setTimeout(sendScore, 4000);
+  }
+  function bonusXP(n) {
+    const before = levelOf(xp).n;
+    xp += n; LS.set("g-xp", xp); bumpWeek(n);
+    const after = levelOf(xp);
+    if (after.n > before) setTimeout(() => celebrate(`Nouveau grade : ${after.name}`, `Tu passes au grade ${after.n}. Ta rigueur paie, continue comme ça.`), 2500);
+  }
+  let scoreTimer = null;
+  async function sendScore() {
+    if (!sb || !sbUser || !CFG.engage?.ligue || !LS.get("g-ligue", false)) return;
+    await apiPost("/api/ligue/score", { xp: weekXP() }).catch(() => null);
+  }
+
+  // ---------- Ligue de la semaine ----------
+  const TIER_ICON = ["🥉", "🥈", "🥇", "🔷", "💎"];
+  async function apiGet(url) {
+    const { data } = await sb.auth.getSession().catch(() => ({ data: null }));
+    const token = data?.session?.access_token;
+    if (!token) return { error: "Reconnecte-toi d'abord." };
+    const r = await fetch(url, { headers: { authorization: `Bearer ${token}` } }).catch(() => null);
+    if (!r) return { error: "Le serveur ne répond pas. Réessaie." };
+    const j = await r.json().catch(() => ({}));
+    return r.ok ? j : { error: j.error || "Ça n'a pas marché. Réessaie." };
+  }
+  async function renderLeague() {
+    const on = Boolean(CFG.engage?.ligue && SB);
+    $("league").hidden = !on;
+    if (!on) return;
+    if (!sbUser) {
+      $("lgDays").textContent = "";
+      $("lgBody").innerHTML = `<p class="small muted">Affronte 30 joueurs de ton niveau chaque semaine : les plus réguliers montent de ligue, de Bronze à Diamant. Ce qui compte, c'est de noter tes repas, ton eau et tes séances, jamais ton poids.</p>
+        <button class="primary" type="button" data-lg="login">Me connecter pour jouer</button>`;
+      return;
+    }
+    if (LS.get("g-ligue", false)) await sendScore();
+    const b = await apiGet("/api/ligue");
+    if (b.error) { $("lgBody").innerHTML = `<p class="small muted">${esc(b.error)}</p>`; return; }
+    LS.set("g-ligue", Boolean(b.joined));
+    if (!b.joined) {
+      $("lgDays").textContent = "";
+      $("lgBody").innerHTML = `<p class="small muted">Chaque semaine, tu affrontes 30 joueurs de ton niveau. Les 5 premiers montent de ligue, les 5 derniers descendent. Les points viennent de ta régularité (repas, eau, séances, défis), jamais de ton poids.</p>
+        <label class="f" for="lgPseudo">Ton pseudo (visible par ton groupe)<input type="text" id="lgPseudo" maxlength="20" autocomplete="nickname" placeholder="Ex. : Chef_Ramen"></label>
+        <button class="primary" type="button" data-lg="join">Rejoindre la ligue</button>
+        <p class="small muted" id="lgMsg" aria-live="polite"></p>`;
+      return;
+    }
+    const n = b.members.length, me = b.members.find(m => m.me);
+    $("lgDays").textContent = b.daysLeft > 1 ? `ENCORE ${b.daysLeft} JOURS` : "DERNIER JOUR";
+    const next = b.tiers[b.tier], prev = b.tiers[b.tier - 2];
+    const zoneUp = (m) => m.rank <= b.move && m.xp > 0 && b.tier < b.tiers.length;
+    const zoneDown = (m) => n >= 10 && m.rank > n - b.move && b.tier > 1;
+    const hint = me && zoneUp(me) ? `Tu es en zone de montée : garde ta place jusqu'à dimanche pour passer en ligue ${next}.`
+      : me && zoneDown(me) ? `Attention, zone de descente : quelques repas notés suffisent pour remonter.`
+      : next ? `Les ${b.move} premiers passent en ligue ${next} dimanche soir.` : "Tu es dans la meilleure ligue. Reste dans le haut du classement !";
+    $("lgBody").innerHTML = `
+      <div class="lg-head"><span class="lg-tier">${TIER_ICON[b.tier - 1]} Ligue ${esc(b.tierName)}</span><span class="small muted">${me ? `${me.rank}<sup>e</sup> sur ${n}` : ""}</span></div>
+      <p class="small">${esc(hint)}</p>
+      <ol class="lg-list">${b.members.map(m => `<li class="${m.me ? "me" : ""} ${zoneUp(m) ? "up" : zoneDown(m) ? "down" : ""}">
+        <span class="lg-r">${m.rank}</span><span class="lg-p">${esc(m.pseudo)}${m.me ? " (toi)" : ""}</span><span class="lg-x">${nb(m.xp)} XP</span></li>`).join("")}</ol>
+      ${n < 5 ? `<p class="small muted">Ton groupe se remplit au fil de la semaine. Invite des amis à jouer !</p>` : ""}
+      <p class="small muted">Pseudo : ${esc(b.pseudo)}${prev ? ` · Les ${b.move} derniers redescendent en ${esc(prev)}.` : ""} <button class="linkbtn" type="button" data-lg="quit">Quitter la ligue</button></p>`;
+  }
+  $("lgBody").addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-lg]"); if (!b) return;
+    if (b.dataset.lg === "login") { show("profil"); $("accEmail")?.focus(); return; }
+    if (b.dataset.lg === "join") {
+      const pseudo = $("lgPseudo").value.trim();
+      b.disabled = true;
+      const r = await apiPost("/api/ligue/rejoindre", { pseudo });
+      b.disabled = false;
+      if (r?.error) { $("lgMsg").textContent = r.error; return; }
+      LS.set("g-ligue", true); track("ligue_rejointe"); toast("Bienvenue dans la ligue !");
+      renderLeague();
+      return;
+    }
+    if (b.dataset.lg === "quit") {
+      b.disabled = true;
+      const r = await apiPost("/api/ligue/quitter");
+      if (r?.error) { toast(r.error); b.disabled = false; return; }
+      LS.set("g-ligue", false); toast("Tu as quitté la ligue.");
+      renderLeague();
+    }
+  });
+
+  // ---------- Rappel de série (notification du soir) ----------
+  // Sans compte : l'appareil s'abonne aux notifications, et l'appli dit au serveur quel est le dernier jour avec un repas.
+  const PUSH = Boolean(CFG.engage?.push && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window);
+  let pushReg = null, pushSub = null;
+  const lastMealDay = () => Object.keys(days).filter(logged).sort().pop() || null;
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+  const standalone = window.matchMedia?.("(display-mode: standalone)").matches || navigator.standalone === true;
+  const b64ToBytes = (s) => { const p = "=".repeat((4 - s.length % 4) % 4); const raw = atob((s + p).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(raw, c => c.charCodeAt(0)); };
+  const postJSON = (url, body) => fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
+    .then(r => r.json().then(j => (r.ok ? j : { error: j.error || "Ça n'a pas marché." })).catch(() => ({ error: "Ça n'a pas marché." }))).catch(() => ({ error: "Pas de connexion." }));
+  async function pushInit() {
+    if (PUSH) {
+      pushReg = await navigator.serviceWorker.getRegistration().catch(() => null);
+      pushSub = pushReg ? await pushReg.pushManager.getSubscription().catch(() => null) : null;
+      if (pushSub) pushSync();
+    }
+    renderRemind();
+  }
+  function pushSync() {
+    const last = lastMealDay();
+    if (!pushSub || !last) return;
+    postJSON("/api/push/etat", { endpoint: pushSub.endpoint, lastMealDay: last, streak: streak() });
+  }
+  async function remindOn() {
+    if (!PUSH || !pushReg) { toast("Les rappels ne sont pas disponibles sur ce navigateur."); return; }
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") { toast("Notifications refusées. Tu peux les autoriser dans les réglages du navigateur."); renderRemind(); return; }
+    const k = await fetch("/api/push/cle").then(r => r.json()).catch(() => ({}));
+    if (!k.key) { toast("Les rappels sont momentanément indisponibles."); return; }
+    try { pushSub = await pushReg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(k.key) }); }
+    catch { toast("L'activation a échoué. Réessaie."); return; }
+    const r = await postJSON("/api/push/abonner", { subscription: pushSub.toJSON(), lastMealDay: lastMealDay(), streak: streak() });
+    if (r.error) { toast(r.error); return; }
+    track("rappel_active"); toast("Rappel activé : on te prévient le soir si ta série est en danger.");
+    renderRemind();
+  }
+  async function remindOff() {
+    if (!pushSub) return;
+    await postJSON("/api/push/desabonner", { endpoint: pushSub.endpoint });
+    await pushSub.unsubscribe().catch(() => {});
+    pushSub = null; toast("Rappel désactivé."); renderRemind();
+  }
+  function renderRemind() {
+    const can = PUSH && Boolean(pushReg);
+    const later = LS.get("g-remind-later", "");
+    const recent = later && (Date.parse(TODAY) - Date.parse(later)) < 3 * 86400000;
+    $("remind").hidden = !(can && !pushSub && Notification.permission === "default" && streak() >= 1 && !recent);
+    $("remindPanel").hidden = !(can || (isIOS && !standalone && CFG.engage?.push));
+    if (can) {
+      const denied = Notification.permission === "denied";
+      $("remindState").textContent = pushSub ? "Activé : une notification à 20 h, seulement les jours où ta série est en danger."
+        : denied ? "Les notifications sont bloquées pour ce site. Autorise-les dans les réglages du navigateur."
+        : "Une notification à 20 h, seulement les jours où tu n'as encore rien noté et où ta série est en jeu.";
+      $("remindToggle").hidden = denied;
+      $("remindToggle").textContent = pushSub ? "Désactiver le rappel" : "Activer le rappel du soir";
+    } else {
+      $("remindState").textContent = "Sur iPhone, installe d'abord l'appli sur ton écran d'accueil (Partager, puis « Sur l'écran d'accueil ») pour recevoir le rappel du soir.";
+      $("remindToggle").hidden = true;
+    }
+  }
+  $("remindOn").addEventListener("click", remindOn);
+  $("remindLater").addEventListener("click", () => { LS.set("g-remind-later", TODAY); renderRemind(); });
+  $("remindToggle").addEventListener("click", () => (pushSub ? remindOff() : remindOn()));
 
   // ---------- Vue Pas cher ----------
   function renderRecipes() {
@@ -1246,7 +1456,7 @@
     VIEWS.forEach(x => $("view-" + x).hidden = x !== v);
     document.querySelectorAll("nav.tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.v === v)));
     if (v === "recettes") renderRecipes();
-    if (v === "progres") { renderProgress(); renderBody(); }
+    if (v === "progres") { renderProgress(); renderBody(); renderLeague(); }
     if (v === "profil") mountProfileForm($("profileForm"), "p-");
     if (v === "jour") loadAd("jour");
     track("vue", { onglet: v });
@@ -1335,7 +1545,8 @@
   window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); deferred = e; $("installBtn").hidden = false; });
   $("installBtn").addEventListener("click", async () => { if (!deferred) return; deferred.prompt(); await deferred.userChoice.catch(() => {}); deferred = null; $("installBtn").hidden = true; });
   if (window.matchMedia("(display-mode: standalone)").matches) $("installPanel").hidden = true;
-  if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("/sw.js").catch(() => {});
+  if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("/sw.js").then(() => pushInit()).catch(() => {});
+  else pushInit();
 
   // ---------- Démarrage ----------
   function renderAll() { renderDay(); }

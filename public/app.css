@@ -334,3 +334,30 @@ textarea{font:400 16px var(--body);color:var(--ink);background:var(--sunk);borde
 .frigo ol,.frigo ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;font-family:var(--body);font-size:14px}
 .frigo .vs{color:var(--muted)}
 .prem-list{margin:0 0 8px;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.45}
+
+/* Coffre du jour */
+.chest{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center}
+.chest-ico{width:44px;height:44px;border-radius:12px;background:var(--sunk);display:grid;place-items:center;font-size:24px;filter:grayscale(.6);opacity:.75}
+.chest.ready .chest-ico{background:var(--accent-soft);filter:none;opacity:1;animation:wiggle 2.4s ease-in-out infinite}
+.chest.done .chest-ico{background:var(--accent);color:var(--accent-ink);filter:none;opacity:1;font-size:20px;font-weight:700}
+.chest-main h3{margin:2px 0 8px;font-size:15px}
+.chest-bar{height:6px;border-radius:99px;background:var(--sunk);overflow:hidden}
+.chest-bar i{display:block;height:100%;width:0;background:var(--accent);border-radius:99px;transition:width .5s ease}
+.chest-ico.shake{animation:shake .5s ease-in-out infinite}
+@keyframes wiggle{0%,80%,100%{transform:rotate(0)}85%{transform:rotate(-8deg)}90%{transform:rotate(8deg)}95%{transform:rotate(-4deg)}}
+@keyframes shake{0%,100%{transform:translateX(0) rotate(0)}25%{transform:translateX(-3px) rotate(-10deg)}75%{transform:translateX(3px) rotate(10deg)}}
+@media (prefers-reduced-motion:reduce){.chest.ready .chest-ico,.chest-ico.shake{animation:none}}
+/* Rappel */
+.remind{display:flex;flex-direction:column;gap:8px;border-color:var(--accent)}
+.remind h3{margin:0}
+/* Ligue */
+.lg-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.lg-tier{font:700 18px var(--display)}
+.lg-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;font-size:14px}
+.lg-list li{display:grid;grid-template-columns:28px 1fr auto;gap:8px;align-items:center;padding:8px 10px;border-radius:10px}
+.lg-list li.up{background:var(--accent-soft)}
+.lg-list li.down{background:var(--note-bg);color:var(--note-ink)}
+.lg-list li.me{outline:2px solid var(--accent);font-weight:700}
+.lg-r{font:600 13px var(--mono);color:var(--muted)}
+.lg-p{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lg-x{font:500 13px var(--mono)}

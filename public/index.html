@@ -17,7 +17,7 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Bon'Assiette : calories restantes et macros du jour">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#2f6b3c">
+<meta name="theme-color" content="#c2410c">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/icon-180.png">
@@ -29,6 +29,18 @@
 <script type="application/ld+json" nonce="__NONCE__">{"@context":"https://schema.org","@type":"WebApplication","name":"Bon'Assiette","url":"https://www.bonassiette.fr/","applicationCategory":"HealthApplication","operatingSystem":"Tous (navigateur web)","inLanguage":"fr-FR","description":"Compteur de calories et de protéines gratuit et français, avec recettes à petit prix et valeurs de la table Ciqual (ANSES).","offers":{"@type":"Offer","price":"0","priceCurrency":"EUR"}}</script>
 </head>
 <body>
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+  <symbol id="i-gift" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v8h14v-8M12 8v12"/><path d="M12 8C10.5 5 7 4.5 7 7s3 1 5 1c2 0 5 1.5 5-1s-3.5-2-5 1"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".8"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 13v6h14v-6"/></symbol>
+  <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 2.5c1 3.5 5 5.5 5 10.5a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5 0 2 1 3 2 3 0-3-1-5 1-9z"/></symbol>
+  <symbol id="i-snow" viewBox="0 0 24 24"><path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9M9.5 4.5 12 7l2.5-2.5M9.5 19.5 12 17l2.5 2.5"/></symbol>
+  <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M11 3l1.8 5.2L18 10l-5.2 1.8L11 17l-1.8-5.2L4 10l5.2-1.8z"/><path d="M18.5 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></symbol>
+  <symbol id="i-medal" viewBox="0 0 24 24"><circle cx="12" cy="15" r="5"/><path d="M8.5 11 6 3h4l2 5 2-5h4l-2.5 8"/></symbol>
+</svg>
 <header class="top">
   <div class="top-in">
     <h1 class="brand">Bon'<span>Assiette</span></h1>
@@ -59,21 +71,21 @@
       <p class="date" id="today"></p>
       <div class="alert" id="streakAlert" role="status" hidden></div>
       <div class="panel photo-hero" id="photoHero">
-        <button class="photo-btn big" id="photoBtn" type="button"><span class="ph-ico" aria-hidden="true">📷</span><span class="ph-t">Prends ton repas en photo</span><small>Chaque aliment reconnu et pesé, avec ses calories et ses macros</small></button>
+        <button class="photo-btn big" id="photoBtn" type="button"><span class="ph-ico" aria-hidden="true"><svg class="ic"><use href="#i-camera"/></svg></span><span class="ph-txt"><span class="ph-t">Photo de ton repas</span><small>Calories et macros, aliment par aliment</small></span></button>
         <input type="file" id="photoIn" accept="image/jpeg,image/png,image/webp,image/heic,image/*" class="sr">
         <div class="ph-foot"><span class="small" id="photoLeft" aria-live="polite"></span><button class="linkbtn" id="photoPlus" type="button" hidden>Passer à Bon'Assiette+ →</button></div>
         <details class="ph-more" id="plateBox">
-          <summary>Plus précis : indique ton assiette <span class="muted">(facultatif)</span></summary>
+          <summary>Indique ton assiette <span class="muted">(facultatif)</span></summary>
           <div class="seg" id="plate" role="group" aria-label="Taille de l'assiette">
             <button type="button" data-p="bol" aria-pressed="false">Bol</button>
             <button type="button" data-p="petite" aria-pressed="false">Petite</button>
             <button type="button" data-p="normale" aria-pressed="false">Normale</button>
             <button type="button" data-p="grande" aria-pressed="false">Grande</button>
           </div>
-          <p class="small muted">Astuce : pose une fourchette à côté de l'assiette, elle sert de repère pour juger les quantités. Ton choix est gardé pour les prochaines photos.</p>
+          <p class="small muted">Une fourchette posée à côté aide à juger les quantités.</p>
         </details>
       </div>
-      <div class="panel">
+      <div class="panel summary">
         <div class="day">
           <div class="ring" aria-hidden="true">
             <svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" class="ring-bg"/><circle id="ringArc" cx="60" cy="60" r="52" class="ring-fg arc"/></svg>
@@ -94,21 +106,23 @@
         <p class="small muted" id="lvFreeze"></p>
       </div>
 
+      <div class="tiles">
       <div class="panel defi" id="defi">
-        <div class="ico" id="defiIco">!</div>
+        <div class="ico" id="defiIco"><svg class="ic"><use href="#i-target"/></svg></div>
         <div><div class="eyebrow">Défi du jour</div><h3 id="defiTxt"></h3></div>
         <span class="check" id="defiState"></span>
       </div>
 
       <div class="panel chest" id="chest">
-        <div class="chest-ico" id="chestIco" aria-hidden="true">🎁</div>
+        <div class="chest-ico" id="chestIco" aria-hidden="true"><svg class="ic"><use href="#i-gift"/></svg></div>
         <div class="chest-main"><div class="eyebrow">Coffre du jour</div><h3 id="chestTxt"></h3><div class="chest-bar"><i id="chestBar"></i></div></div>
         <button class="primary" id="chestOpen" type="button" hidden>Ouvrir</button>
       </div>
+      </div>
 
       <div class="panel remind" id="remind" hidden>
-        <h3>🔔 Ne perds plus ta série</h3>
-        <p class="small muted">Un rappel à 20 h, seulement les jours où tu n'as encore rien noté.</p>
+        <h3><svg class="ic"><use href="#i-bell"/></svg>Ne perds plus ta série</h3>
+        <p class="small muted">Un rappel à 20 h, seulement si tu n'as rien noté.</p>
         <div class="grid2"><button class="ghost" id="remindLater" type="button">Plus tard</button><button class="primary" id="remindOn" type="button">Activer</button></div>
       </div>
 
@@ -154,7 +168,7 @@
         <div class="results" id="results"></div>
         <button class="ghost" id="customBtn" type="button">Saisir un repas à la main</button>
         <div id="customBox" hidden class="grid2">
-          <p class="small muted full">Recopie les valeurs de l'étiquette du produit, pour la quantité que tu as mangée.</p>
+          <p class="small muted full">Les valeurs de l'étiquette, pour ce que tu as mangé.</p>
           <label class="f full" for="cName">Nom<input type="text" id="cName" maxlength="80" placeholder="Ex. : gratin de mamie"></label>
           <label class="f" for="cK">Calories (kcal)<input type="number" id="cK" inputmode="numeric" min="0" max="3000"></label>
           <label class="f" for="cP">Protéines (g)<input type="number" id="cP" inputmode="decimal" min="0" max="300"></label>
@@ -162,9 +176,9 @@
           <label class="f" for="cL">Lipides (g)<input type="number" id="cL" inputmode="decimal" min="0" max="300"></label>
           <button class="primary full" id="cAdd" type="button">Ajouter</button>
         </div>
-        <button class="linkbtn" id="sugBtn" type="button">Il manque un repas ? Propose-le pour tout le monde</button>
+        <button class="linkbtn" id="sugBtn" type="button">Il manque un repas ? Propose-le</button>
         <div id="sugBox" hidden class="grid2">
-          <p class="small muted full">On vérifie chaque proposition avant de l'ajouter à la recherche. Remplis ce que tu sais pour une portion : on estime le reste.</p>
+          <p class="small muted full">Remplis ce que tu sais, on estime le reste. On vérifie avant de publier.</p>
           <label class="f full" for="sName">Nom du repas<input type="text" id="sName" maxlength="80" placeholder="Ex. : tacos 2 viandes, bowl poulet avocat"></label>
           <label class="f" for="sPortion">Portion (g)<input type="number" id="sPortion" inputmode="numeric" min="1" max="3000" placeholder="facultatif"></label>
           <label class="f" for="sPrice">Prix (€)<input type="number" id="sPrice" inputmode="decimal" min="0" max="100" step="0.01" placeholder="facultatif"></label>
@@ -187,8 +201,8 @@
   <section id="view-recettes" class="view" hidden>
     <div class="panel frigo" id="frigoPanel">
       <div class="row"><h2>Avec ce que j'ai dans le frigo</h2><b class="plus-tag">Bon'Assiette+</b></div>
-      <p class="small muted">Dis ce que tu as sous la main : l'IA te propose un repas qui rentre dans tes calories et tes macros, avec les quantités et les étapes.</p>
-      <label class="f" for="frigoIn">Dans mon frigo et mes placards
+      <p class="small muted">Dis ce que tu as, on te propose un repas calé sur tes macros.</p>
+      <label class="f" for="frigoIn">Dans mon frigo
         <textarea id="frigoIn" rows="3" maxlength="600" placeholder="Ex. : 3 œufs, riz, thon en boîte, tomates, fromage râpé"></textarea>
       </label>
       <label class="f" for="frigoFor">Ce repas doit faire
@@ -227,7 +241,7 @@
       </div>
     </div>
     <div class="recipes" id="recipes"></div>
-    <p class="tip">Valeurs nutritionnelles calculées ingrédient par ingrédient avec la table Ciqual 2025 de l'ANSES. Prix : estimations pour une portion avec des produits de supermarché discount ; ils varient selon le magasin.</p>
+    <p class="tip">Valeurs Ciqual 2025 (ANSES), ingrédient par ingrédient. Prix estimés en supermarché discount.</p>
   </section>
 
   <!-- PROGRÈS -->
@@ -243,11 +257,11 @@
     </div>
     <div class="panel">
       <h2>Suivi du corps</h2>
-      <p class="small muted">Une mesure par semaine au maximum, idéalement une par mois. Le poids varie de 1 à 2 kg d'un jour à l'autre (eau, repas, sel) : seule la tendance sur plusieurs semaines a du sens.</p>
+      <p class="small muted">Une mesure par semaine suffit : le poids varie de 1 à 2 kg d'un jour à l'autre.</p>
       <div id="bodyForm" class="grid2">
         <label class="f" for="mW">Poids (kg)<input type="number" id="mW" inputmode="decimal" min="30" max="300" step="0.1"></label>
         <label class="f" for="mWaist">Tour de taille (cm, facultatif)<input type="number" id="mWaist" inputmode="decimal" min="40" max="200" step="0.5"></label>
-        <p class="small muted full">Mesure le tour de taille au niveau du nombril, debout, sans serrer.</p>
+        <p class="small muted full">Tour de taille : au nombril, debout, sans serrer.</p>
         <button class="primary full" id="bodySave" type="button">Enregistrer la mesure</button>
       </div>
       <p class="note" id="bodyWait" hidden></p>
@@ -256,8 +270,8 @@
     <div class="panel">
       <h2>Ta semaine en bref</h2>
       <div class="recap" id="recap"></div>
-      <button class="ghost big-cta" id="shareBtn" type="button">📤 Partager ma progression</button>
-      <p class="small muted">Une image avec ta série, ton grade et ta semaine. Jamais tes calories ni ton poids.</p>
+      <button class="ghost big-cta" id="shareBtn" type="button"><svg class="ic"><use href="#i-share"/></svg>Partager ma progression</button>
+      <p class="small muted">Série, grade et semaine. Jamais tes calories ni ton poids.</p>
     </div>
     <div class="panel">
       <div class="row"><h2>Badges</h2><span class="num" id="badgeCount"></span></div>
@@ -269,7 +283,7 @@
   <section id="view-profil" class="view grid-2" hidden>
     <div class="panel">
       <h2>Mon profil</h2>
-      <p class="small muted">Ton objectif du jour est calculé à partir de ces informations. Elles restent sur ton téléphone.</p>
+      <p class="small muted">Sert à calculer ton objectif. Reste sur ton téléphone.</p>
       <div id="profileForm"></div>
       <button class="primary" id="saveProfile" type="button">Enregistrer</button>
     </div>
@@ -277,8 +291,7 @@
       <div class="panel" id="accountPanel" hidden>
         <div class="row"><h2>Mon compte</h2><span class="num" id="accSync"></span></div>
         <div id="accOut" class="stack">
-          <p class="small"><strong>Connexion ou création de compte</strong></p>
-          <p class="small muted">Déjà un compte ? Entre ton e-mail pour te reconnecter et retrouver tes repas, tes points et ta série. Sinon, ton compte gratuit est créé automatiquement. Pas de mot de passe : tu reçois un code à 6 chiffres par e-mail. Ton poids et ton tour de taille restent sur ton appareil.</p>
+          <p class="small muted">Connecte-toi ou crée ton compte gratuit : tu reçois un code par e-mail, pas de mot de passe. Ton poids reste sur ton téléphone.</p>
           <label class="f" for="accEmail">Ton adresse e-mail<input type="email" id="accEmail" autocomplete="email" inputmode="email" maxlength="254" placeholder="toi@exemple.fr"></label>
           <button class="primary" id="accSend" type="button">Recevoir mon code</button>
           <div id="accCodeBox" class="stack" hidden>
@@ -288,7 +301,7 @@
           <p class="small muted" id="accMsg" aria-live="polite"></p>
         </div>
         <div id="accIn" class="stack" hidden>
-          <p class="small">Connecté avec <strong id="accWho"></strong>. Tes repas, tes points et ta série sont sauvegardés automatiquement.</p>
+          <p class="small">Connecté : <strong id="accWho"></strong>. Tout est sauvegardé.</p>
           <div class="grid2"><button class="ghost" id="accSyncNow" type="button">Synchroniser</button><button class="ghost" id="accLogout" type="button">Se déconnecter</button></div>
           <button class="primary" id="accGoPlus" type="button" hidden>Passer à Bon'Assiette+</button>
           <div id="accCredits" class="stack" hidden>
@@ -296,12 +309,12 @@
             <button class="ghost" id="accBuyPack" type="button" hidden>Prendre 5 utilisations</button>
           </div>
           <div id="accSub" class="stack" hidden>
-            <p class="small">Abonné à <strong>Bon'Assiette+</strong> : analyse photo de tes repas (6 par jour), idées de repas avec ton frigo (8 par jour) et aucune publicité. Merci !</p>
+            <p class="small"><strong>Bon'Assiette+ actif</strong> : 6 photos et 8 idées frigo par jour, sans pub. Merci !</p>
             <button class="ghost" id="accPortal" type="button">Gérer ou résilier mon abonnement</button>
           </div>
           <button class="linkbtn" id="accDelete" type="button">Supprimer mon compte</button>
           <div id="accDelConfirm" class="confirm" hidden>
-            <p class="small">Ton compte et tes données sauvegardées en ligne seront supprimés définitivement. Ce qui est sur ce téléphone reste.</p>
+            <p class="small">Ton compte et ta sauvegarde en ligne seront supprimés. Ce téléphone garde ses données.</p>
             <div class="grid2"><button class="ghost" id="accDelNo" type="button">Annuler</button><button class="danger" id="accDelYes" type="button">Supprimer</button></div>
           </div>
         </div>
@@ -313,21 +326,21 @@
       </div>
       <div class="panel">
         <h3>Une idée, un souci ?</h3>
-        <p class="small muted">Dis-nous ce qui te manque ou ce qui ne marche pas : chaque message est lu.</p>
+        <p class="small muted">Écris-nous, on lit tout.</p>
         <a class="ghost btnlink" href="/contact">Écrire au support</a>
       </div>
       <div class="panel" id="installPanel">
         <h3>Mets Bon'Assiette sur ton écran d'accueil</h3>
-        <p class="small muted">Sur iPhone : bouton Partager, puis « Sur l'écran d'accueil ». Sur Android : menu ⋮, puis « Installer l'application ».</p>
+        <p class="small muted">iPhone : Partager, puis « Sur l'écran d'accueil ». Android : menu ⋮, puis « Installer l'application ».</p>
         <button class="primary" id="installBtn" type="button" hidden>Installer Bon'Assiette</button>
       </div>
       <div class="panel">
         <h3>Tes données</h3>
-        <p class="small muted" id="dataNote">Tout reste dans ce navigateur. Rien n'est envoyé à un serveur, sauf si tu crées un compte.</p>
+        <p class="small muted" id="dataNote">Tout reste dans ce navigateur, sauf si tu crées un compte.</p>
         <button class="ghost" id="cookiesBtn" type="button" hidden>Gérer les cookies</button>
         <button class="ghost" id="resetBtn" type="button">Effacer toutes mes données</button>
         <div id="resetConfirm" class="confirm" hidden>
-          <p class="small">Tous tes repas, ton profil et tes badges seront effacés de cet appareil. C'est définitif.</p>
+          <p class="small">Repas, profil et badges seront effacés de cet appareil. C'est définitif.</p>
           <div class="grid2"><button class="ghost" id="resetNo" type="button">Annuler</button><button class="danger" id="resetYes" type="button">Tout effacer</button></div>
         </div>
       </div>
@@ -340,15 +353,15 @@
       <h2>Comment ça marche</h2>
       <ol class="how">
         <li><strong>Remplis ton profil.</strong> Bon'Assiette calcule combien de calories et de protéines il te faut par jour.</li>
-        <li><strong>Note ce que tu manges.</strong> Cherche le plat, choisis la portion, appuie sur « Ajouter ». Tes plats habituels apparaissent ensuite en un geste. Tu peux aussi prendre ton assiette en photo : Bon'Assiette détaille chaque aliment avec son poids (par exemple 150 g de pâtes, 60 g de béchamel) et tu corriges les grammes si besoin.</li>
+        <li><strong>Note ce que tu manges.</strong> Cherche le plat, choisis la portion, ajoute. Ou prends ton assiette en photo : chaque aliment est pesé, tu corriges si besoin.</li>
         <li><strong>Regarde ce qu'il te reste.</strong> Le cercle montre les calories restantes, les barres tes protéines, glucides et lipides.</li>
         <li><strong>Manque d'idées ou de budget ?</strong> L'onglet « Pas cher » propose des recettes à moins de 2 € la portion, avec la liste de courses.</li>
         <li><strong>Bois et bouge.</strong> Coche tes verres d'eau et note tes séances d'entraînement.</li>
-        <li><strong>Reviens chaque jour.</strong> Ta série 🔥 augmente tant que tu notes au moins un repas par jour.</li>
+        <li><strong>Reviens chaque jour.</strong> Ta série grimpe tant que tu notes un repas par jour.</li>
       </ol>
 
       <h3>Points et grades</h3>
-      <p>Chaque bon geste rapporte des points (XP). En cumulant les points, tu montes en grade dans la brigade : Plongeur, Commis, Apprenti, Cuistot, Cuisinier, Chef de partie, Sous-chef, Chef de cuisine, Chef étoilé, Grand chef, et enfin la Toque d'or, qui demande au moins 250 jours de rigueur. Les points récompensent la régularité, jamais le fait de manger moins.</p>
+      <p>Chaque bon geste rapporte des points (XP) et te fait monter en grade, de Plongeur à la Toque d'or. Les points récompensent la régularité, jamais le fait de manger moins.</p>
       <ul>
         <li>Repas noté : +10 XP · recette cuisinée : +15 XP</li>
         <li>Séance d'entraînement : +20 XP (une par jour)</li>
@@ -358,14 +371,14 @@
       </ul>
 
       <h3>Combien d'eau ?</h3>
-      <p>L'Autorité européenne de sécurité des aliments (EFSA) conseille environ 2 L d'eau par jour pour une femme et 2,5 L pour un homme, dont à peu près 20 % viennent des aliments. Il reste environ 1,6 L à boire pour une femme et 2 L pour un homme : 7 ou 8 verres de 25 cl. Bois davantage s'il fait chaud ou si tu fais du sport.</p>
+      <p>L'EFSA conseille 2 L d'eau par jour pour une femme et 2,5 L pour un homme, dont 20 % viennent des aliments. Reste à boire 7 ou 8 verres de 25 cl, plus s'il fait chaud ou si tu fais du sport.</p>
 
       <h3>L'analyse photo</h3>
-      <p>La photo est envoyée à un service d'intelligence artificielle (Claude, d'Anthropic) qui reconnaît les aliments et estime les quantités. Les calories et macros sont ensuite calculées avec la table Ciqual de l'ANSES (l'aliment retenu est affiché sous chacun) ; seuls les aliments absents de la table gardent une valeur estimée par l'IA. Les quantités restent une estimation : vérifie toujours les grammes. Pour plus de précision, indique la taille de ton assiette et pose une fourchette à côté. La photo n'est pas conservée par Bon'Assiette. Tu as 3 analyses offertes en créant ton compte, et le coffre du jour (gratuit, une fois par jour quand ta journée est remplie) peut t'en faire gagner d'autres. Avec Bon'Assiette+, tu en as jusqu'à 6 par jour. Tout le reste de l'appli est gratuit.</p>
+      <p>Notre IA reconnaît les aliments et estime les grammes. Les calories viennent ensuite de la table Ciqual (l'aliment retenu s'affiche). Vérifie les grammes : c'est une estimation. La photo n'est pas conservée.</p>
+      <p>3 analyses offertes à l'inscription, d'autres à gagner dans le coffre du jour, jusqu'à 6 par jour avec Bon'Assiette+.</p>
 
       <h3>D'où viennent les valeurs nutritionnelles ?</h3>
-      <p>De la <strong>table Ciqual 2025</strong> de l'ANSES (Agence nationale de sécurité sanitaire), la référence officielle française. Chaque plat indique sa portion et l'aliment Ciqual utilisé : appuie sur « Source » pour le voir. Les recettes sont calculées ingrédient par ingrédient.</p>
-      <p>Les portions sont des portions moyennes. Si la tienne est plus petite ou plus grande, choisis ½, 1½ ou 2 avant d'ajouter.</p>
+      <p>De la <strong>table Ciqual 2025</strong> de l'ANSES, la référence française. Appuie sur « Source » sous un plat pour voir l'aliment utilisé. Portion différente ? Choisis ½, 1½, 2 ou le poids exact.</p>
 
       <h3>Comment ton objectif est calculé</h3>
       <ul>
@@ -386,22 +399,16 @@
           <li>Morton RW et al. A systematic review, meta-analysis and meta-regression of the effect of protein supplementation on resistance training-induced gains in muscle mass and strength. <em>British Journal of Sports Medicine</em>, 2018, 52(6):376-384. <a href="https://doi.org/10.1136/bjsports-2017-097608" rel="noopener" target="_blank">doi.org/10.1136/bjsports-2017-097608</a></li>
           <li>ANSES. Table de composition nutritionnelle des aliments Ciqual 2025. <a href="https://ciqual.anses.fr" rel="noopener" target="_blank">ciqual.anses.fr</a></li>
           <li>FAO. <em>Food energy – methods of analysis and conversion factors</em>. Étude FAO Alimentation et nutrition n° 77, 2003. <a href="https://www.fao.org/3/y5022e/y5022e00.htm" rel="noopener" target="_blank">fao.org</a></li>
+          <li>EFSA. Scientific Opinion on Dietary Reference Values for water. <em>EFSA Journal</em>, 2010, 8(3):1459. <a href="https://doi.org/10.2903/j.efsa.2010.1459" rel="noopener" target="_blank">doi.org/10.2903/j.efsa.2010.1459</a></li>
         </ol>
       </details>
 
       <h3>Pourquoi une seule pesée par semaine ?</h3>
-      <p>Le poids bouge de 1 à 2 kg d'un jour à l'autre sans que rien ne change vraiment (eau, sel, digestion). Se peser tous les jours ne montre que ce bruit et peut devenir une source de stress. Une mesure par semaine, ou mieux une par mois, montre la vraie tendance. C'est pour ça que Bon'Assiette bloque la mesure suivante pendant 7 jours.</p>
+      <p>Le poids bouge de 1 à 2 kg d'un jour à l'autre (eau, sel, digestion). Se peser chaque jour ne montre que ce bruit. Une mesure par semaine montre la vraie tendance.</p>
 
       <h3>Et les prix ?</h3>
-      <p>Ce sont des estimations pour une portion, basées sur des produits de marque distributeur en supermarché discount. Ils changent selon le magasin et la période.</p>
+      <p>Des estimations par portion, en marque distributeur et supermarché discount.</p>
 
-      <h3>Sources</h3>
-      <ul>
-        <li>ANSES, Table de composition nutritionnelle des aliments Ciqual, version 2025 — <span class="mono">ciqual.anses.fr</span></li>
-        <li>EFSA, Scientific Opinion on Dietary Reference Values for water, EFSA Journal, 2010.</li>
-        <li>Mifflin M. D. et al., « A new predictive equation for resting energy expenditure in healthy individuals », American Journal of Clinical Nutrition, 1990.</li>
-        <li>ANSES, Actualisation des repères du PNNS : élaboration des références nutritionnelles, 2016.</li>
-      </ul>
       <button class="primary" id="helpDone" type="button">J'ai compris</button>
     </div>
   </section>
@@ -452,11 +459,11 @@
 <div class="sheet-bg" id="premBg" hidden></div>
 <div class="sheet" id="premSheet" role="dialog" aria-modal="true" aria-labelledby="premTitle" hidden>
   <div class="eyebrow">Bon'Assiette+</div>
-  <h3 id="premTitle">L'IA qui t'aide à bien manger, tous les jours</h3>
+  <h3 id="premTitle">Moins de calcul, plus de résultats</h3>
   <ul class="prem-list">
-    <li><strong>Ton assiette en photo</strong> : chaque aliment est reconnu et pesé (150 g de pâtes, 60 g de béchamel…), avec ses calories et ses macros.</li>
-    <li><strong>Un repas avec ce que tu as dans le frigo</strong>, qui rentre pile dans tes calories et tes protéines, avec les quantités et les étapes.</li>
-    <li><strong>Aucune publicité.</strong></li>
+    <li><strong>Photo de ton assiette</strong> : chaque aliment pesé, calories et macros.</li>
+    <li><strong>Idée repas avec ton frigo</strong>, calée sur tes macros.</li>
+    <li><strong>Zéro pub.</strong></li>
   </ul>
   <p class="note" id="premNote">L'abonnement Bon'Assiette+ arrive bientôt. En attendant, tout le reste de l'appli reste gratuit.</p>
   <button class="primary big-cta" id="premSub" type="button" hidden>S'abonner</button>
@@ -471,18 +478,18 @@
       <p class="eyebrow">Bienvenue</p>
       <h2 id="onbTitle" class="onb-title">Mange mieux, sans te ruiner.</h2>
       <ul class="onb-list">
-        <li><strong>Note tes repas en un geste.</strong> Plats maison, sandwich, fast-food, cantine : les repas de tous les jours sont déjà là.</li>
-        <li><strong>Vois ce qu'il te reste</strong> en calories et en protéines, calculé pour toi.</li>
-        <li><strong>Gagne des points et monte en grade</strong> en notant tes repas, ton eau et tes séances.</li>
-        <li><strong>Trouve des repas à moins de 2 €</strong> avec la liste de courses.</li>
+        <li><strong>Note tes repas en un geste</strong>, ou en photo.</li>
+        <li><strong>Vois ce qu'il te reste</strong> en calories et protéines.</li>
+        <li><strong>Gagne des points</strong> et monte en grade.</li>
+        <li><strong>Mange à moins de 2 €</strong> le repas.</li>
       </ul>
-      <p class="small muted">Valeurs issues de la table Ciqual de l'ANSES. Tes données restent sur ton téléphone.</p>
+      <p class="small muted">Valeurs Ciqual (ANSES). Tes données restent sur ton téléphone.</p>
       <button class="primary big-cta" type="button" data-next="2">Commencer</button>
     </div>
     <div class="onb-step" data-step="2" hidden>
       <p class="eyebrow">Étape 1 sur 2</p>
       <h2 class="onb-title">Parle-nous de toi</h2>
-      <p class="small muted">Ça sert à calculer ton objectif du jour. Bon'Assiette est réservée aux adultes.</p>
+      <p class="small muted">Pour calculer ton objectif. Réservé aux adultes.</p>
       <div id="onbForm"></div>
       <button class="primary big-cta" type="button" id="onbCalc">Calculer mon objectif</button>
     </div>
@@ -500,13 +507,13 @@
 <!-- Bandeau cookies (mesure d'audience) -->
 <div class="consent" id="consent" role="dialog" aria-labelledby="consentTitle" hidden>
   <h3 id="consentTitle">Tu acceptes la mesure d'audience ?</h3>
-  <p class="small">Bon'Assiette aimerait utiliser Google Analytics pour compter les visites et améliorer l'appli. Ça dépose des cookies. Tes repas et ton profil ne sont jamais envoyés. <a href="/confidentialite">En savoir plus</a></p>
+  <p class="small">Google Analytics compte les visites (cookies). Tes repas et ton profil ne sont jamais envoyés. <a href="/confidentialite">En savoir plus</a></p>
   <div class="grid2"><button class="ghost" id="consentNo" type="button">Refuser</button><button class="ghost" id="consentYes" type="button">Accepter</button></div>
 </div>
 
 <div class="celebrate" id="celebrate" role="dialog" aria-modal="true" aria-labelledby="celTitle" hidden>
   <div class="cel-in">
-    <div class="cel-flame" id="celIcon" aria-hidden="true">🔥</div>
+    <div class="cel-flame" id="celIcon" aria-hidden="true"><svg class="ic ic-xl"><use href="#i-flame"/></svg></div>
     <h2 id="celTitle" class="onb-title"></h2>
     <p id="celText"></p>
     <button class="primary big-cta" id="celOk" type="button">Continuer</button>

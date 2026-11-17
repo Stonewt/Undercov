@@ -1,12 +1,11 @@
 // Bon'Assiette : garde l'appli en cache pour qu'elle s'ouvre même sans réseau.
 // Ce fichier remplace aussi l'ancien service worker publicitaire de l'ancien site
 // chez les visiteurs qui l'avaient encore.
-const CACHE = "bonassiette-v21";
+const CACHE = "bonassiette-v22";
 const FILES = [
   "/", "/app.css", "/app.js", "/data.js", "/manifest.webmanifest", "/icon.svg",
   "/fonts/bricolage-grotesque-latin-700-normal.woff2", "/fonts/bricolage-grotesque-latin-800-normal.woff2",
-  "/fonts/figtree-latin-400-normal.woff2", "/fonts/figtree-latin-500-normal.woff2", "/fonts/figtree-latin-600-normal.woff2",
-  "/fonts/dm-mono-latin-400-normal.woff2", "/fonts/dm-mono-latin-500-normal.woff2"
+  "/fonts/figtree-latin-400-normal.woff2", "/fonts/figtree-latin-500-normal.woff2", "/fonts/figtree-latin-600-normal.woff2"
 ];
 
 self.addEventListener("install", (e) => {

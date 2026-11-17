@@ -20,6 +20,8 @@
 
   // ---------- Outils ----------
   const $ = (id) => document.getElementById(id);
+  // Icône du jeu dessiné (symboles #i-… en haut de la page).
+  const IC = (n, c = "") => `<svg class="ic ${c}" aria-hidden="true"><use href="#i-${n}"/></svg>`;
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const r0 = (n) => Math.round(Number(n) || 0);
   const pad = (n) => String(n).padStart(2, "0");
@@ -226,8 +228,8 @@
          renderDay();
     }
   }
-  function celebrate(title, text, icon = "🔥") {
-    $("celTitle").textContent = title; $("celText").textContent = text; $("celIcon").textContent = icon;
+  function celebrate(title, text, icon = "flame") {
+    $("celTitle").textContent = title; $("celText").textContent = text; $("celIcon").innerHTML = IC(icon, "ic-xl");
     $("celebrate").hidden = false; $("celOk").focus();
   }
   $("celOk").addEventListener("click", () => { $("celebrate").hidden = true; });
@@ -261,29 +263,30 @@
     $("ringArc").classList.toggle("over", left < 0);
     const bar = (k, b, n) => { $(b).style.width = Math.min(100, s[k] / Math.max(1, t[k]) * 100) + "%"; $(n).textContent = `${r0(s[k])} / ${t[k]} g`; };
     bar("prot", "barP", "numP"); bar("gluc", "barG", "numG"); bar("lip", "barL", "numL");
-    $("goalLine").textContent = `Objectif « ${GOALS[p.goal].toLowerCase()} » : ${nb(t.kcal)} kcal et ${t.prot} g de protéines par jour.`;
+    $("goalLine").textContent = `${GOALS[p.goal]} : ${nb(t.kcal)} kcal et ${t.prot} g de protéines par jour`;
     const st = streak();
     $("streakN").textContent = st;
     const lv = levelOf(xp);
     $("lvName").textContent = `Grade ${lv.n} · ${lv.name}`;
     $("lvXp").textContent = lv.to ? `${nb(xp - lv.from)} / ${nb(lv.to - lv.from)} XP` : `${nb(xp)} XP`;
     $("lvBar").style.width = (lv.to ? Math.min(100, (xp - lv.from) / (lv.to - lv.from) * 100) : 100) + "%";
-    $("lvFreeze").textContent = freezes ? `🧊 ${freezes} protection${freezes > 1 ? "s" : ""} de série` : "🧊 Une protection tous les 7 jours de série";
+    $("lvFreeze").innerHTML = IC("snow") + (freezes ? ` ${freezes} protection${freezes > 1 ? "s" : ""} de série` : " Une protection tous les 7 jours de série");
+    $("lvFreeze").classList.add("lvfreeze");
     const hour = new Date().getHours();
     const risk = !logged(TODAY) && st > 0;
     $("streakAlert").hidden = !risk;
     if (risk) $("streakAlert").innerHTML = hour >= 17
-      ? `<strong>🔥 Ta série de ${st} jour${st > 1 ? "s" : ""} s'arrête à minuit.</strong> Note un repas pour la garder.`
-      : `<strong>🔥 Série de ${st} jour${st > 1 ? "s" : ""}.</strong> Note ton premier repas du jour pour la prolonger.`;
+      ? `<strong>${IC("flame")} Série de ${st} jour${st > 1 ? "s" : ""} :</strong> note un repas avant minuit.`
+      : `<strong>${IC("flame")} Série de ${st} jour${st > 1 ? "s" : ""}.</strong> Note un repas pour la prolonger.`;
 
     const d = defiToday(), ok = d.test(s, t, list);
     $("defiTxt").textContent = d.txt;
     $("defi").classList.toggle("done", ok);
-    $("defiIco").textContent = ok ? "✓" : "!";
+    $("defiIco").innerHTML = IC(ok ? "check" : "target");
     $("defiState").textContent = ok ? "Réussi" : "";
     if (ok) { const done = LS.get("g-defis", []); if (!done.includes(TODAY)) { done.push(TODAY); LS.set("g-defis", done); const g = gainXP(20); toast(g ? `Défi du jour réussi · +${g} XP` : "Défi du jour réussi"); } }
 
-    $("mealCount").textContent = list.length ? `${list.length} REPAS` : "";
+    $("mealCount").textContent = list.length ? `${list.length} repas` : "";
     $("meals").innerHTML = list.length ? list.map((m, i) => `
       <div class="meal"><span class="t">${esc(m.name)}${m.grams ? ` <span class="muted">${nb(m.grams)} g</span>` : m.qty && m.qty !== 1 ? ` <span class="muted">× ${esc(String(m.qty).replace(".", ","))}</span>` : ""}</span><span class="k">${nb(m.kcal)} kcal</span>
       <div class="sub"><span>${esc(m.time)}</span><span>P ${r0(m.prot)} g</span><span>G ${r0(m.gluc)} g</span><span>L ${r0(m.lip)} g</span>
@@ -325,10 +328,10 @@
     const g = gainXP(item.recipe ? 15 : 10);
     renderDay();
     const after = streak();
-    toast(after > before && after > 1 ? `🔥 ${after} jours d'affilée` : `${item.name} ajouté${g ? ` · +${g} XP` : ""}`);
+    toast(after > before && after > 1 ? `Série : ${after} jours d'affilée` : `${item.name} ajouté${g ? ` · +${g} XP` : ""}`);
     checkMilestone();
     pushSync();
-    if (days[TODAY].length === CHEST_MEALS) setTimeout(() => { if (LS.get("g-chest", "") !== TODAY) toast("🎁 Ton coffre du jour est prêt !"); }, 1600);
+    if (days[TODAY].length === CHEST_MEALS) setTimeout(() => { if (LS.get("g-chest", "") !== TODAY) toast("Ton coffre du jour est prêt"); }, 1600);
   }
 
   // Catégories et recherche
@@ -469,7 +472,7 @@
     $("glasses").innerHTML = Array.from({ length: Math.max(goal, n) }, (_, i) =>
       `<button type="button" class="glass ${i < n ? "on" : ""}" data-w="${i}" aria-pressed="${i < n}" aria-label="${i + 1} verre${i ? "s" : ""}"></button>`).join("");
     $("waterNum").textContent = `${liters(n * GLASS_ML)} / ${liters(goal * GLASS_ML)}`;
-    $("waterLine").textContent = n >= goal ? "Objectif atteint 💧" : `Encore ${goal - n} verre${goal - n > 1 ? "s" : ""} de 25 cl`;
+    $("waterLine").textContent = n >= goal ? "Objectif atteint" : `Encore ${goal - n} verre${goal - n > 1 ? "s" : ""} de 25 cl`;
     $("waterMinus").disabled = !n;
   }
   function setWater(n) {
@@ -481,7 +484,7 @@
       LS.set("g-water-xp", TODAY);
       const g = gainXP(10);
       track("objectif_eau");
-      renderDay(); toast(`Objectif d'eau atteint 💧${g ? ` · +${g} XP` : ""}`);
+      renderDay(); toast(`Objectif d'eau atteint${g ? ` · +${g} XP` : ""}`);
       return;
     }
     renderWater();
@@ -503,10 +506,10 @@
   const segHTML = (vals, cur, fmt) => vals.map(v => `<button type="button" data-v="${esc(v)}" aria-pressed="${v === cur}">${esc(fmt(v))}</button>`).join("");
   function renderTrain() {
     const s = trains[TODAY], open = !$("trainForm").hidden;
-    $("trainNum").textContent = `${trainsWeek()} SUR 7 JOURS`;
+    $("trainNum").textContent = `${trainsWeek()} sur 7 jours`;
     $("trainBtn").hidden = Boolean(s) || open;
     $("trainDone").hidden = !s;
-    if (s) { $("trainForm").hidden = true; $("trainTxt").textContent = `✓ Séance notée : ${s.t}, ${s.min} min`; }
+    if (s) { $("trainForm").hidden = true; $("trainTxt").textContent = `Séance notée : ${s.t}, ${s.min} min`; }
   }
   function mountTrainForm() {
     $("trainType").innerHTML = segHTML(SPORTS, pick.t, v => v);
@@ -523,7 +526,7 @@
     let g = 0;
     if (LS.get("g-train-xp", "") !== TODAY) { LS.set("g-train-xp", TODAY); g = gainXP(20); } // une seule fois par jour
     track("seance_notee", { sport: pick.t, minutes: pick.min });
-    renderDay(); toast(`Séance notée 💪${g ? ` · +${g} XP` : ""}`);
+    renderDay(); toast(`Séance notée${g ? ` · +${g} XP` : ""}`);
   });
   $("trainUndo").addEventListener("click", () => {
     const { [TODAY]: _, ...rest } = trains; trains = rest;
@@ -806,7 +809,7 @@
     clearTimeout(pushTimer);
     if (!sb || !sbUser) return;
     const { error } = await sb.from("user_data").upsert({ user_id: sbUser.id, data: snapshot(), updated_at: new Date().toISOString() });
-    syncLabel(error ? "ÉCHEC DE SAUVEGARDE" : "SAUVEGARDÉ");
+    syncLabel(error ? "Échec de sauvegarde" : "Sauvegardé");
   }
   async function syncAll() {
     syncLabel("SYNCHRO…");
@@ -819,7 +822,7 @@
       applyingRemote = false;
       reloadState(); renderAll();
       await pushNow();
-    } catch { applyingRemote = false; syncLabel("ÉCHEC DE SYNCHRO"); }
+    } catch { applyingRemote = false; syncLabel("Échec de synchro"); }
   }
   function renderAccount() {
     $("accOut").hidden = Boolean(sbUser); $("accIn").hidden = !sbUser;
@@ -865,7 +868,7 @@
       let before = 0; try { before = Number(localStorage.getItem("g-credits")) || 0; } catch { /* stockage indisponible */ }
       for (let i = 0; i < 8; i++) {
         await refreshSub();
-        if (credits > before) { toast(`Merci ! ${credits - before} utilisations ajoutées 🎉`); track("pack_achete"); show("jour"); return; }
+        if (credits > before) { toast(`Merci ! ${credits - before} utilisations ajoutées`); track("pack_achete"); show("jour"); return; }
         await new Promise(r => setTimeout(r, 2000));
       }
       toast("Paiement reçu. L'activation prend parfois une minute : appuie sur Synchroniser dans Profil.");
@@ -873,7 +876,7 @@
     }
     if (backFromPay !== "ok") { if (backFromPay === "annule") toast("Paiement annulé. Rien n'a été débité."); return; }
     for (let i = 0; i < 6; i++) {
-      if (await refreshSub()) { toast("Merci ! Bon'Assiette+ est activé 🎉"); track("abonnement_actif"); show("jour"); return; }
+      if (await refreshSub()) { toast("Merci ! Bon'Assiette+ est activé"); track("abonnement_actif"); show("jour"); return; }
       await new Promise(r => setTimeout(r, 2000));
     }
     toast("Paiement reçu. L'activation prend parfois une minute : appuie sur Synchroniser dans Profil.");
@@ -976,7 +979,7 @@
   }
   function renderFrigoTarget() {
     const c = frigoTarget();
-    $("frigoTarget").textContent = `Objectif de ce repas : environ ${nb(c.kcal)} kcal · ${c.prot} g de protéines · ${c.gluc} g de glucides · ${c.lip} g de lipides.`;
+    $("frigoTarget").textContent = `Objectif : environ ${nb(c.kcal)} kcal et ${c.prot} g de protéines`;
   }
   $("frigoFor").addEventListener("change", renderFrigoTarget);
   let frigoLast = null;
@@ -1022,16 +1025,16 @@
     $("chest").hidden = !on;
     if (!on) return;
     const n = meals().length, opened = LS.get("g-chest", "") === TODAY, ready = Boolean(sbUser) && n >= CHEST_MEALS && !opened;
-    $("chestTxt").textContent = !sbUser ? "Connecte-toi pour ouvrir un coffre chaque jour : il peut contenir une analyse photo."
-      : opened ? "Ouvert aujourd'hui. Un nouveau coffre t'attend demain !"
-      : ready ? "Ta journée est remplie : ouvre ton coffre !"
-      : `Note encore ${CHEST_MEALS - n} repas pour l'ouvrir`;
+    $("chestTxt").textContent = !sbUser ? "Connecte-toi pour l'ouvrir chaque jour"
+      : opened ? "Ouvert. À demain !"
+      : ready ? "Prêt, ouvre-le !"
+      : `Encore ${CHEST_MEALS - n} repas`;
     $("chestBar").style.width = (opened ? 100 : Math.min(n, CHEST_MEALS) / CHEST_MEALS * 100) + "%";
     $("chestOpen").hidden = !(ready || !sbUser);
     $("chestOpen").textContent = sbUser ? "Ouvrir" : "Me connecter";
     $("chest").classList.toggle("ready", ready);
     $("chest").classList.toggle("done", opened);
-    $("chestIco").textContent = opened ? "✓" : "🎁";
+    $("chestIco").innerHTML = IC(opened ? "check" : "gift");
   }
   $("chestOpen").addEventListener("click", async () => {
     if (!sbUser) { show("profil"); $("accEmail")?.focus(); return; }
@@ -1046,11 +1049,11 @@
     let title, text, icon;
     if (r.photo) {
       await refreshSub();
-      title = "Une analyse photo !"; icon = "📸";
+      title = "Une analyse photo !"; icon = "camera";
       text = "Prends ton prochain repas en photo : chaque aliment est reconnu et pesé, avec ses calories et ses macros.";
     } else {
       bonusXP(Math.max(0, Math.min(60, Math.round(Number(r.xp) || 0))));
-      title = `+${r.xp} XP`; icon = "✨"; text = "Bonus du coffre, en plus de tes points du jour. Demain, peut-être une analyse photo !";
+      title = `+${r.xp} XP`; icon = "sparkles"; text = "Bonus du coffre. Demain, peut-être une analyse photo !";
     }
     track("coffre_ouvert", { gain: r.photo ? "photo" : "xp" });
     renderDay();
@@ -1092,7 +1095,7 @@
     if (r.granted > 0) {
       await refreshSub();
       track("analyses_offertes", { n: r.granted });
-      celebrate(`${r.granted} analyses photo offertes`, "Prends ton repas en photo depuis l'accueil : chaque aliment est reconnu et pesé, avec ses calories et ses macros.", "📸");
+      celebrate(`${r.granted} analyses photo offertes`, "Prends ton repas en photo depuis l'accueil.", "camera");
     }
   }
 
@@ -1123,7 +1126,7 @@
   }
 
   // ---------- Ligue de la semaine ----------
-  const TIER_ICON = ["🥉", "🥈", "🥇", "🔷", "💎"];
+  const TIER_ICON = [1, 2, 3, 4, 5].map(n => IC("medal", "tier-" + n));
   async function apiGet(url) {
     const { data } = await sb.auth.getSession().catch(() => ({ data: null }));
     const token = data?.session?.access_token;
@@ -1156,7 +1159,7 @@
       return;
     }
     const n = b.members.length, me = b.members.find(m => m.me);
-    $("lgDays").textContent = b.daysLeft > 1 ? `ENCORE ${b.daysLeft} JOURS` : "DERNIER JOUR";
+    $("lgDays").textContent = b.daysLeft > 1 ? `Encore ${b.daysLeft} jours` : "Dernier jour";
     const next = b.tiers[b.tier], prev = b.tiers[b.tier - 2];
     const zoneUp = (m) => m.rank <= b.move && m.xp > 0 && b.tier < b.tiers.length;
     const zoneDown = (m) => n >= 10 && m.rank > n - b.move && b.tier > 1;
@@ -1263,8 +1266,8 @@
     const t = targets(P()), s = sum(meals());
     const kc = r0(t.kcal - s.kcal), pr = r0(t.prot - s.prot);
     $("needLine").textContent = kc > 0
-      ? `Il te reste environ ${nb(kc)} kcal et ${Math.max(0, pr)} g de protéines aujourd'hui. Les recettes qui donnent le plus de protéines par euro passent en premier.`
-      : "Ton objectif du jour est atteint. Voici des idées pour demain.";
+      ? `Il te reste ${nb(kc)} kcal et ${Math.max(0, pr)} g de protéines. Les plus riches en protéines par euro d'abord.`
+      : "Objectif atteint. Des idées pour demain.";
     const budget = Number($("budget").value), time = Number($("time").value);
     const list = RECIPES.filter(r => r.cost <= budget && r.min <= time && r.need.every(n => kitchen.has(n)))
       .sort((a, b) => (b.prot / b.cost) - (a.prot / a.cost));
@@ -1312,7 +1315,7 @@
     }
     $("week").innerHTML = cols.join("");
     $("week").querySelectorAll("[data-h]").forEach(el => { el.style.height = Number(el.dataset.h) + "%"; });
-    $("weekAvg").textContent = n ? `MOYENNE ${nb(total / n)} KCAL` : "";
+    $("weekAvg").textContent = n ? `Moyenne ${nb(total / n)} kcal` : "";
     let daysOk = 0, mealsN = 0, protOk = 0; // sur les 7 derniers jours
     for (let i = 0; i < 7; i++) {
       const d = new Date(today); d.setDate(d.getDate() - i);
@@ -1346,12 +1349,12 @@
     c.width = W; c.height = H;
     const ctx = c.getContext("2d");
     try {
-      await Promise.all(['800 150px "Bricolage Grotesque"', '700 36px "Bricolage Grotesque"', '500 30px "Figtree"', '600 44px "Figtree"', '500 30px "DM Mono"']
+      await Promise.all(['800 150px "Bricolage Grotesque"', '700 36px "Bricolage Grotesque"', '500 30px "Figtree"', '600 44px "Figtree"', '600 30px "Figtree"']
         .map(f => document.fonts.load(f)));
     } catch { /* polices système en secours */ }
-    const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, "#2f6b3c"); g.addColorStop(1, "#1c4526");
+    const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, "#e8590c"); g.addColorStop(1, "#9a3412");
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    roundRect(ctx, 60, 60, W - 120, H - 120, 48); ctx.fillStyle = "#f2f4ef"; ctx.fill();
+    roundRect(ctx, 60, 60, W - 120, H - 120, 48); ctx.fillStyle = "#faf6f0"; ctx.fill();
     const st = streak(), lv = levelOf(xp), t = targets(P());
     let daysOk = 0, mealsN = 0, protOk = 0;
     for (let i = 0; i < 7; i++) {
@@ -1361,24 +1364,24 @@
     }
     const got = BADGES.filter(b => badges[b.id]).length, tw = trainsWeek();
     ctx.textBaseline = "top";
-    ctx.fillStyle = "#2f6b3c"; ctx.font = '800 56px "Bricolage Grotesque"'; ctx.fillText("Bon'Assiette", 120, 130);
-    ctx.fillStyle = "#56635a"; ctx.font = '500 30px "DM Mono"';
-    ctx.fillText(new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }).toUpperCase(), 120, 204);
-    ctx.fillStyle = "#18201b"; ctx.font = '800 150px "Bricolage Grotesque"'; ctx.fillText(`🔥 ${st}`, 120, 280);
-    ctx.fillStyle = "#56635a"; ctx.font = '600 44px "Figtree"'; ctx.fillText(st === 1 ? "jour d'affilée" : "jours d'affilée", 120, 455);
-    roundRect(ctx, 120, 560, W - 240, 160, 28); ctx.fillStyle = "#e2eee3"; ctx.fill();
-    ctx.fillStyle = "#2f6b3c"; ctx.font = '500 30px "DM Mono"'; ctx.fillText(`GRADE ${lv.n} · ${nb(xp)} XP`, 160, 592);
-    ctx.fillStyle = "#18201b"; ctx.font = '800 60px "Bricolage Grotesque"'; ctx.fillText(lv.name, 160, 634);
+    ctx.fillStyle = "#c2410c"; ctx.font = '800 56px "Bricolage Grotesque"'; ctx.fillText("Bon'Assiette", 120, 130);
+    ctx.fillStyle = "#6b5f56"; ctx.font = '600 30px "Figtree"';
+    ctx.fillText(new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }), 120, 204);
+    ctx.fillStyle = "#1f1a17"; ctx.font = '800 150px "Bricolage Grotesque"'; ctx.fillText(String(st), 120, 280);
+    ctx.fillStyle = "#6b5f56"; ctx.font = '600 44px "Figtree"'; ctx.fillText(st === 1 ? "jour de série" : "jours de série", 120, 455);
+    roundRect(ctx, 120, 560, W - 240, 160, 28); ctx.fillStyle = "#fdeadd"; ctx.fill();
+    ctx.fillStyle = "#c2410c"; ctx.font = '600 30px "Figtree"'; ctx.fillText(`Grade ${lv.n} · ${nb(xp)} XP`, 160, 592);
+    ctx.fillStyle = "#1f1a17"; ctx.font = '800 60px "Bricolage Grotesque"'; ctx.fillText(lv.name, 160, 634);
     const stats = [[`${daysOk}/7`, "jours notés"], [String(mealsN), mealsN > 1 ? "repas cette semaine" : "repas cette semaine"],
       [String(protOk), "jours protéines OK"], [String(tw), tw > 1 ? "séances de sport" : "séance de sport"],
       [`${waterWeek()}/7`, "jours eau OK"], [`${got}/${BADGES.length}`, "badges"]];
     stats.forEach(([v, l], i) => {
       const x = 120 + (i % 2) * 430, y = 770 + Math.floor(i / 2) * 140;
-      ctx.fillStyle = "#18201b"; ctx.font = '800 64px "Bricolage Grotesque"'; ctx.fillText(v, x, y);
-      ctx.fillStyle = "#56635a"; ctx.font = '500 30px "Figtree"'; ctx.fillText(l, x, y + 78);
+      ctx.fillStyle = "#1f1a17"; ctx.font = '800 64px "Bricolage Grotesque"'; ctx.fillText(v, x, y);
+      ctx.fillStyle = "#6b5f56"; ctx.font = '500 30px "Figtree"'; ctx.fillText(l, x, y + 78);
     });
-    ctx.fillStyle = "#2f6b3c"; ctx.font = '700 36px "Bricolage Grotesque"'; ctx.fillText("bonassiette.fr", 120, 1190);
-    ctx.fillStyle = "#56635a"; ctx.font = '500 30px "Figtree"'; ctx.fillText("Compteur de calories gratuit et français", 120, 1238);
+    ctx.fillStyle = "#c2410c"; ctx.font = '700 36px "Bricolage Grotesque"'; ctx.fillText("bonassiette.fr", 120, 1190);
+    ctx.fillStyle = "#6b5f56"; ctx.font = '500 30px "Figtree"'; ctx.fillText("Compteur de calories gratuit et français", 120, 1238);
     return c;
   }
   const closeShare = () => { $("shareBg").hidden = true; $("shareSheet").hidden = true; shareFile = null; };
@@ -1599,7 +1602,7 @@
 
   // ---------- Démarrage ----------
   function renderAll() { renderDay(); }
-  $("today").textContent = today.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+  $("today").textContent = ((s) => s.charAt(0).toUpperCase() + s.slice(1))(today.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }));
   applyFreezes();
   renderAll();
   initMeasure();

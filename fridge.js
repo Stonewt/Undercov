@@ -1,5 +1,6 @@
 // Bon'Assiette+ : « Qu'est-ce que je mange avec ce que j'ai ? ». À partir des ingrédients du frigo et de ce qu'il
 // reste à manger aujourd'hui (calories et macros), l'IA propose un repas réalisable, avec quantités et étapes.
+import { ground, CIQUAL_EDITION } from "./ciqual.js";
 const API_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = process.env.FRIDGE_MODEL || "claude-haiku-5-5";
 const DAILY_CAP = Number(process.env.FRIDGE_DAILY_CAP) || 500; // plafond de coût pour tout le site
@@ -34,15 +35,16 @@ const TOOL = {
         items: {
           type: "object",
           additionalProperties: false,
-          required: ["nom", "grammes", "du_frigo"],
+          required: ["nom", "ciqual", "grammes", "du_frigo"],
           properties: {
             nom: { type: "string", description: "Ingrédient, ex. « riz cuit », « œufs »" },
+            ciqual: { type: "string", description: "Le même ingrédient décrit avec le vocabulaire de la table Ciqual, dans l'état de sa pesée, ex. « riz blanc cru », « oeuf cru », « thon au naturel appertisé égoutté »" },
             grammes: { type: "number", description: "Quantité en grammes (poids cru sauf mention contraire dans le nom)" },
             du_frigo: { type: "boolean", description: "true si l'ingrédient fait partie de ceux donnés, false pour un basique de placard (huile, sel, épices)" }
           }
         }
       },
-      etapes: { type: "array", items: { type: "string" }, description: "De 2 à 7 étapes courtes et concrètes" },
+      etapes: { type: "array", items: { type: "string" }, description: "De 2 à 7 étapes courtes et concrètes, sans répéter les quantités (elles peuvent être ajustées ensuite)" },
       kcal: { type: "number", description: "Calories totales du repas" },
       prot: { type: "number", description: "Protéines totales en grammes" },
       gluc: { type: "number", description: "Glucides totaux en grammes" },
@@ -54,7 +56,7 @@ const TOOL = {
 
 function clean(o) {
   const ingredients = (Array.isArray(o?.ingredients) ? o.ingredients : []).slice(0, 14).map(i => ({
-    nom: str(i.nom, 60), grammes: num(i.grammes, 0, 2000), du_frigo: Boolean(i.du_frigo)
+    nom: str(i.nom, 60), ciqual: str(i.ciqual, 80), grammes: num(i.grammes, 0, 2000), du_frigo: Boolean(i.du_frigo)
   })).filter(i => i.nom && i.grammes > 0);
   const etapes = (Array.isArray(o?.etapes) ? o.etapes : []).slice(0, 8).map(e => str(e, 240)).filter(Boolean);
   return {
@@ -64,6 +66,36 @@ function clean(o) {
     ingredients, etapes,
     kcal: num(o?.kcal, 0, 3000), prot: num(o?.prot, 0, 300), gluc: num(o?.gluc, 0, 500), lip: num(o?.lip, 0, 300),
     conseil: str(o?.conseil, 200)
+  };
+}
+
+// Valeurs de chaque ingrédient calculées avec la table Ciqual, puis quantités ajustées pour approcher l'objectif
+// de calories (les ingrédients du placard, comme l'huile, ne bougent pas). Les totaux sont la somme des ingrédients.
+async function fitToTarget(recette, cible, signal) {
+  const items = recette.ingredients.map(i => ({ query: i.ciqual || i.nom, hint: i.nom, grams: 100, fallback: null }));
+  const per100 = await ground(items, { signal });
+  const known = per100.map(v => v.source !== null);
+  // Sans valeur Ciqual pour un ingrédient, on répartit l'estimation de l'IA au prorata des grammes.
+  const aiTotal = recette.ingredients.reduce((a, i) => a + i.grammes, 0) || 1;
+  const vals = recette.ingredients.map((ing, i) => known[i] ? per100[i]
+    : { kcal: recette.kcal * 100 / aiTotal, prot: recette.prot * 100 / aiTotal, gluc: recette.gluc * 100 / aiTotal, lip: recette.lip * 100 / aiTotal, source: null });
+  const totals = (grams) => grams.reduce((t, g, i) => ({
+    kcal: t.kcal + vals[i].kcal * g / 100, prot: t.prot + vals[i].prot * g / 100, gluc: t.gluc + vals[i].gluc * g / 100, lip: t.lip + vals[i].lip * g / 100
+  }), { kcal: 0, prot: 0, gluc: 0, lip: 0 });
+  let grams = recette.ingredients.map(i => i.grammes);
+  const fixed = recette.ingredients.map(i => !i.du_frigo);
+  const t0 = totals(grams), fixedKcal = totals(grams.map((g, i) => (fixed[i] ? g : 0))).kcal;
+  const movable = t0.kcal - fixedKcal;
+  if (movable > 0 && cible.kcal > 0) {
+    const f = Math.min(1.6, Math.max(0.6, (cible.kcal - fixedKcal) / movable));
+    grams = grams.map((g, i) => (fixed[i] ? g : Math.max(5, Math.round(g * f / 5) * 5)));
+  }
+  const t = totals(grams);
+  return {
+    ...recette,
+    ingredients: recette.ingredients.map((ing, i) => ({ nom: ing.nom, grammes: grams[i], du_frigo: ing.du_frigo, source: vals[i].source })),
+    kcal: Math.round(t.kcal), prot: Math.round(t.prot), gluc: Math.round(t.gluc), lip: Math.round(t.lip),
+    edition: CIQUAL_EDITION
   };
 }
 
@@ -104,7 +136,7 @@ export async function fridgeHandler(req, res) {
     const out = (await r.json()).content?.find(x => x.type === "tool_use")?.input;
     const recette = clean(out);
     if (!recette.possible) return res.status(422).json({ error: "Pas de repas correct possible avec ça. Ajoute un ou deux ingrédients (œufs, riz, pâtes, conserve…)." });
-    res.set("Cache-Control", "no-store").json(recette);
+    res.set("Cache-Control", "no-store").json(await fitToTarget(recette, cible, ctrl.signal));
   } catch (e) {
     console.error("frigo:", e?.message);
     res.status(502).json({ error: "L'idée de repas n'a pas abouti. Réessaie dans un moment." });

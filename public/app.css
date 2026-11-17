@@ -373,3 +373,10 @@ textarea{font:400 16px var(--body);color:var(--ink);background:var(--sunk);borde
 .ph-foot .small{font-weight:600}
 .src ol{margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:6px;line-height:1.45}
 .src ol a{color:var(--accent);overflow-wrap:anywhere}
+
+/* Taille d'assiette (facultatif) et source des valeurs */
+.ph-more summary{cursor:pointer;font-size:14px;font-weight:600;color:var(--accent);padding:6px 0}
+.ph-more[open] summary{margin-bottom:8px}
+.ph-more .seg{margin-bottom:8px}
+.pitem .psrc{grid-column:1/-1;font-size:12px;color:var(--muted)}
+.frigo .vs.est{font-style:italic}

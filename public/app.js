@@ -662,8 +662,11 @@
         <label class="pg"><input type="number" inputmode="numeric" min="0" max="2000" step="5" value="${r0(a.g)}" aria-label="Quantité de ${esc(a.nom)} en grammes"><span>g</span></label>
         <button class="del" type="button" data-x="${i}" aria-label="Retirer ${esc(a.nom)}">Retirer</button>
         <span class="sub" data-sub="${i}">${macroLine(scaled(a))}</span>
+        <span class="psrc">${a.source ? `${esc(a.source.edition || "Ciqual")} : ${esc(a.source.nom)}` : "Valeurs estimées par l'IA (aliment absent de la table Ciqual)"}</span>
       </div>`).join("") : `<p class="small muted">Plus aucun aliment dans la liste.</p>`;
-    $("photoNote").textContent = [CONF[photo.conf] || CONF.moyenne, photo.rem].filter(Boolean).join(" ");
+    const nCiq = photo.items.filter(a => a.source).length;
+    const srcNote = nCiq ? `Calories et macros calculées avec la table ${photo.edition || "Ciqual"} de l'ANSES pour ${nCiq === photo.items.length ? "tous les aliments" : `${nCiq} aliment${nCiq > 1 ? "s" : ""} sur ${photo.items.length}`}. Les quantités restent estimées d'après la photo.` : "";
+    $("photoNote").textContent = [CONF[photo.conf] || CONF.moyenne, srcNote, photo.rem].filter(Boolean).join(" ");
     $("photoBody").hidden = false;
     updatePhotoTotal();
   }
@@ -692,7 +695,8 @@
     $("photoImg").src = dataUrl; $("photoImg").hidden = false;
     photoState("Analyse en cours… quelques secondes", "wait");
     try {
-      const res = await apiPost("/api/analyse", { image: dataUrl.slice(dataUrl.indexOf(",") + 1), mime: "image/jpeg" });
+      const plate = LS.get("g-plate", "");
+      const res = await apiPost("/api/analyse", { image: dataUrl.slice(dataUrl.indexOf(",") + 1), mime: "image/jpeg", ...(plate ? { assiette: plate } : {}) });
       if (res && !res.error) creditUsed();
       if (run !== photoRun) return;
       if (res.error) {
@@ -700,8 +704,8 @@
         throw new Error(res.error);
       }
       if (!res.est_un_repas || !Array.isArray(res.aliments)) throw new Error("On ne voit pas de repas sur cette photo. Cadre bien ton assiette et réessaie.");
-      photo = { nom: res.nom, conf: res.confiance, rem: res.remarque, items: res.aliments.map(a => ({ ...a, g0: a.grammes, g: a.grammes })) };
-      track("photo_analysee", { aliments: photo.items.length, confiance: photo.conf });
+      photo = { nom: res.nom, conf: res.confiance, rem: res.remarque, edition: res.edition || "", items: res.aliments.map(a => ({ ...a, g0: a.grammes, g: a.grammes })) };
+      track("photo_analysee", { aliments: photo.items.length, confiance: photo.conf, ciqual: photo.items.filter(a => a.source).length, assiette: plate || "non" });
       renderPhoto();
     } catch (e) {
       if (run !== photoRun) return;
@@ -994,11 +998,11 @@
       <div class="line"><span>${r0(r.temps_min)} min</span><span>${nb(r.kcal)} kcal <span class="vs">/ ${nb(cible.kcal)}</span></span></div>
       <div class="line"><span>P ${r0(r.prot)} g <span class="vs">/ ${cible.prot}</span></span><span>G ${r0(r.gluc)} g · L ${r0(r.lip)} g</span></div>
       <div class="rule"></div>
-      <ul>${r.ingredients.map(i => `<li>${esc(i.nom)} — ${nb(i.grammes)} g${i.du_frigo ? "" : ` <span class="vs">(placard)</span>`}</li>`).join("")}</ul>
+      <ul>${r.ingredients.map(i => `<li>${esc(i.nom)} — ${nb(i.grammes)} g${i.du_frigo ? "" : ` <span class="vs">(placard)</span>`}${i.source === null ? ` <span class="vs est">(valeurs estimées)</span>` : ""}</li>`).join("")}</ul>
       <div class="rule"></div>
       <ol>${r.etapes.map(e => `<li>${esc(e)}</li>`).join("")}</ol>
       ${r.conseil ? `<p class="small muted">${esc(r.conseil)}</p>` : ""}
-      <p class="small muted">Valeurs estimées par l'IA : vérifie les quantités si tu suis tes macros au gramme près.</p>`;
+      <p class="small muted">${r.edition ? `Calories et macros calculées ingrédient par ingrédient avec la table ${esc(r.edition)} de l'ANSES, quantités ajustées à ton objectif.` : "Valeurs estimées par l'IA : vérifie les quantités si tu suis tes macros au gramme près."}</p>`;
     $("frigoOut").hidden = false; $("frigoActs").hidden = false;
   }
   $("frigoGo").addEventListener("click", frigoAsk);
@@ -1068,6 +1072,17 @@
     plus.hidden = !PREMIUM;
   }
   $("photoPlus").addEventListener("click", () => openPrem("plus_vide"));
+  const renderPlate = () => {
+    const p = LS.get("g-plate", "");
+    $("plate").querySelectorAll("[data-p]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.p === p)));
+    if (p) $("plateBox").open = true;
+  };
+  $("plate").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-p]"); if (!b) return;
+    LS.set("g-plate", LS.get("g-plate", "") === b.dataset.p ? "" : b.dataset.p);
+    renderPlate();
+  });
+  renderPlate();
   // Analyses offertes à la création du compte (une seule fois par compte, décidé par le serveur).
   async function claimWelcome() {
     if (!sbUser || !CFG.engage?.welcome || LS.get("g-welcome", "") === sbUser.id) return;

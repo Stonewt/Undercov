@@ -11,8 +11,9 @@
   // Abonnement Bon'Assiette+ : l'état vient de la base (table subscriptions) après connexion.
   // Le serveur revérifie de son côté à chaque analyse photo ; ici, ça ne sert qu'à l'affichage.
   const PREMIUM = CFG.premium && typeof CFG.premium.price === "string" ? CFG.premium : null;
-  let subActive = false;
+  let subActive = false, credits = 0; // credits : utilisations restantes d'un pack (achat unique)
   const isSubscriber = () => subActive;
+  const hasAccess = () => subActive || credits > 0;
 
   const DATA = window.GAMELLE_DATA || { foods: [], recipes: [] };
   const FOODS = DATA.foods, RECIPES = DATA.recipes;
@@ -526,7 +527,7 @@
   let wantPlus = false, photo = null, photoRun = 0, photoFocus = null, photoReady = false;
   // Réservé aux abonnés Bon'Assiette+ : les autres voient ce que fait la fonction et peuvent s'abonner.
   $("photoBtn").addEventListener("click", () => {
-    if (isSubscriber()) {
+    if (hasAccess()) {
       if (photoReady) $("photoIn").click(); else toast("L'analyse photo est momentanément indisponible. Réessaie plus tard.");
       return;
     }
@@ -541,7 +542,7 @@
   // Contenu de la fenêtre selon la situation : abonnement pas encore ouvert, pas connecté, ou prêt à payer.
   function renderPremSheet() {
     const ready = Boolean(PREMIUM && sb);
-    $("premSub").hidden = !ready;
+    $("premSub").hidden = !ready; $("premPack").hidden = true;
     if (!ready) {
       $("premNote").textContent = "L'abonnement Bon'Assiette+ arrive bientôt. En attendant, tout le reste de l'appli reste gratuit.";
       $("premOk").textContent = "J'ai compris";
@@ -552,9 +553,29 @@
       ? `${PREMIUM.price}, sans engagement : tu résilies quand tu veux depuis Profil. Paiement sécurisé par Stripe. Le reste de l'appli reste gratuit.`
       : `${PREMIUM.price}, sans engagement. Connecte-toi d'abord (ou crée ton compte gratuit, sans mot de passe) pour retrouver ton abonnement sur tous tes appareils.`;
     $("premOk").textContent = "Plus tard";
+    const pack = PREMIUM.pack;
+    $("premPack").hidden = !pack;
+    if (pack) $("premPack").textContent = sbUser ? `Ou ${pack.credits} utilisations pour ${pack.price}, sans abonnement` : `Ou un pack de ${pack.credits} utilisations · ${pack.price}`;
   }
   const closePrem = () => { $("premBg").hidden = true; $("premSheet").hidden = true; photoFocus?.focus?.(); };
   $("premOk").addEventListener("click", closePrem);
+  // Pack d'utilisations : achat unique, pour qui ne veut pas s'abonner.
+  async function buyPack(btn) {
+    if (!sbUser) { wantPlus = true; closePrem(); show("profil"); $("accEmail")?.focus(); return; }
+    btn.disabled = true;
+    const r = await apiPost("/api/checkout", { pack: true });
+    btn.disabled = false;
+    if (r?.url) { track("pack_debut"); location.assign(r.url); } else toast(r?.error || "Le paiement n'a pas pu démarrer. Réessaie.");
+  }
+  $("premPack").addEventListener("click", () => buyPack($("premPack")));
+  $("accBuyPack").addEventListener("click", () => buyPack($("accBuyPack")));
+  // Une utilisation du pack vient d'être consommée (le serveur la décompte ; ici on met l'affichage à jour).
+  function creditUsed() {
+    if (subActive || credits <= 0) return;
+    credits--; renderPremium();
+    try { localStorage.setItem("g-credits", String(credits)); } catch { /* stockage indisponible */ }
+    toast(credits > 0 ? `Il te reste ${credits} utilisation${credits > 1 ? "s" : ""}` : "C'était ta dernière utilisation. Abonne-toi ou reprends un pack dans Profil.");
+  }
   $("premBg").addEventListener("click", closePrem);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("premSheet").hidden) closePrem(); });
   $("premSub").addEventListener("click", async () => {
@@ -663,6 +684,7 @@
     photoState("Analyse en cours… quelques secondes", "wait");
     try {
       const res = await apiPost("/api/analyse", { image: dataUrl.slice(dataUrl.indexOf(",") + 1), mime: "image/jpeg" });
+      if (res && !res.error) creditUsed();
       if (run !== photoRun) return;
       if (res.error) {
         if (res.status === 402) { subActive = false; renderPremium(); }
@@ -796,22 +818,46 @@
   function renderPremium() {
     $("accSub").hidden = !(sbUser && subActive);
     $("accGoPlus").hidden = !(sbUser && PREMIUM && !subActive);
+    const pack = PREMIUM?.pack;
+    $("accCredits").hidden = !(sbUser && !subActive && (credits > 0 || pack));
+    $("accCreditsTxt").textContent = credits > 0
+      ? `Il te reste ${credits} utilisation${credits > 1 ? "s" : ""} de Bon'Assiette+ (photo ou frigo), sans date limite.`
+      : "Pas envie de t'abonner ? Un pack d'utilisations se prend une fois, sans limite de temps.";
+    $("accBuyPack").hidden = !pack;
+    if (pack) $("accBuyPack").textContent = `${credits > 0 ? "Reprendre" : "Prendre"} ${pack.credits} utilisations · ${pack.price}`;
     const badge = $("photoBtn").querySelector(".plus"); if (badge) badge.hidden = subActive;
     document.querySelectorAll(".plus-tag").forEach(t => { t.hidden = subActive; });
     if (subActive) document.querySelectorAll("[id^='ad-']").forEach(b => { b.hidden = true; });
   }
   async function refreshSub() {
-    if (!sb || !sbUser || !PREMIUM) { subActive = false; renderPremium(); return false; }
+    if (!sb || !sbUser || !PREMIUM) { subActive = false; credits = 0; renderPremium(); return false; }
     const { data } = await sb.from("subscriptions").select("status,current_period_end").eq("user_id", sbUser.id).maybeSingle();
     const end = data?.current_period_end ? Date.parse(data.current_period_end) + 3 * 86400000 : Infinity;
     subActive = Boolean(data) && (data.status === "active" || data.status === "past_due") && end > Date.now();
+    if (PREMIUM.pack) {
+      const c = await sb.from("credits").select("balance").eq("user_id", sbUser.id).maybeSingle();
+      credits = Math.max(0, Math.round(Number(c.data?.balance)) || 0);
+      try { localStorage.setItem("g-credits", String(credits)); } catch { /* stockage indisponible */ }
+    } else credits = 0;
     renderPremium();
     return subActive;
   }
   // Retour de la page de paiement : l'abonnement peut mettre quelques secondes à être confirmé par Stripe.
   const backFromPay = new URLSearchParams(location.search).get("abonnement");
-  if (backFromPay) history.replaceState(null, "", "/");
+  const backFromPack = new URLSearchParams(location.search).get("achat");
+  if (backFromPay || backFromPack) history.replaceState(null, "", "/");
   async function afterPayment() {
+    if (backFromPack) {
+      if (backFromPack !== "ok") { if (backFromPack === "annule") toast("Achat annulé. Rien n'a été débité."); return; }
+      let before = 0; try { before = Number(localStorage.getItem("g-credits")) || 0; } catch { /* stockage indisponible */ }
+      for (let i = 0; i < 8; i++) {
+        await refreshSub();
+        if (credits > before) { toast(`Merci ! ${credits - before} utilisations ajoutées 🎉`); track("pack_achete"); show("jour"); return; }
+        await new Promise(r => setTimeout(r, 2000));
+      }
+      toast("Paiement reçu. L'activation prend parfois une minute : appuie sur Synchroniser dans Profil.");
+      return;
+    }
     if (backFromPay !== "ok") { if (backFromPay === "annule") toast("Paiement annulé. Rien n'a été débité."); return; }
     for (let i = 0; i < 6; i++) {
       if (await refreshSub()) { toast("Merci ! Bon'Assiette+ est activé 🎉"); track("abonnement_actif"); show("jour"); return; }
@@ -846,7 +892,7 @@
         if (sbUser && sbUser.id !== before) {
           if (event === "SIGNED_IN") { track("connexion_compte"); toast("Connecté · tes données sont sauvegardées"); }
           await syncAll();
-          if (backFromPay) await afterPayment(); else await refreshSub();
+          if (backFromPay || backFromPack) await afterPayment(); else await refreshSub();
         } else if (!sbUser && before) { subActive = false; renderPremium(); }
       }, 0);
     });
@@ -920,7 +966,7 @@
   $("frigoFor").addEventListener("change", renderFrigoTarget);
   let frigoLast = null;
   async function frigoAsk() {
-    if (!isSubscriber()) { openPrem("frigo"); return; }
+    if (!hasAccess()) { openPrem("frigo"); return; }
     const ingredients = $("frigoIn").value.trim();
     if (ingredients.length < 3) { $("frigoMsg").textContent = "Écris au moins un ingrédient."; $("frigoIn").focus(); return; }
     const cible = frigoTarget();
@@ -929,6 +975,7 @@
     const r = await apiPost("/api/frigo", { ingredients, cible, cuisine: [...kitchen], temps: Number($("time").value) || 30 });
     $("frigoGo").disabled = false; $("frigoAgain").disabled = false;
     if (!r || r.error) { $("frigoMsg").textContent = r?.error || "Ça n'a pas marché. Réessaie."; return; }
+    creditUsed();
     frigoLast = r; track("frigo_idee");
     $("frigoMsg").textContent = "";
     $("frigoOut").innerHTML = `

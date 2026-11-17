@@ -45,6 +45,11 @@ const STRIPE_PRICE = /^price_[A-Za-z0-9]{10,}$/.test(process.env.STRIPE_PRICE_ID
 // Facultatif : configuration du portail client créée par scripts/setup.mjs (sinon, celle par défaut du tableau de bord Stripe).
 const STRIPE_PORTAL = /^bpc_[A-Za-z0-9]{10,}$/.test(process.env.STRIPE_PORTAL_CONFIG_ID || "") ? process.env.STRIPE_PORTAL_CONFIG_ID : "";
 const PREMIUM_ON = Boolean(ACCOUNTS_ON && SB_SERVICE && STRIPE_KEY && STRIPE_WH && STRIPE_PRICE);
+// Facultatif : pack d'utilisations (achat unique). STRIPE_PACK_PRICE_ID est le tarif créé par scripts/setup.mjs ;
+// le nombre d'utilisations par pack est dans config.js.
+const STRIPE_PACK = /^price_[A-Za-z0-9]{10,}$/.test(process.env.STRIPE_PACK_PRICE_ID || "") ? process.env.STRIPE_PACK_PRICE_ID : "";
+const PACK_CREDITS = Math.max(1, Math.round(Number(CONFIG.packCredits) || 5));
+const PACK_ON = Boolean(PREMIUM_ON && STRIPE_PACK);
 // En mode test uniquement, la cause exacte d'un échec est affichée pour pouvoir la corriger (jamais en mode réel).
 const testDetail = (e) => (STRIPE_KEY.startsWith("sk_test_") ? ` [test : ${String(e?.message || e).slice(0, 220)}]` : "");
 const stripe = PREMIUM_ON ? new Stripe(STRIPE_KEY, { timeout: 15_000, maxNetworkRetries: 1 }) : null;
@@ -73,6 +78,13 @@ async function saveSubscription(row) {
     method: "POST", headers: { ...sbAdmin, prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(row)
   });
   if (!r.ok) throw new Error(`subscriptions: ${r.status}`);
+}
+// Pack d'utilisations : le solde (table credits) n'est modifié que par les fonctions SQL use_credit et add_credits,
+// appelées ici avec la clé secrète. Les utilisateurs peuvent seulement lire leur solde.
+async function rpc(fn, args) {
+  const r = await fetch(`${SB_URL}/rest/v1/rpc/${fn}`, { method: "POST", headers: sbAdmin, body: JSON.stringify(args) });
+  if (!r.ok) throw new Error(`${fn}: ${r.status}`);
+  return r.json();
 }
 // Abonné = statut actif (ou paiement en retard, avec 3 jours de tolérance avant la coupure).
 const isActive = (s) => Boolean(s) && (s.status === "active" || s.status === "past_due")
@@ -195,14 +207,27 @@ const requireUser = async (req, res, next) => {
     next();
   } catch (e) { console.error("auth:", e?.message); res.status(502).json({ error: "Vérification impossible. Réessaie." }); }
 };
-// Abonnement obligatoire : met l'abonnement dans req.subscription.
-const requireSubscriber = async (req, res, next) => {
-  if (!PREMIUM_ON) return res.status(503).json({ error: "L'abonnement Bon'Assiette+ n'est pas encore ouvert." });
+// Accès aux fonctions IA : abonnement actif (req.subscription), sinon une utilisation du pack est décomptée (req.credit).
+// Si l'appel échoue ensuite (panne, plafond du jour, rien d'exploitable), l'utilisation est rendue.
+const requireAccess = async (req, res, next) => {
+  if (!PREMIUM_ON) return res.status(503).json({ error: "Bon'Assiette+ n'est pas encore ouvert." });
   try {
     req.subscription = await subscriptionOf(req.user.id);
-    if (!isActive(req.subscription)) return res.status(402).json({ error: "Cette fonction est réservée aux abonnés Bon'Assiette+." });
-    next();
-  } catch (e) { console.error("abonnement:", e?.message); res.status(502).json({ error: "Vérification impossible. Réessaie." }); }
+    if (isActive(req.subscription)) return next();
+    req.subscription = null;
+    if (PACK_ON && (await rpc("use_credit", { uid: req.user.id })) === true) {
+      req.credit = true;
+      res.on("finish", () => {
+        if (res.statusCode >= 500 || res.statusCode === 429 || res.statusCode === 422) {
+          rpc("add_credits", { uid: req.user.id, n: 1 }).catch(e => console.error("utilisation rendue :", e?.message));
+        }
+      });
+      return next();
+    }
+    res.status(402).json({ error: PACK_ON
+      ? "Cette fonction fait partie de Bon'Assiette+ : abonne-toi, ou prends un pack d'utilisations."
+      : "Cette fonction est réservée aux abonnés Bon'Assiette+." });
+  } catch (e) { console.error("accès:", e?.message); res.status(502).json({ error: "Vérification impossible. Réessaie." }); }
 };
 
 // Analyse photo : abonnés connectés uniquement, 6 par jour et par compte, photo de 1,5 Mo max.
@@ -214,11 +239,11 @@ app.post(
     next();
   },
   requireUser,
-  requireSubscriber,
+  requireAccess,
   rateLimit({
     windowMs: 24 * 60 * 60 * 1000,
     limit: 6,
-    keyGenerator: (req) => req.user.id,
+    keyGenerator: (req) => req.user.id, skip: (req) => Boolean(req.credit),
     standardHeaders: "draft-8",
     legacyHeaders: false,
     handler: (req, res) => res.status(429).json({ error: "Tu as utilisé tes 6 analyses photo du jour. Reviens demain, ou ajoute ton repas à la main." })
@@ -233,9 +258,9 @@ app.post(
   sameOrigin,
   (req, res, next) => (req.is("application/json") ? next() : res.status(415).json({ error: "Format refusé." })),
   requireUser,
-  requireSubscriber,
+  requireAccess,
   rateLimit({
-    windowMs: 24 * 60 * 60 * 1000, limit: 8, keyGenerator: (req) => req.user.id, standardHeaders: "draft-8", legacyHeaders: false,
+    windowMs: 24 * 60 * 60 * 1000, limit: 8, keyGenerator: (req) => req.user.id, skip: (req) => Boolean(req.credit), standardHeaders: "draft-8", legacyHeaders: false,
     handler: (req, res) => res.status(429).json({ error: "Tu as utilisé tes 8 idées de repas du jour. Reviens demain !" })
   }),
   express.json({ limit: "4kb", strict: true }),
@@ -249,7 +274,7 @@ app.post(
   (req, res, next) => (req.is("application/json") ? next() : res.status(415).json({ error: "Format refusé." })),
   requireUser,
   rateLimit({
-    windowMs: 24 * 60 * 60 * 1000, limit: 10, keyGenerator: (req) => req.user.id, standardHeaders: "draft-8", legacyHeaders: false,
+    windowMs: 24 * 60 * 60 * 1000, limit: 10, keyGenerator: (req) => req.user.id, skip: (req) => Boolean(req.credit), standardHeaders: "draft-8", legacyHeaders: false,
     handler: (req, res) => res.status(429).json({ error: "Merci pour tes 10 propositions du jour ! Reviens demain pour en ajouter d'autres." })
   }),
   express.json({ limit: "4kb", strict: true }),
@@ -293,8 +318,10 @@ app.post(
 const siteUrl = (req) => (CANONICAL_HOST && IS_PROD ? `https://${CANONICAL_HOST}` : `${req.protocol}://${req.get("host")}`);
 const payLimit = rateLimit({ windowMs: 60 * 60 * 1000, limit: 10, standardHeaders: "draft-8", legacyHeaders: false,
   handler: (req, res) => res.status(429).json({ error: "Trop de tentatives. Réessaie dans une heure." }) });
-app.post("/api/checkout", sameOrigin, payLimit, requireUser, async (req, res) => {
+app.post("/api/checkout", sameOrigin, payLimit, requireUser, express.json({ limit: "1kb", strict: true }), async (req, res) => {
   if (!PREMIUM_ON) return res.status(503).json({ error: "L'abonnement Bon'Assiette+ n'est pas encore ouvert." });
+  const pack = Boolean(req.body?.pack); // achat unique d'un pack d'utilisations, au lieu de l'abonnement
+  if (pack && !PACK_ON) return res.status(503).json({ error: "Le pack d'utilisations n'est pas encore disponible." });
   try {
     const current = await subscriptionOf(req.user.id);
     if (isActive(current)) return res.status(409).json({ error: "Tu es déjà abonné." });
@@ -302,13 +329,23 @@ app.post("/api/checkout", sameOrigin, payLimit, requireUser, async (req, res) =>
     // Un client qui n'existe plus (ex. créé en mode test) est ignoré.
     let customer = current?.provider_ref || "";
     if (customer) { try { const c = await stripe.customers.retrieve(customer); if (c.deleted) customer = ""; } catch { customer = ""; } }
-    const session = await stripe.checkout.sessions.create({
-      mode: "subscription",
-      line_items: [{ price: STRIPE_PRICE, quantity: 1 }],
+    const common = {
       client_reference_id: req.user.id,
       ...(customer ? { customer } : { customer_email: req.user.email || undefined }),
+      locale: "fr"
+    };
+    const session = await stripe.checkout.sessions.create(pack ? {
+      ...common,
+      mode: "payment",
+      line_items: [{ price: STRIPE_PACK, quantity: 1 }],
+      metadata: { user_id: req.user.id, pack: String(PACK_CREDITS) },
+      success_url: `${siteUrl(req)}/?achat=ok`,
+      cancel_url: `${siteUrl(req)}/?achat=annule`
+    } : {
+      ...common,
+      mode: "subscription",
+      line_items: [{ price: STRIPE_PRICE, quantity: 1 }],
       subscription_data: { metadata: { user_id: req.user.id } },
-      locale: "fr",
       success_url: `${siteUrl(req)}/?abonnement=ok`,
       cancel_url: `${siteUrl(req)}/?abonnement=annule`
     });
@@ -342,7 +379,19 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json", limit: "
   catch (e) { console.error("webhook: signature refusée", e?.message); return res.status(400).end(); }
   try {
     const obj = event.data.object;
-    if (event.type === "checkout.session.completed" && obj.mode === "subscription" && obj.subscription) {
+    if (event.type === "checkout.session.completed" && obj.mode === "payment" && obj.payment_status === "paid") {
+      // Pack d'utilisations payé : crédité une seule fois par paiement, même si Stripe renvoie l'événement.
+      const userId = obj.client_reference_id || obj.metadata?.user_id;
+      const n = Math.max(1, Math.min(100, Math.round(Number(obj.metadata?.pack)) || PACK_CREDITS));
+      if (/^[0-9a-f-]{36}$/.test(userId || "")) {
+        const ins = await fetch(`${SB_URL}/rest/v1/credit_purchases`, {
+          method: "POST", headers: { ...sbAdmin, prefer: "resolution=ignore-duplicates,return=representation" },
+          body: JSON.stringify({ session_id: obj.id, user_id: userId, credits: n, cents: Number.isFinite(obj.amount_total) ? obj.amount_total : null })
+        });
+        if (!ins.ok) throw new Error(`credit_purchases: ${ins.status}`);
+        if ((await ins.json()).length) await rpc("add_credits", { uid: userId, n });
+      }
+    } else if (event.type === "checkout.session.completed" && obj.mode === "subscription" && obj.subscription) {
       const sub = await stripe.subscriptions.retrieve(obj.subscription);
       const userId = obj.client_reference_id || sub.metadata?.user_id;
       if (/^[0-9a-f-]{36}$/.test(userId || "")) {
@@ -403,7 +452,7 @@ app.post(
 const PUBLIC_CONFIG = JSON.stringify({
   adsClient: ADS_ON ? CONFIG.adsClient : "", adSlots: ADS_ON ? CONFIG.adSlots : {}, gaId: GA_ON ? CONFIG.gaId : "",
   supabase: ACCOUNTS_ON ? { url: SB_URL, key: SB_ANON } : null,
-  premium: PREMIUM_ON ? { price: String(CONFIG.premiumPrice || "") } : null
+  premium: PREMIUM_ON ? { price: String(CONFIG.premiumPrice || ""), pack: PACK_ON ? { price: String(CONFIG.packPrice || ""), credits: PACK_CREDITS } : null } : null
 }).replace(/</g, "\\u003c");
 const HEAD_EXTRA = /^ca-pub-\d{10,20}$/.test(CONFIG.adsClient)
   ? `<meta name="google-adsense-account" content="${CONFIG.adsClient}">` : "";

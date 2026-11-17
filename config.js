@@ -11,5 +11,9 @@ export default {
   gaId: "",
   // Abonnement Bon'Assiette+ : prix AFFICHÉ dans l'appli. Le prix réellement facturé est celui du tarif Stripe
   // (variable STRIPE_PRICE_ID dans Railway) : les deux doivent correspondre.
-  premiumPrice: "2,99 €/mois"
+  premiumPrice: "2,99 €/mois",
+  // Pack d'utilisations (achat unique, sans abonnement) : prix AFFICHÉ et nombre d'utilisations. Le prix facturé est celui
+  // du tarif Stripe STRIPE_PACK_PRICE_ID (créé par scripts/setup.mjs avec PACK_CENTS) : les deux doivent correspondre.
+  packPrice: "1,49 €",
+  packCredits: 5
 };

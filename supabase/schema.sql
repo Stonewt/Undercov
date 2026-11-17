@@ -79,3 +79,44 @@ create table if not exists public.feedback (
 );
 alter table public.feedback enable row level security;
 revoke all on public.feedback from anon, authenticated;
+
+-- 5. Packs d'utilisations (achat unique, sans abonnement). Le solde n'est modifié QUE par les deux fonctions ci-dessous,
+--    appelées par le serveur avec la clé secrète. Chaque utilisateur peut lire son propre solde.
+create table if not exists public.credits (
+  user_id    uuid primary key references auth.users (id) on delete cascade,
+  balance    integer not null default 0 check (balance >= 0),
+  updated_at timestamptz not null default now()
+);
+alter table public.credits enable row level security;
+drop policy if exists "lire son solde" on public.credits;
+create policy "lire son solde" on public.credits
+  for select to authenticated using ((select auth.uid()) = user_id);
+
+-- Chaque paiement de pack n'est crédité qu'une fois (identifiant de session Stripe unique).
+create table if not exists public.credit_purchases (
+  session_id text primary key,
+  user_id    uuid references auth.users (id) on delete set null,
+  credits    integer not null,
+  cents      integer,
+  created_at timestamptz not null default now()
+);
+alter table public.credit_purchases enable row level security;
+revoke all on public.credit_purchases from anon, authenticated;
+
+create or replace function public.add_credits(uid uuid, n integer) returns integer
+language sql security definer set search_path = public as $$
+  insert into public.credits (user_id, balance, updated_at) values (uid, greatest(n, 0), now())
+  on conflict (user_id) do update set balance = public.credits.balance + greatest(excluded.balance, 0), updated_at = now()
+  returning balance;
+$$;
+create or replace function public.use_credit(uid uuid) returns boolean
+language sql security definer set search_path = public as $$
+  with u as (
+    update public.credits set balance = balance - 1, updated_at = now() where user_id = uid and balance > 0 returning 1
+  )
+  select exists (select 1 from u);
+$$;
+revoke execute on function public.add_credits(uuid, integer) from public, anon, authenticated;
+revoke execute on function public.use_credit(uuid) from public, anon, authenticated;
+grant execute on function public.add_credits(uuid, integer) to service_role;
+grant execute on function public.use_credit(uuid) to service_role;

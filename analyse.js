@@ -11,7 +11,8 @@ export const photoEnabled = () => Boolean(process.env.ANTHROPIC_API_KEY);
 
 // Fonction réservée aux abonnés Bon'Assiette+ : le serveur vérifie l'abonnement avant d'arriver ici
 // (req.subscription, voir server.js). Aucune analyse n'est payée par le site pour un visiteur non abonné.
-const isSubscriber = (req) => Boolean(req.user?.id && req.subscription);
+// Abonné, ou utilisation d'un pack décomptée par le serveur (req.credit).
+const isSubscriber = (req) => Boolean(req.user?.id && (req.subscription || req.credit));
 
 let day = "", countToday = 0;
 function takeGlobalSlot() {

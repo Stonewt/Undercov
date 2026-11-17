@@ -14,7 +14,7 @@ const ENV_FILE = path.join(ROOT, ".env.setup");
 if (!fs.existsSync(ENV_FILE)) {
   console.error(`Fichier manquant : ${ENV_FILE}\nCrée-le avec les lignes suivantes (voir README) :\n` +
     "SUPABASE_ACCESS_TOKEN=sbp_...\nSTRIPE_SECRET_KEY=sk_live_... ou sk_test_...\nRAILWAY_TOKEN=...\nANTHROPIC_API_KEY=sk-ant-...\n" +
-    "SITE_URL=https://www.bonassiette.fr\n# facultatif : SUPABASE_PROJECT_REF=..., SUPABASE_REGION=eu-west-3, RAILWAY_SERVICE=nom-du-service, PREMIUM_CENTS=299");
+    "SITE_URL=https://www.bonassiette.fr\n# facultatif : SUPABASE_PROJECT_REF=..., SUPABASE_REGION=eu-west-3, RAILWAY_SERVICE=nom-du-service, PREMIUM_CENTS=299, PACK_CENTS=149, PACK_CREDITS=5");
   process.exit(1);
 }
 const E = {};
@@ -26,6 +26,7 @@ const need = (k) => { if (!E[k]) { console.error(`Il manque ${k} dans .env.setup
 const SITE = (E.SITE_URL || "https://www.bonassiette.fr").replace(/\/+$/, "");
 const HOST = new URL(SITE).host;
 const PREMIUM_CENTS = Number(E.PREMIUM_CENTS) || 299;
+const PACK_CENTS = Number(E.PACK_CENTS) || 149, PACK_CREDITS = Number(E.PACK_CREDITS) || 5;
 const EMAIL_ONLY = process.argv.includes("--email");
 // --stripe : Stripe + Railway seulement (passage en paiements réels), sans toucher à Supabase.
 const STRIPE_ONLY = process.argv.includes("--stripe");
@@ -119,6 +120,23 @@ async function stripeSetup() {
     } });
     log(`  Tarif mensuel créé : ${(PREMIUM_CENTS / 100).toFixed(2).replace(".", ",")} € TTC.`);
   } else log("  Tarif mensuel déjà présent.");
+  // Pack d'utilisations : produit séparé (son nom s'affiche sur la page de paiement) et tarif unique.
+  let packProduct = (await stripeApi("/products?limit=100&active=true")).data.find(p => p.metadata?.app === "bonassiette-pack");
+  if (!packProduct) {
+    packProduct = await stripeApi("/products", { method: "POST", form: {
+      name: `Pack Bon'Assiette+ · ${PACK_CREDITS} utilisations`, description: `${PACK_CREDITS} analyses photo ou idées de repas avec le frigo, sans abonnement ni date limite.`,
+      "metadata[app]": "bonassiette-pack", statement_descriptor: "BONASSIETTE PACK", url: SITE, tax_code: TAX_CODE
+    } });
+    log("  Produit « pack d'utilisations » créé.");
+  } else log("  Produit « pack d'utilisations » déjà présent.");
+  let pack = (await stripeApi(`/prices?product=${packProduct.id}&active=true&limit=100`)).data
+    .find(p => p.currency === "eur" && !p.recurring && p.unit_amount === PACK_CENTS);
+  if (!pack) {
+    pack = await stripeApi("/prices", { method: "POST", form: {
+      product: packProduct.id, currency: "eur", unit_amount: String(PACK_CENTS), tax_behavior: "inclusive", nickname: "Pack d'utilisations"
+    } });
+    log(`  Tarif du pack créé : ${(PACK_CENTS / 100).toFixed(2).replace(".", ",")} € TTC, achat unique.`);
+  } else log("  Tarif du pack déjà présent.");
   const whUrl = `${SITE}/api/stripe/webhook`;
   const events = ["checkout.session.completed", "customer.subscription.updated", "customer.subscription.deleted"];
   const existing = (await stripeApi("/webhook_endpoints?limit=100")).data.find(w => w.url === whUrl);
@@ -143,7 +161,7 @@ async function stripeSetup() {
     } });
     log("  Portail client configuré (résiliation, carte, factures).");
   } else log("  Portail client déjà configuré.");
-  Object.assign(vars, { STRIPE_SECRET_KEY: STRIPE_KEY, STRIPE_WEBHOOK_SECRET: wh.secret, STRIPE_PRICE_ID: price.id, STRIPE_PORTAL_CONFIG_ID: portal.id });
+  Object.assign(vars, { STRIPE_SECRET_KEY: STRIPE_KEY, STRIPE_WEBHOOK_SECRET: wh.secret, STRIPE_PRICE_ID: price.id, STRIPE_PACK_PRICE_ID: pack.id, STRIPE_PORTAL_CONFIG_ID: portal.id });
 }
 
 // ---------- 3. Railway ----------

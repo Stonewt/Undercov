@@ -645,7 +645,7 @@
     $("photoBg").hidden = false; $("photoSheet").hidden = false;
   }
   function closePhoto() {
-    photoRun++; photo = null;
+    photoRun++; photo = null; photoFind = -1;
     $("photoBg").hidden = true; $("photoSheet").hidden = true;
     photoFocus?.focus?.();
   }
@@ -656,25 +656,61 @@
     moyenne: "Estimation faite à partir de la photo : corrige les grammes si besoin.",
     bonne: "Estimation plutôt fiable, mais jette un œil aux grammes."
   };
+  // Aliment ouvert pour être remplacé (-1 : aucun). Remplacer un aliment recalcule tout avec la table Ciqual.
+  let photoFind = -1, findTimer = null, findRun = 0;
   function renderPhoto() {
     $("photoTitle").textContent = photo.nom;
-    photoState("Voici ce qu'on voit dans ton assiette. Modifie les grammes : tout se recalcule.");
+    photoState("Vérifie chaque aliment : touche son nom pour le changer, ou corrige les grammes.");
     $("photoItems").innerHTML = photo.items.length ? photo.items.map((a, i) => `
       <div class="pitem" data-i="${i}">
-        <span class="pn">${esc(a.nom)}</span>
+        <button class="pn pedit" type="button" data-edit="${i}" aria-label="Changer l'aliment : ${esc(a.nom)}">${esc(a.nom)}${IC("pencil")}</button>
         <label class="pg"><input type="number" inputmode="numeric" min="0" max="2000" step="5" value="${r0(a.g)}" aria-label="Quantité de ${esc(a.nom)} en grammes"><span>g</span></label>
         <button class="del" type="button" data-x="${i}" aria-label="Retirer ${esc(a.nom)}">Retirer</button>
         <span class="sub" data-sub="${i}">${macroLine(scaled(a))}</span>
-        <span class="psrc">${a.source ? `${esc(a.source.edition || "Ciqual")} : ${esc(a.source.nom)}` : "Valeurs estimées par l'IA (aliment absent de la table Ciqual)"}</span>
+        <span class="psrc">${a.pending ? "Choisis l'aliment dans la liste" : a.source ? `${esc(a.source.edition || "Ciqual")} : ${esc(a.source.nom)}` : "Valeurs estimées par l'IA (aliment absent de la table Ciqual)"}</span>
+        <div class="pfind" ${photoFind === i ? "" : "hidden"}>
+          <input type="search" class="pq" maxlength="80" placeholder="Quel aliment ? Ex. : magret de canard grillé" aria-label="Chercher le bon aliment" autocomplete="off">
+          <div class="pres" aria-live="polite"></div>
+        </div>
       </div>`).join("") : `<p class="small muted">Plus aucun aliment dans la liste.</p>`;
     const nCiq = photo.items.filter(a => a.source).length;
     const srcNote = nCiq ? `Calories et macros calculées avec la table ${photo.edition || "Ciqual"} de l'ANSES pour ${nCiq === photo.items.length ? "tous les aliments" : `${nCiq} aliment${nCiq > 1 ? "s" : ""} sur ${photo.items.length}`}. Les quantités restent estimées d'après la photo.` : "";
     $("photoNote").textContent = [CONF[photo.conf] || CONF.moyenne, srcNote, photo.rem].filter(Boolean).join(" ");
     $("photoBody").hidden = false;
     updatePhotoTotal();
+    if (photoFind >= 0) {
+      const q = $("photoItems").querySelector(`.pitem[data-i="${photoFind}"] .pq`);
+      const a = photo.items[photoFind];
+      if (q) { if (!a.pending) q.value = a.nom; q.focus(); q.select(); if (q.value.trim().length >= 2) findFoods(q); }
+    }
+  }
+  // Recherche dans la table Ciqual (côté serveur, sans IA, gratuite).
+  function findFoods(input) {
+    clearTimeout(findTimer);
+    const box = input.closest(".pfind").querySelector(".pres"), q = input.value.trim();
+    if (q.length < 2) { box.innerHTML = ""; return; }
+    findTimer = setTimeout(async () => {
+      const run = ++findRun;
+      const r = await fetch(`/api/aliments?q=${encodeURIComponent(q)}`).then(x => x.json()).catch(() => null);
+      if (run !== findRun || !box.isConnected) return;
+      const items = Array.isArray(r?.items) ? r.items : [];
+      box._items = items; box._edition = r?.edition || "";
+      box.innerHTML = items.length
+        ? items.map((f, j) => `<button type="button" data-pick="${j}"><span>${esc(f.nom)}</span><span class="k">${nb(f.kcal)} kcal/100 g</span></button>`).join("")
+        : `<p class="small muted">Rien trouvé. Essaie un mot plus simple (ex. « canard », « riz »).</p>`;
+    }, 250);
+  }
+  function pickFood(i, f, edition) {
+    const a = photo.items[i]; if (!a || !f) return;
+    const g = a.g > 0 ? a.g : 100, k = g / 100;
+    Object.assign(a, { nom: f.nom, g, g0: g, kcal: f.kcal * k, proteines: f.prot * k, glucides: f.gluc * k, lipides: f.lip * k,
+      source: { code: f.code, nom: f.nom, edition }, pending: false });
+    photo.edited = true; photoFind = -1;
+    track("photo_corrigee", { code: f.code });
+    renderPhoto();
   }
   function updatePhotoTotal() {
-    const t = sum(photo.items.map(scaled));
+    const t = sum(photo.items.filter(a => !a.pending).map(scaled));
     $("photoTot").innerHTML = `
       <div class="line tot"><span>Total</span><span>${nb(t.kcal)} kcal</span></div>
       <div class="line"><span><i class="dot d-p"></i>Protéines</span><span>${r0(t.prot)} g</span></div>
@@ -707,6 +743,7 @@
         throw new Error(res.error);
       }
       if (!res.est_un_repas || !Array.isArray(res.aliments)) throw new Error("On ne voit pas de repas sur cette photo. Cadre bien ton assiette et réessaie.");
+      photoFind = -1;
       photo = { nom: res.nom, conf: res.confiance, rem: res.remarque, edition: res.edition || "", items: res.aliments.map(a => ({ ...a, g0: a.grammes, g: a.grammes })) };
       track("photo_analysee", { aliments: photo.items.length, confiance: photo.conf, ciqual: photo.items.filter(a => a.source).length, assiette: plate || "non" });
       renderPhoto();
@@ -717,23 +754,44 @@
     }
   });
   $("photoItems").addEventListener("input", (e) => {
-    const row = e.target.closest(".pitem"); if (!row || !photo) return;
+    if (e.target.classList.contains("pq")) { findFoods(e.target); return; }
+    const row = e.target.closest(".pitem"); if (!row || !photo || !e.target.closest(".pg")) return;
     const a = photo.items[Number(row.dataset.i)];
     a.g = Math.min(2000, Math.max(0, Number(e.target.value) || 0));
     row.querySelector("[data-sub]").textContent = macroLine(scaled(a));
     updatePhotoTotal();
   });
   $("photoItems").addEventListener("click", (e) => {
-    const b = e.target.closest("[data-x]"); if (!b || !photo) return;
-    photo.items.splice(Number(b.dataset.x), 1); renderPhoto();
+    if (!photo) return;
+    const pick = e.target.closest("[data-pick]");
+    if (pick) {
+      const box = pick.closest(".pres"), row = pick.closest(".pitem");
+      pickFood(Number(row.dataset.i), box._items?.[Number(pick.dataset.pick)], box._edition);
+      return;
+    }
+    const edit = e.target.closest("[data-edit]");
+    if (edit) { const i = Number(edit.dataset.edit); photoFind = photoFind === i ? -1 : i; renderPhoto(); return; }
+    const b = e.target.closest("[data-x]"); if (!b) return;
+    photo.items.splice(Number(b.dataset.x), 1); photoFind = -1; renderPhoto();
+  });
+  $("photoItems").addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && e.target.classList.contains("pq")) { e.stopPropagation(); photoFind = -1; renderPhoto(); }
+    if (e.key === "Enter" && e.target.classList.contains("pq")) { e.preventDefault(); e.target.closest(".pfind").querySelector("[data-pick]")?.click(); }
+  });
+  // Ajouter un aliment oublié par l'analyse.
+  $("photoMore").addEventListener("click", () => {
+    if (!photo) return;
+    photo.items.push({ nom: "Aliment à choisir", g: 100, g0: 100, kcal: 0, proteines: 0, glucides: 0, lipides: 0, source: null, pending: true });
+    photoFind = photo.items.length - 1; renderPhoto();
   });
   $("photoCancel").addEventListener("click", closePhoto);
   $("photoBg").addEventListener("click", closePhoto);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("photoSheet").hidden) closePhoto(); });
   $("photoAdd").addEventListener("click", () => {
     if (!photo) return;
-    const t = sum(photo.items.map(scaled));
+    const t = sum(photo.items.filter(a => !a.pending).map(scaled));
     if (!(t.kcal > 0)) return;
+    if (photo.edited) track("photo_ajoutee_corrigee");
     addMeal({ name: photo.nom, ...t });
     closePhoto();
   });

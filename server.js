@@ -14,6 +14,7 @@ import { analyseHandler, photoEnabled } from "./analyse.js";
 import { suggestHandler } from "./suggest.js";
 import { fridgeHandler } from "./fridge.js";
 import { createEngage } from "./engage.js";
+import { lookup, CIQUAL_EDITION } from "./ciqual.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, "public");
@@ -272,6 +273,12 @@ app.get("/api/ligue", needEngage, requireUser, perUser(120, 60 * 60 * 1000, "Ré
 app.post("/api/ligue/rejoindre", sameOrigin, jsonOnly, needEngage, requireUser, perUser(10, 60 * 60 * 1000, "Réessaie dans une heure."), smallJson, (req, res) => ENGAGE.join(req, res));
 app.post("/api/ligue/quitter", sameOrigin, needEngage, requireUser, perUser(10, 60 * 60 * 1000, "Réessaie dans une heure."), (req, res) => ENGAGE.quit(req, res));
 app.post("/api/ligue/score", sameOrigin, jsonOnly, needEngage, requireUser, perUser(300, 24 * 60 * 60 * 1000, "Réessaie demain."), smallJson, (req, res) => ENGAGE.score(req, res));
+// Recherche d'aliments dans la table Ciqual (corriger un aliment de l'analyse photo). Données publiques, sans IA.
+app.get("/api/aliments", perIp(120, 60 * 1000), (req, res) => {
+  const q = String(req.query.q ?? "").replace(/[\u0000-\u001f<>]/g, " ").trim();
+  if (q.length < 2 || q.length > 80) return res.json({ edition: CIQUAL_EDITION, items: [] });
+  res.set("Cache-Control", "public, max-age=3600").json({ edition: CIQUAL_EDITION, items: lookup(q, 8) });
+});
 app.get("/api/push/cle", needEngage, (req, res) => ENGAGE.pushKey(req, res));
 app.post("/api/push/abonner", sameOrigin, jsonOnly, needEngage, perIp(20, 60 * 60 * 1000), smallJson, (req, res) => ENGAGE.pushSave(req, res));
 app.post("/api/push/etat", sameOrigin, jsonOnly, needEngage, perIp(200, 60 * 60 * 1000), smallJson, (req, res) => ENGAGE.pushState(req, res));

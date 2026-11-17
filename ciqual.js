@@ -22,11 +22,16 @@ const INDEX = TABLE.foods.map(f => { const t = tokens(f.n); return { f, t, set: 
 const DF = new Map();
 for (const e of INDEX) for (const w of e.set) DF.set(w, (DF.get(w) || 0) + 1);
 const idf = (w) => Math.log(1 + INDEX.length / (1 + (DF.get(w) || 0)));
+// Mots (après racine) qui disent qu'un aliment est cuit, et préparations à ne choisir que si elles sont demandées.
+const COOKED = new Set(["cuit", "cuite", "grill", "grille", "poel", "poele", "roti", "rotie", "four", "saut", "saute", "frit", "frite", "vapeur",
+  "bouilli", "bouillie", "brais", "braise", "mijot", "mijote", "plat", "dur", "poch", "poche", "brouill", "brouille", "rechauff", "rechauffe", "confit"].map(w => stem(w)));
+const SPECIAL = new Set(["fum", "fume", "appertis", "appertise", "preemball", "preemballe", "seche", "deshydrat", "deshydrate", "poudr", "poudre", "surgel", "surgele"].map(w => stem(w)));
 
 export function search(query, k = 8) {
   const q = [...new Set(tokens(query))];
   if (!q.length) return [];
   const total = q.reduce((a, w) => a + idf(w), 0);
+  const qCooked = q.some(w => COOKED.has(w)), qRaw = q.includes("cru");
   const scored = [];
   for (const e of INDEX) {
     let s = 0;
@@ -37,6 +42,12 @@ export function search(query, k = 8) {
     if (!s) continue;
     if (e.head === q[0]) s += 0.4 * idf(q[0]); // le premier mot (l'aliment principal) compte double
     s -= 0.03 * Math.max(0, e.t.length - q.length); // à score égal, l'entrée la plus simple
+    // État de l'aliment : un magret « cuit » ne doit pas tomber sur « cru » ni « fumé » (jusqu'à +50 % de calories).
+    const cooked = e.t.some(w => COOKED.has(w)), raw = e.set.has("cru"), special = e.t.some(w => SPECIAL.has(w));
+    if (qCooked && raw && !qRaw) s -= 0.5 * total;
+    if (qRaw && cooked && !qCooked) s -= 0.5 * total;
+    if (qCooked && cooked) s += 0.15 * total;
+    if (special && !q.some(w => SPECIAL.has(w))) s -= 0.25 * total;
     scored.push({ f: e.f, score: s / total });
   }
   return scored.sort((a, b) => b.score - a.score).slice(0, k);
@@ -75,6 +86,8 @@ async function pickWithAI(items, cands, signal) {
       messages: [{ role: "user", content:
         "Pour chaque aliment, choisis dans sa liste l'entrée de la table Ciqual qui correspond le mieux, " +
         "en respectant l'état (cuit ou cru, avec ou sans sauce, frit, etc.). Pour un aliment cuit, préfère une entrée cuite. " +
+        "Une viande, un poisson ou un œuf servi dans une assiette est cuit (ex. magret de canard → « Canard, magret, grillé/poêlé »). " +
+        "Ne choisis une entrée fumée, crue, appertisée, séchée ou préemballée que si l'aliment l'est clairement. " +
         "Si aucune entrée ne correspond vraiment, réponds -1.\n\n" + lines }]
     })
   });
@@ -107,4 +120,11 @@ export async function ground(items, { signal } = {}) {
     const fb = it.fallback || {};
     return { kcal: Math.round(Number(fb.kcal) || 0), prot: Number(fb.prot) || 0, gluc: Number(fb.gluc) || 0, lip: Number(fb.lip) || 0, source: null };
   });
+}
+
+// Recherche pour l'utilisateur (corriger un aliment de l'analyse photo) : valeurs pour 100 g, sans appel à l'IA.
+export function lookup(query, k = 8) {
+  if (!ciqualReady()) return [];
+  return search(String(query || "").slice(0, 80), k)
+    .map(x => ({ code: x.f.c, nom: x.f.n, kcal: x.f.kcal, prot: x.f.prot, gluc: x.f.gluc, lip: x.f.lip }));
 }

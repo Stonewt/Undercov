@@ -60,6 +60,8 @@ const TOOL = {
 
 const PROMPT = `Tu analyses la photo d'un repas pour une appli française de suivi nutritionnel.
 Identifie chaque aliment séparément (par exemple : pâtes cuites, sauce béchamel, fromage râpé), y compris la matière grasse visible (huile, beurre, sauce), et précise son état (cru, cuit, frit, en sauce).
+Une viande, un poisson ou un œuf servi dans une assiette est cuit : dans « ciqual », indique toujours le mode de cuisson (grillé/poêlé, rôti/cuit au four, cuit à l'eau, frit). Ne mets « fumé », « cru » ou « en conserve » que si c'est visible.
+Attention aux viandes qui se ressemblent : un magret de canard se reconnaît à ses tranches rosées bordées d'une épaisse couche de peau et de gras dorée ; ne le confonds pas avec du bœuf.
 Estime sa quantité en grammes, poids tel que servi, de façon réaliste. Pour juger les tailles, sers-toi des repères visibles : une assiette plate mesure souvent 26 cm de diamètre, une fourchette environ 19 cm, une main adulte environ 18 cm.
 Donne aussi tes propres calories, protéines, glucides et lipides pour cette quantité : ils ne servent que si l'aliment est absent de la table Ciqual, qui sera utilisée pour le calcul final.
 Les quantités sont pour ce qui est visible sur la photo.
